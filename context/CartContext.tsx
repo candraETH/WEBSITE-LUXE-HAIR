@@ -63,17 +63,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const updateQuantity = (slug: string, length: number, quantity: number, variant = "default") => {
-    if (quantity < 1) {
-      removeFromCart(slug, length, variant)
-      return
-    }
+    const safeQuantity = Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1
 
     setItems((prevItems) =>
       prevItems.map((item) =>
         item.slug === slug &&
         item.length === length &&
         (item.variant ?? "default") === variant
-          ? { ...item, quantity }
+          ? { ...item, quantity: safeQuantity }
           : item
       )
     )

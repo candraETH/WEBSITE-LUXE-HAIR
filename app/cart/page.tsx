@@ -130,25 +130,27 @@ export default function CartPage() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() =>
-                          updateQuantity(item.slug, item.length, item.quantity - 1, item.variant)
+                          updateQuantity(item.slug, item.length, Math.max(1, item.quantity - 1), item.variant)
                         }
-                        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:text-foreground transition-colors"
+                        disabled={item.quantity <= 1}
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
                       >
                         −
                       </button>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={item.quantity}
                         onChange={(e) =>
                           updateQuantity(
                             item.slug,
                             item.length,
-                            parseInt(e.target.value) || 1,
+                            parseInt(e.target.value.replace(/\D/g, ""), 10) || 1,
                             item.variant
                           )
                         }
                         className="w-12 text-center font-semibold text-foreground focus:outline-none border border-gray-300 rounded-md py-1"
-                        min="1"
                       />
                       <button
                         onClick={() =>

@@ -714,13 +714,19 @@ function SelectLengthComponent({
         <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
           <button
             onClick={() => handleQuantityChange(quantity - 1)}
-            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground sm:h-8 sm:w-8 sm:text-sm"
+            disabled={quantity <= 1}
+            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600 sm:h-8 sm:w-8 sm:text-sm"
           >
             -
           </button>
-          <span className="flex h-10 min-w-[52px] items-center justify-center border-l border-r border-gray-300 px-3 text-base font-semibold text-foreground sm:h-8 sm:min-w-[40px] sm:px-2 sm:text-sm">
-            {quantity}
-          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={quantity}
+            onChange={(e) => handleQuantityChange(parseInt(e.target.value.replace(/\D/g, ""), 10) || 1)}
+            className="h-10 w-[64px] border-l border-r border-gray-300 px-2 text-center text-base font-semibold text-foreground focus:outline-none sm:h-8 sm:w-[48px] sm:text-sm"
+          />
           <button
             onClick={() => handleQuantityChange(quantity + 1)}
             className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground sm:h-8 sm:w-8 sm:text-sm"
