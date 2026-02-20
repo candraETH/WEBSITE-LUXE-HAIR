@@ -473,7 +473,7 @@ function SelectLengthComponent({
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const { addToCart } = useCart()
+  const { addToCart, getTotalItems } = useCart()
   const supportsColorSelection = ["Hair Extensions", "Weft Hair", "Bulk Hair"].includes(category)
   const availableColors =
     colors && colors.length > 0 ? colors : supportsColorSelection ? DEFAULT_HAIR_COLORS : []
@@ -710,20 +710,20 @@ function SelectLengthComponent({
         </div>
       )}
       <div className="flex flex-col items-center gap-2">
-        <span className="text-xs font-medium text-foreground">Order Quantity</span>
-        <div className="flex items-center border border-gray-300 rounded-md bg-white">
+        <span className="text-sm font-medium text-foreground">Order Quantity</span>
+        <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
           <button
             onClick={() => handleQuantityChange(quantity - 1)}
-            className="px-2 py-1 text-sm text-gray-600 hover:text-foreground transition-colors"
+            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground sm:h-8 sm:w-8 sm:text-sm"
           >
             -
           </button>
-          <span className="w-10 border-l border-r border-gray-300 py-1 text-center text-sm font-semibold text-foreground">
+          <span className="flex h-10 min-w-[52px] items-center justify-center border-l border-r border-gray-300 px-3 text-base font-semibold text-foreground sm:h-8 sm:min-w-[40px] sm:px-2 sm:text-sm">
             {quantity}
           </span>
           <button
             onClick={() => handleQuantityChange(quantity + 1)}
-            className="px-2 py-1 text-sm text-gray-600 hover:text-foreground transition-colors"
+            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground sm:h-8 sm:w-8 sm:text-sm"
           >
             +
           </button>
@@ -791,16 +791,33 @@ function SelectLengthComponent({
           </div>
 
           <div className="space-y-3">
-            <button
-              onClick={(event) => void handleAddToCart(event.currentTarget)}
-              disabled={isAddingToCart}
-              className="group w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9B24A] to-[#BE8C23] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(190,140,35,0.85)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-85 disabled:hover:translate-y-0 disabled:hover:scale-100"
-            >
-              <svg data-fly-source="true" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <span>{isAddingToCart ? "Adding..." : "Add to Cart"}</span>
-            </button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button
+                onClick={(event) => void handleAddToCart(event.currentTarget)}
+                disabled={isAddingToCart}
+                className="group w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9B24A] to-[#BE8C23] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(190,140,35,0.85)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-85 disabled:hover:translate-y-0 disabled:hover:scale-100"
+              >
+                <svg data-fly-source="true" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span>{isAddingToCart ? "Adding..." : "Add to Cart"}</span>
+              </button>
+
+              <Link
+                href="/cart"
+                className="relative inline-flex h-full min-w-[54px] items-center justify-center rounded-xl border border-[#D4AF37]/35 bg-white px-3 text-[#5a4a2f] shadow-[0_10px_20px_-16px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D4AF37] hover:text-[#C4951F]"
+                aria-label="Open cart"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                {getTotalItems() > 0 && (
+                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#D4AF37] px-1 text-[10px] font-bold leading-none text-white">
+                    {getTotalItems()}
+                  </span>
+                )}
+              </Link>
+            </div>
 
             <button
               onClick={handleDirectWhatsApp}
