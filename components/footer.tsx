@@ -8,7 +8,7 @@ export function Footer() {
           {/* Brand */}
           <div className="lg:col-span-1">
             <Link href="#home" className="font-serif text-2xl font-bold tracking-wider text-foreground">
-              LUXE HAIR
+              CANDRAS HAIR
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Premium quality hair extensions, wigs, and more. Elevate your
@@ -108,7 +108,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} LUXE HAIR. All rights reserved.
+            &copy; {new Date().getFullYear()} CANDRAS HAIR. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
             Prices are for display purposes. Contact us via WhatsApp to order.

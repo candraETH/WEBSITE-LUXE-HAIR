@@ -15,7 +15,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'LUXE HAIR | Premium Hair Extensions, Wigs & More',
+  title: 'CANDRAS HAIR | Premium Hair Extensions, Wigs & More',
   description:
     'Discover premium quality hair extensions, wigs, weft hair, and bulk hair. Luxury hair solutions for every style.',
 }

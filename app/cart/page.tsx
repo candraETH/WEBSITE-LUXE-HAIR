@@ -38,9 +38,15 @@ export default function CartPage() {
     return (
       <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
-          <Link href="/">
-            <Button variant="ghost" className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors">
-              ← Back to Shop
+          <Link href={continueShoppingHref}>
+            <Button
+              variant="ghost"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Shop
             </Button>
           </Link>
         </div>
@@ -81,9 +87,15 @@ export default function CartPage() {
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
       {/* Back Button */}
       <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
-        <Link href="/">
-          <Button variant="ghost" className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors">
-            ← Back to Shop
+        <Link href={continueShoppingHref}>
+          <Button
+            variant="ghost"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back to Shop
           </Button>
         </Link>
       </div>

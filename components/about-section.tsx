@@ -30,7 +30,7 @@ export function AboutSection() {
             </h2>
             <div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
               <p>
-                At LUXE HAIR, we believe every woman deserves to feel confident and
+                At CANDRAS HAIR, we believe every woman deserves to feel confident and
                 beautiful. Our premium collection is carefully sourced from the finest
                 suppliers worldwide, ensuring each product meets our exacting standards
                 of quality.
@@ -42,7 +42,7 @@ export function AboutSection() {
               </p>
               <p>
                 We offer 100% human hair products that can be styled, colored, and
-                treated just like your own hair. Experience the LUXE difference.
+                treated just like your own hair. Experience the CANDRAS difference.
               </p>
             </div>
 

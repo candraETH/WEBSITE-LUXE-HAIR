@@ -2,7 +2,8 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { use, useEffect, useMemo, useState } from "react"
+import { use, useEffect, useMemo, useState, type MouseEvent } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -12,6 +13,7 @@ import { Navbar } from "@/components/navbar"
 import { useCart } from "@/context/CartContext"
 import ProductGallery from "@/components/product-gallery"
 import { testimonialsCount } from "@/lib/testimonials-data"
+import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 
 // Product data
 const allProducts = [
@@ -199,10 +201,47 @@ interface PageProps {
 }
 
 export default function OrderPage({ params }: PageProps) {
+  const router = useRouter()
   const { slug } = use(params)
   const product = allProducts.find((p) => p.slug === slug)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [backToShopHref, setBackToShopHref] = useState("/")
+
+  useEffect(() => {
+    const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
+    if (storedRoute && !storedRoute.startsWith("/order/") && !storedRoute.startsWith("/cart")) {
+      setBackToShopHref(storedRoute)
+      return
+    }
+
+    const referrer = document.referrer
+    if (!referrer) {
+      return
+    }
+
+    try {
+      const refUrl = new URL(referrer)
+      if (
+        refUrl.origin === window.location.origin &&
+        !refUrl.pathname.startsWith("/order/") &&
+        !refUrl.pathname.startsWith("/cart")
+      ) {
+        setBackToShopHref(`${refUrl.pathname}${refUrl.search}${refUrl.hash}`)
+      }
+    } catch {
+      // ignore invalid referrer
+    }
+  }, [])
+
+  const handleBackToShopClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    if (window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push(backToShopHref)
+  }
 
   if (!product) {
     return (
@@ -210,8 +249,13 @@ export default function OrderPage({ params }: PageProps) {
         <div className="flex flex-col items-center justify-center px-6 py-24">
           <h1 className="mb-4 text-3xl font-serif font-bold">Product Not Found</h1>
           <p className="mb-8 text-muted-foreground">The product you're looking for doesn't exist.</p>
-          <Link href="/">
-            <Button>Back to Shop</Button>
+          <Link href={backToShopHref} onClick={handleBackToShopClick}>
+            <Button className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Shop
+            </Button>
           </Link>
         </div>
       </div>
@@ -325,8 +369,14 @@ export default function OrderPage({ params }: PageProps) {
 
       {/* Back Button */}
       <div className="mx-auto max-w-7xl px-6 py-3 lg:py-4">
-        <Link href="/">
-          <Button variant="ghost" className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors">
+        <Link href={backToShopHref} onClick={handleBackToShopClick}>
+          <Button
+            variant="ghost"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             Back to Shop
           </Button>
         </Link>
@@ -699,43 +749,9 @@ function SelectLengthComponent({
                 </button>
               ))}
             </div>
-            {slug === "virgin-straight-bulk" && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Selected color adds an extra{" "}
-                <span className="font-semibold text-[#D4AF37]">$15</span> per item.
-                Color <span className="font-semibold text-foreground">#2</span> has no extra charge.
-              </p>
-            )}
           </div>
         </div>
       )}
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-sm font-medium text-foreground">Order Quantity</span>
-        <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
-          <button
-            onClick={() => handleQuantityChange(quantity - 1)}
-            disabled={quantity <= 1}
-            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600 sm:h-8 sm:w-8 sm:text-sm"
-          >
-            -
-          </button>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={quantity}
-            onChange={(e) => handleQuantityChange(parseInt(e.target.value.replace(/\D/g, ""), 10) || 1)}
-            className="h-10 w-[64px] border-l border-r border-gray-300 px-2 text-center text-base font-semibold text-foreground focus:outline-none sm:h-8 sm:w-[48px] sm:text-sm"
-          />
-          <button
-            onClick={() => handleQuantityChange(quantity + 1)}
-            className="flex h-10 w-10 items-center justify-center text-lg text-gray-600 transition-colors hover:text-foreground sm:h-8 sm:w-8 sm:text-sm"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
       {/* Premium Selection + Action Panel */}
       <div className="rounded-2xl border border-[#EADCC2] bg-gradient-to-r from-[#FFFDF8] to-[#FAF6EE] px-4 py-4 md:px-5 md:py-5 shadow-[0_25px_45px_-35px_rgba(0,0,0,0.45)]">
         <div className="grid gap-3 border-b border-[#EEE4D2] pb-4 md:grid-cols-[1.05fr_1fr]">
@@ -784,6 +800,35 @@ function SelectLengthComponent({
               <p className="text-[15px] md:text-[16px] text-muted-foreground">Total:</p>
               <p className="text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">${totalPrice}</p>
             </div>
+
+            <div className="mt-3 border-t border-[#EEE4D2] pt-3">
+              <div className="flex flex-col items-start gap-1.5">
+                <span className="text-[13px] font-medium text-foreground">Order Quantity</span>
+                <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
+                  <button
+                    onClick={() => handleQuantityChange(quantity - 1)}
+                    disabled={quantity <= 1}
+                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={quantity}
+                    onChange={(e) => handleQuantityChange(parseInt(e.target.value.replace(/\D/g, ""), 10) || 1)}
+                    className="h-9 w-[58px] border-l border-r border-gray-300 px-2 text-center text-sm font-semibold text-foreground focus:outline-none"
+                  />
+                  <button
+                    onClick={() => handleQuantityChange(quantity + 1)}
+                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -826,15 +871,18 @@ function SelectLengthComponent({
 
             </div>
 
-            <button
-              onClick={handleDirectWhatsApp}
-              className="w-full group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2CC96D] to-[#21B25A] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.45)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(33,178,90,0.75)] active:translate-y-0 active:scale-[0.99]"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
-              <span>Order via WhatsApp</span>
-            </button>
+            <div className="grid grid-cols-[auto_1fr] gap-2">
+              <span className="min-w-[54px]" aria-hidden="true" />
+              <button
+                onClick={handleDirectWhatsApp}
+                className="w-full group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2CC96D] to-[#21B25A] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.45)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(33,178,90,0.75)] active:translate-y-0 active:scale-[0.99]"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                <span>Order via WhatsApp</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
