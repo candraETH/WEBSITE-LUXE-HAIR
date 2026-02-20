@@ -320,7 +320,7 @@ export default function OrderPage({ params }: PageProps) {
   }, [selectedColorCode, availableColorImageMap, galleryImages])
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
       <Navbar />
 
       {/* Back Button */}
@@ -358,7 +358,7 @@ export default function OrderPage({ params }: PageProps) {
 
         <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
           {/* Product Image */}
-          <div className="order-2 lg:order-1">
+          <div className="order-2 min-w-0 lg:order-1">
             <ProductGallery
               images={galleryImages}
               alt={product.name}
@@ -369,8 +369,8 @@ export default function OrderPage({ params }: PageProps) {
           </div>
 
           {/* Order Form */}
-          <div className="order-1 lg:order-2">
-            <div className="rounded-2xl border border-border/30 bg-gradient-to-b from-card to-card/50 px-4 py-6 sm:px-5 md:px-6 md:py-7 shadow-lg backdrop-blur-sm">
+          <div className="order-1 min-w-0 lg:order-2">
+            <div className="overflow-hidden rounded-2xl border border-border/30 bg-gradient-to-b from-card to-card/50 px-4 py-6 sm:px-5 md:px-6 md:py-7 shadow-lg backdrop-blur-sm">
               <div>
                 <h3 className="mb-4 font-serif text-2xl font-semibold text-foreground">
                   Select Your Length
@@ -632,7 +632,7 @@ function SelectLengthComponent({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="w-full min-w-0 space-y-4 overflow-x-hidden">
       <RadioGroup value={selectedLength} onValueChange={setSelectedLength}>
         <div className="grid gap-1.5 grid-cols-3 sm:grid-cols-3">
           {lengths.map((length) => {
@@ -674,7 +674,7 @@ function SelectLengthComponent({
         <div className="space-y-3 border-t border-border/30 pt-4">
           <div>
             <h4 className="mb-3 font-semibold text-foreground">Select Color</h4>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            <div className="grid w-full grid-cols-4 gap-2 sm:grid-cols-6">
               {availableColors.map((color) => (
                 <button
                   key={color.code}
@@ -682,7 +682,7 @@ function SelectLengthComponent({
                     setSelectedColorCode(color.code)
                     onColorChange?.(color.code)
                   }}
-                  className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-all duration-200 ${
+                  className={`flex w-full min-w-0 flex-col items-center gap-1 rounded-lg p-2 transition-all duration-200 ${
                     selectedColorCode.toLowerCase() === color.code.toLowerCase()
                       ? "ring-2 ring-[#D4AF37] bg-[#FBF8F3]"
                       : "hover:bg-secondary"
@@ -693,7 +693,7 @@ function SelectLengthComponent({
                     style={{ backgroundColor: color.hex }}
                     title={color.label}
                   />
-                  <span className="max-w-[92px] text-[9px] font-semibold leading-tight text-center text-foreground md:text-[10px]">
+                  <span className="max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight text-center text-foreground md:text-[10px]">
                     {color.code.toLowerCase() === "#2" ? "#2 ( Natural Hair )" : color.code}
                   </span>
                 </button>

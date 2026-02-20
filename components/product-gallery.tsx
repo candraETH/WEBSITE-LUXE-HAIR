@@ -66,9 +66,9 @@ export default function ProductGallery({
   }
 
   return (
-    <div>
-      <div className="relative overflow-hidden rounded-2xl bg-secondary shadow-2xl">
-        <div ref={mainRef} className="overflow-hidden">
+    <div className="w-full min-w-0">
+      <div className="relative w-full overflow-hidden rounded-2xl bg-secondary shadow-2xl">
+        <div ref={mainRef} className="w-full overflow-hidden">
           <div className="flex">
             {images.map((src, i) => (
               <div key={i} className="min-w-full shrink-0 grow-0 basis-full">
@@ -119,8 +119,8 @@ export default function ProductGallery({
       </div>
 
       {hasMultipleImages && (
-        <div ref={thumbRef} className="mt-4 overflow-hidden">
-          <div className="flex gap-2">
+        <div ref={thumbRef} className="mt-4 w-full min-w-0 overflow-hidden">
+          <div className="flex min-w-0 gap-2">
             {images.map((src, i) => (
               <button
                 key={i}

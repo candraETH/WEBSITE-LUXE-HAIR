@@ -11,8 +11,8 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-background to-background/50">
-        <div className="mx-auto max-w-7xl px-6 py-8 lg:py-10">
+      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
+        <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
           <Link href="/">
             <Button variant="ghost" className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors">
               ← Back to Shop
@@ -20,7 +20,7 @@ export default function CartPage() {
           </Link>
         </div>
 
-        <div className="mx-auto max-w-7xl px-6 py-24">
+        <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-24">
           <div className="text-center">
             <h1 className="mb-4 font-serif text-4xl font-bold text-foreground">Your Cart is Empty</h1>
             <p className="mb-8 text-muted-foreground">Browse our collection and add some items to get started.</p>
@@ -53,9 +53,9 @@ export default function CartPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-background/50">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
       {/* Back Button */}
-      <div className="mx-auto max-w-7xl px-6 py-8 lg:py-10">
+      <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
         <Link href="/">
           <Button variant="ghost" className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors">
             ← Back to Shop
@@ -64,36 +64,36 @@ export default function CartPage() {
       </div>
 
       {/* Cart Section */}
-      <div className="mx-auto max-w-7xl px-6 py-8 lg:py-16">
+      <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-16">
         <h1 className="mb-2 font-serif text-5xl font-bold text-foreground">Shopping Cart</h1>
         <p className="mb-12 text-muted-foreground">{getTotalItems()} item(s) in your cart</p>
 
-        <div className="grid gap-16 lg:grid-cols-3">
+        <div className="grid gap-8 lg:gap-16 lg:grid-cols-3">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {items.map((item, index) => (
               <div
                 key={`${item.slug}-${item.length}-${item.variant ?? "default"}-${index}`}
-                className="flex gap-6 rounded-xl border border-border/30 bg-card/50 p-6 transition-all duration-300 hover:shadow-lg"
+                className="flex flex-col gap-4 rounded-xl border border-border/30 bg-card/50 p-4 sm:flex-row sm:gap-6 sm:p-6 transition-all duration-300 hover:shadow-lg"
               >
                 {/* Product Image */}
-                <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-secondary">
+                <div className="relative h-24 w-24 sm:h-32 sm:w-32 flex-shrink-0 overflow-hidden rounded-lg bg-secondary">
                   <Image
                     src={item.image}
                     alt={item.name}
                     fill
-                    sizes="128px"
+                    sizes="(max-width: 640px) 96px, 128px"
                     className="object-cover"
                   />
                 </div>
 
                 {/* Product Details */}
-                <div className="flex flex-1 flex-col justify-between">
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-accent/80">
                       {item.category}
                     </p>
-                    <h3 className="mb-2 font-serif text-xl font-semibold text-foreground">
+                    <h3 className="mb-2 font-serif text-lg sm:text-xl font-semibold text-foreground">
                       {item.name}
                     </h3>
                     <p className="text-sm text-muted-foreground">
@@ -101,7 +101,7 @@ export default function CartPage() {
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() =>
@@ -145,11 +145,11 @@ export default function CartPage() {
                 </div>
 
                 {/* Price */}
-                <div className="flex flex-col items-end justify-between">
-                  <p className="text-sm text-muted-foreground/80">
+                <div className="flex flex-row items-center justify-between sm:flex-col sm:items-end sm:justify-between">
+                  <p className="text-xs sm:text-sm text-muted-foreground/80">
                     ${item.price.toFixed(2)} each
                   </p>
-                  <p className="font-serif text-2xl font-bold text-[#D4AF37]">
+                  <p className="font-serif text-xl sm:text-2xl font-bold text-[#D4AF37]">
                     ${(item.price * item.quantity).toFixed(2)}
                   </p>
                 </div>
@@ -159,7 +159,7 @@ export default function CartPage() {
 
           {/* Order Summary */}
           <div className="h-fit">
-            <div className="rounded-xl bg-gradient-to-b from-[#FBF8F3] to-[#FAF6F0] border border-[#D4AF37]/30 p-8 space-y-6 sticky top-8">
+            <div className="rounded-xl bg-gradient-to-b from-[#FBF8F3] to-[#FAF6F0] border border-[#D4AF37]/30 p-5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 lg:sticky lg:top-8">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-[#D4AF37] mb-4">
                   Order Summary
@@ -172,11 +172,11 @@ export default function CartPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Shipping</p>
-                    <p className="font-semibold text-foreground">Calculated at checkout</p>
+                    <p className="text-right font-semibold text-foreground">Calculated at checkout</p>
                   </div>
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Tax</p>
-                    <p className="font-semibold text-foreground">Calculated at checkout</p>
+                    <p className="text-right font-semibold text-foreground">Calculated at checkout</p>
                   </div>
                 </div>
 
