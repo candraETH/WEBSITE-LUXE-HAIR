@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { Menu, X, ShoppingBag } from "lucide-react"
 import { useCart } from "@/context/CartContext"
@@ -24,8 +25,15 @@ export function Navbar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/#home" className="font-serif text-2xl font-bold tracking-wider text-foreground">
-          CANDRAS HAIR
+        <Link href="/#home" className="flex items-center gap-2.5 font-serif text-2xl font-bold tracking-wider text-foreground">
+          <Image
+            src="/images/logo-mark.png"
+            alt="Candra's Hair logo"
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain"
+          />
+          <span>CANDRA&apos;S HAIR</span>
         </Link>
 
         {/* Desktop Nav */}

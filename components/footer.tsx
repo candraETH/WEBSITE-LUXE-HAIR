@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 
 export function Footer() {
@@ -7,8 +8,15 @@ export function Footer() {
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <Link href="#home" className="font-serif text-2xl font-bold tracking-wider text-foreground">
-              CANDRAS HAIR
+            <Link href="/#home" className="flex items-center gap-2 font-serif text-2xl font-bold tracking-wider text-foreground">
+              <Image
+                src="/images/logo-mark.png"
+                alt="Candra's Hair logo"
+                width={34}
+                height={34}
+                className="h-[34px] w-[34px] object-contain"
+              />
+              <span>CANDRA&apos;S HAIR</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Premium quality hair extensions, wigs, and more. Elevate your
@@ -46,21 +54,40 @@ export function Footer() {
               Company
             </h4>
             <ul className="flex flex-col gap-3">
-              {[
-                { label: "About Us", href: "#about" },
-                { label: "Testimonials", href: "#home" },
-                { label: "Shipping Info", href: "#" },
-                { label: "Return Policy", href: "#" },
-              ].map((link) => (
-                <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link
+                  href="/#about"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#testimonials"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Testimonials
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="https://www.dhl.com/global-en/home/tracking.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Shipping Info
+                </a>
+              </li>
+              <li>
+                <Link
+                  href="/return-policy"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Return Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -85,10 +112,10 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="mailto:hello@luxehair.com"
+                  href="mailto:support@candrashair.com"
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  hello@luxehair.com
+                  support@candrashair.com
                 </a>
               </li>
               <li>
@@ -108,7 +135,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} CANDRAS HAIR. All rights reserved.
+            &copy; {new Date().getFullYear()} CANDRA&apos;S HAIR. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
             Prices are for display purposes. Contact us via WhatsApp to order.

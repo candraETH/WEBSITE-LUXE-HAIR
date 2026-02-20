@@ -68,11 +68,24 @@ export default function CartPage() {
 
   const totalPrice = getTotalPrice()
 
+  const getDisplayName = (item: (typeof items)[number]) => {
+    const variant = item.variant?.trim()
+    if (!variant || variant === "default") {
+      return item.name
+    }
+
+    if (item.name.toLowerCase().includes(variant.toLowerCase())) {
+      return item.name
+    }
+
+    return `${item.name} ${variant}`
+  }
+
   const handleCheckout = () => {
     const itemsList = items
       .map(
         (item) =>
-          `• ${item.name} (${item.length}") - ${item.quantity}x - $${(item.price * item.quantity).toFixed(2)}`
+          `\u2022 ${getDisplayName(item)} - ${item.quantity}x - $${(item.price * item.quantity).toFixed(2)} (${item.length}")`
       )
       .join("\n")
 
@@ -117,7 +130,7 @@ export default function CartPage() {
                 <div className="relative h-24 w-24 sm:h-32 sm:w-32 flex-shrink-0 overflow-hidden rounded-lg bg-secondary">
                   <Image
                     src={item.image}
-                    alt={item.name}
+                    alt={getDisplayName(item)}
                     fill
                     sizes="(max-width: 640px) 96px, 128px"
                     className="object-cover"
@@ -131,7 +144,7 @@ export default function CartPage() {
                       {item.category}
                     </p>
                     <h3 className="mb-2 font-serif text-lg sm:text-xl font-semibold text-foreground">
-                      {item.name}
+                      {getDisplayName(item)}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       Length: <span className="font-semibold text-foreground">{item.length}"</span>

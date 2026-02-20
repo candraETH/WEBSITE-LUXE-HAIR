@@ -15,9 +15,14 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'CANDRAS HAIR | Premium Hair Extensions, Wigs & More',
+  title: "CANDRA'S HAIR | Premium Hair Extensions, Wigs & More",
   description:
     'Discover premium quality hair extensions, wigs, weft hair, and bulk hair. Luxury hair solutions for every style.',
+  icons: {
+    icon: '/images/logo-favicon.png',
+    shortcut: '/images/logo-favicon.png',
+    apple: '/images/logo-favicon.png',
+  },
 }
 
 export const viewport: Viewport = {

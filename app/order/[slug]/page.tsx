@@ -533,6 +533,10 @@ function SelectLengthComponent({
   const normalizedColorCode = selectedColorCode.toLowerCase()
   const selectedColor = availableColors.find((color) => color.code.toLowerCase() === normalizedColorCode)
   const selectedColorLabel = selectedColor?.label ?? ""
+  const selectedColorDisplay =
+    selectedColorLabel && selectedColorCode
+      ? `${selectedColorLabel} ${selectedColorCode}`
+      : selectedColorLabel || selectedColorCode
   const colorSurcharge =
     slug === "virgin-straight-bulk" && normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
   const baseSinglePrice = parseFloat((basePrice + (currentLength - 16) * pricePerInch).toFixed(2))
@@ -659,7 +663,7 @@ function SelectLengthComponent({
     await animateFlyToCart(sourceButton)
     addToCart({
       slug,
-      name: selectedColorLabel ? `${name} - ${selectedColorLabel}` : name,
+      name: selectedColorDisplay ? `${name} - ${selectedColorDisplay}` : name,
       category,
       length: currentLength,
       quantity,
@@ -673,7 +677,7 @@ function SelectLengthComponent({
   }
 
   const handleDirectWhatsApp = () => {
-    const colorTag = selectedColorLabel ? ` - Color: ${selectedColorLabel} (${selectedColorCode})` : ""
+    const colorTag = selectedColorDisplay ? ` - Color: ${selectedColorDisplay}` : ""
     const surchargeTag = colorSurcharge > 0 ? ` Includes color surcharge (+$${colorSurcharge}/item).` : ""
     const message = encodeURIComponent(
       `Hi, I'm interested in ordering the ${name} (${category})${colorTag} - ${currentLength}" (${quantity} ${quantity === 1 ? 'item' : 'items'}). Total: $${totalPrice}.${surchargeTag} Can you help me complete this order?`
