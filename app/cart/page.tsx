@@ -2,15 +2,140 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 
+const FALLBACK_COUNTRIES = [
+  "Afghanistan",
+  "Albania",
+  "Algeria",
+  "Argentina",
+  "Australia",
+  "Austria",
+  "Bahrain",
+  "Bangladesh",
+  "Belgium",
+  "Brazil",
+  "Brunei",
+  "Bulgaria",
+  "Cambodia",
+  "Canada",
+  "Chile",
+  "China",
+  "Colombia",
+  "Croatia",
+  "Czech Republic",
+  "Denmark",
+  "Egypt",
+  "Finland",
+  "France",
+  "Germany",
+  "Greece",
+  "Hong Kong",
+  "Hungary",
+  "India",
+  "Indonesia",
+  "Ireland",
+  "Israel",
+  "Italy",
+  "Japan",
+  "Jordan",
+  "Kenya",
+  "Kuwait",
+  "Laos",
+  "Lebanon",
+  "Luxembourg",
+  "Malaysia",
+  "Mexico",
+  "Morocco",
+  "Myanmar",
+  "Netherlands",
+  "New Zealand",
+  "Nigeria",
+  "Norway",
+  "Pakistan",
+  "Philippines",
+  "Poland",
+  "Portugal",
+  "Qatar",
+  "Romania",
+  "Saudi Arabia",
+  "Singapore",
+  "South Africa",
+  "South Korea",
+  "Spain",
+  "Sri Lanka",
+  "Sweden",
+  "Switzerland",
+  "Taiwan",
+  "Thailand",
+  "Turkey",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Vietnam",
+]
+
+const CHECKOUT_FORM_STORAGE_KEY = "candrashair-checkout-form-v1"
+
+type CustomerDetails = {
+  fullName: string
+  phoneNumber: string
+  addressLine: string
+  country: string
+  city: string
+  province: string
+  postalCode: string
+  notes: string
+}
+
+const EMPTY_CUSTOMER_DETAILS: CustomerDetails = {
+  fullName: "",
+  phoneNumber: "",
+  addressLine: "",
+  country: "",
+  city: "",
+  province: "",
+  postalCode: "",
+  notes: "",
+}
+
+function getCountryOptions(): string[] {
+  const intlWithRegions = Intl as unknown as {
+    DisplayNames?: typeof Intl.DisplayNames
+    supportedValuesOf?: (type: string) => string[]
+  }
+
+  if (intlWithRegions.supportedValuesOf && intlWithRegions.DisplayNames) {
+    try {
+      const display = new Intl.DisplayNames(["en"], { type: "region" })
+      const countryNames = intlWithRegions
+        .supportedValuesOf("region")
+        .filter((code) => /^[A-Z]{2}$/.test(code))
+        .map((code) => display.of(code) ?? "")
+        .filter((name) => Boolean(name) && name !== "Unknown Region")
+
+      if (countryNames.length > 0) {
+        return Array.from(new Set(countryNames)).sort((a, b) => a.localeCompare(b))
+      }
+    } catch {
+      // fallback to static list when region key is not supported
+    }
+  }
+
+  return [...FALLBACK_COUNTRIES]
+}
+
 export default function CartPage() {
-  const { items, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
+  const { items, isCartReady, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
   const [continueShoppingHref, setContinueShoppingHref] = useState("/")
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false)
+  const [checkoutError, setCheckoutError] = useState("")
+  const countryOptions = useMemo(() => getCountryOptions(), [])
+  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>(EMPTY_CUSTOMER_DETAILS)
 
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
@@ -33,6 +158,56 @@ export default function CartPage() {
       // ignore invalid referrer
     }
   }, [])
+
+  useEffect(() => {
+    try {
+      const savedCheckoutState = window.localStorage.getItem(CHECKOUT_FORM_STORAGE_KEY)
+      if (!savedCheckoutState) {
+        return
+      }
+
+      const parsedData: unknown = JSON.parse(savedCheckoutState)
+      if (!parsedData || typeof parsedData !== "object") {
+        return
+      }
+
+      const saved = parsedData as Partial<CustomerDetails> & { showCheckoutForm?: boolean }
+
+      setCustomerDetails({
+        fullName: typeof saved.fullName === "string" ? saved.fullName : "",
+        phoneNumber: typeof saved.phoneNumber === "string" ? saved.phoneNumber : "",
+        addressLine: typeof saved.addressLine === "string" ? saved.addressLine : "",
+        country: typeof saved.country === "string" ? saved.country : "",
+        city: typeof saved.city === "string" ? saved.city : "",
+        province: typeof saved.province === "string" ? saved.province : "",
+        postalCode: typeof saved.postalCode === "string" ? saved.postalCode : "",
+        notes: typeof saved.notes === "string" ? saved.notes : "",
+      })
+
+      if (typeof saved.showCheckoutForm === "boolean") {
+        setShowCheckoutForm(saved.showCheckoutForm)
+      }
+    } catch {
+      // ignore invalid checkout draft data
+    }
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      CHECKOUT_FORM_STORAGE_KEY,
+      JSON.stringify({ ...customerDetails, showCheckoutForm })
+    )
+  }, [customerDetails, showCheckoutForm])
+
+  if (!isCartReady) {
+    return (
+      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
+        <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-24">
+          <p className="text-center text-muted-foreground">Loading cart...</p>
+        </div>
+      </main>
+    )
+  }
 
   if (items.length === 0) {
     return (
@@ -81,7 +256,28 @@ export default function CartPage() {
     return `${item.name} ${variant}`
   }
 
+  const handleCheckoutButtonClick = () => {
+    setShowCheckoutForm((prev) => !prev)
+    setCheckoutError("")
+  }
+
   const handleCheckout = () => {
+    const requiredFields: Array<{ key: keyof typeof customerDetails; label: string }> = [
+      { key: "fullName", label: "Full Name" },
+      { key: "phoneNumber", label: "Phone Number" },
+      { key: "addressLine", label: "Address" },
+      { key: "country", label: "Country" },
+      { key: "city", label: "City" },
+      { key: "province", label: "Province" },
+      { key: "postalCode", label: "Postal Code" },
+    ]
+
+    const missingField = requiredFields.find(({ key }) => !customerDetails[key].trim())
+    if (missingField) {
+      setCheckoutError(`Please fill ${missingField.label} before sending your order.`)
+      return
+    }
+
     const itemsList = items
       .map(
         (item) =>
@@ -89,8 +285,21 @@ export default function CartPage() {
       )
       .join("\n")
 
+    const addressLines = [
+      `Name: ${customerDetails.fullName.trim()}`,
+      `Phone: ${customerDetails.phoneNumber.trim()}`,
+      `Address: ${customerDetails.addressLine.trim()}`,
+      `Country: ${customerDetails.country.trim()}`,
+      `City: ${customerDetails.city.trim()}`,
+      `Province: ${customerDetails.province.trim()}`,
+      `Postal Code: ${customerDetails.postalCode.trim()}`,
+      customerDetails.notes.trim() ? `Notes: ${customerDetails.notes.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+
     const message = encodeURIComponent(
-      `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nTotal: $${totalPrice.toFixed(2)}\n\nPlease confirm availability and proceed with the order. Thank you!`
+      `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nTotal: $${totalPrice.toFixed(2)}\n\nShipping details:\n${addressLines}\n\nPlease confirm availability and proceed with the order. Thank you!`
     )
 
     window.open(`https://wa.me/6282234109177?text=${message}`, "_blank")
@@ -243,14 +452,143 @@ export default function CartPage() {
               {/* Action Buttons */}
               <div className="space-y-3">
                 <button
-                  onClick={handleCheckout}
+                  onClick={handleCheckoutButtonClick}
                   className="w-full group flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#25D366] to-[#20BA5A] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 transition-transform group-hover:scale-110">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                   </svg>
-                  <span>Checkout via WhatsApp</span>
+                  <span>{showCheckoutForm ? "Hide Address Form" : "Checkout via WhatsApp"}</span>
                 </button>
+
+                {showCheckoutForm && (
+                  <div className="space-y-4 rounded-xl border border-[#D4AF37]/30 bg-gradient-to-b from-white to-[#FFFCF6] p-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-[#C89E33]">
+                      Shipping Details
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">Full Name</span>
+                          <input
+                            type="text"
+                            value={customerDetails.fullName}
+                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, fullName: e.target.value }))}
+                            placeholder="Enter full name"
+                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                          />
+                        </label>
+
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">Phone Number</span>
+                          <input
+                            type="text"
+                            value={customerDetails.phoneNumber}
+                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+                            placeholder="Enter phone number"
+                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">Country</span>
+                        <select
+                          value={customerDetails.country}
+                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, country: e.target.value }))}
+                          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                        >
+                          <option value="">Select country</option>
+                          {countryOptions.map((country) => (
+                            <option key={country} value={country}>
+                              {country}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Complete Address
+                          <span className="ml-1 text-[11px] text-muted-foreground/70">
+                            ({customerDetails.addressLine.length}/220)
+                          </span>
+                        </span>
+                        <textarea
+                          value={customerDetails.addressLine}
+                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, addressLine: e.target.value }))}
+                          placeholder="Street, building, district, and additional details"
+                          rows={3}
+                          maxLength={220}
+                          className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                        />
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">City</span>
+                          <input
+                            type="text"
+                            value={customerDetails.city}
+                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, city: e.target.value }))}
+                            placeholder="City"
+                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">Postal Code</span>
+                          <input
+                            type="text"
+                            value={customerDetails.postalCode}
+                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, postalCode: e.target.value }))}
+                            placeholder="Postal code"
+                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">Province</span>
+                        <input
+                          type="text"
+                          value={customerDetails.province}
+                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, province: e.target.value }))}
+                          placeholder="Province"
+                          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                        />
+                      </label>
+
+                      <label className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Notes
+                          <span className="ml-1 text-[11px] text-muted-foreground/70">
+                            ({customerDetails.notes.length}/140)
+                          </span>
+                        </span>
+                        <textarea
+                          value={customerDetails.notes}
+                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, notes: e.target.value }))}
+                          placeholder="Optional instructions for CS"
+                          rows={2}
+                          maxLength={140}
+                          className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                        />
+                      </label>
+                    </div>
+
+                    {checkoutError && (
+                      <p className="text-xs font-medium text-red-500">{checkoutError}</p>
+                    )}
+
+                    <button
+                      onClick={handleCheckout}
+                      className="w-full rounded-lg bg-gradient-to-r from-[#25D366] to-[#20BA5A] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:brightness-105"
+                    >
+                      Send Order + Address to WhatsApp
+                    </button>
+                  </div>
+                )}
 
                 <Link href={continueShoppingHref} className="block">
                   <Button variant="outline" className="w-full">

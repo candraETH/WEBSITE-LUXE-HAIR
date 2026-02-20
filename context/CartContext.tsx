@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 
 export interface CartItem {
   slug: string
@@ -17,6 +17,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[]
+  isCartReady: boolean
   addToCart: (item: CartItem) => void
   removeFromCart: (slug: string, length: number, variant?: string) => void
   updateQuantity: (slug: string, length: number, quantity: number, variant?: string) => void
@@ -26,9 +27,65 @@ interface CartContextType {
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
+const CART_STORAGE_KEY = "candrashair-cart-v1"
+
+function isValidCartItem(item: unknown): item is CartItem {
+  if (!item || typeof item !== "object") {
+    return false
+  }
+
+  const candidate = item as Partial<CartItem>
+
+  return (
+    typeof candidate.slug === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.category === "string" &&
+    typeof candidate.length === "number" &&
+    typeof candidate.quantity === "number" &&
+    typeof candidate.price === "number" &&
+    typeof candidate.basePrice === "number" &&
+    typeof candidate.pricePerInch === "number" &&
+    typeof candidate.image === "string"
+  )
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
+  const [isCartReady, setIsCartReady] = useState(false)
+
+  useEffect(() => {
+    try {
+      const savedItems = window.localStorage.getItem(CART_STORAGE_KEY)
+      if (!savedItems) {
+        return
+      }
+
+      const parsedItems: unknown = JSON.parse(savedItems)
+      if (!Array.isArray(parsedItems)) {
+        return
+      }
+
+      const normalizedItems = parsedItems.filter(isValidCartItem).map((item) => ({
+        ...item,
+        variant: item.variant?.trim() ? item.variant : undefined,
+        quantity: Math.max(1, Math.floor(item.quantity)),
+      }))
+
+      setItems(normalizedItems)
+    } catch {
+      // ignore invalid persisted cart
+    } finally {
+      setIsCartReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isCartReady) {
+      return
+    }
+
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
+  }, [isCartReady, items])
 
   const addToCart = (newItem: CartItem) => {
     setItems((prevItems) => {
@@ -94,6 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        isCartReady,
         addToCart,
         removeFromCart,
         updateQuantity,
