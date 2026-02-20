@@ -168,7 +168,7 @@ const allProducts = [
     slug: "wavy-bulk-premium",
     name: "Wavy Bulk Premium",
     price: "$85 - $180",
-    image: "/images/bulk-3.jpg",
+    image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",
     longDescription: "Premium grade wavy bulk hair that's unprocessed and can be colored to any shade. Perfect for custom wig making and creative styling.",

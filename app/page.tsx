@@ -116,7 +116,7 @@ const bulkProducts = [
     name: "Wavy Bulk Premium",
     slug: "wavy-bulk-premium",
     price: "$85 - $180",
-    image: "/images/bulk-3.jpg",
+    image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",
     tag: "New",
