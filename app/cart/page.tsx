@@ -2,12 +2,37 @@
 
 import Link from "next/link"
 import Image from "next/image"
+import { useEffect, useState } from "react"
 import { useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
+import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
+  const [continueShoppingHref, setContinueShoppingHref] = useState("/")
+
+  useEffect(() => {
+    const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
+    if (storedRoute && !storedRoute.startsWith("/cart")) {
+      setContinueShoppingHref(storedRoute)
+      return
+    }
+
+    const referrer = document.referrer
+    if (!referrer) {
+      return
+    }
+
+    try {
+      const refUrl = new URL(referrer)
+      if (refUrl.origin === window.location.origin && !refUrl.pathname.startsWith("/cart")) {
+        setContinueShoppingHref(`${refUrl.pathname}${refUrl.search}${refUrl.hash}`)
+      }
+    } catch {
+      // ignore invalid referrer
+    }
+  }, [])
 
   if (items.length === 0) {
     return (
@@ -24,7 +49,7 @@ export default function CartPage() {
           <div className="text-center">
             <h1 className="mb-4 font-serif text-4xl font-bold text-foreground">Your Cart is Empty</h1>
             <p className="mb-8 text-muted-foreground">Browse our collection and add some items to get started.</p>
-            <Link href="/">
+            <Link href={continueShoppingHref}>
               <Button className="bg-[#D4AF37] hover:bg-[#C4951F] text-white">Continue Shopping</Button>
             </Link>
           </div>
@@ -200,7 +225,7 @@ export default function CartPage() {
                   <span>Checkout via WhatsApp</span>
                 </button>
 
-                <Link href="/" className="block">
+                <Link href={continueShoppingHref} className="block">
                   <Button variant="outline" className="w-full">
                     Continue Shopping
                   </Button>
