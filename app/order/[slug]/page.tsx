@@ -156,7 +156,15 @@ const allProducts = [
     slug: "natural-braiding-hair",
     name: "Natural Braiding Hair",
     price: "$60 - $140",
-    image: "/images/bulk-2.jpg",
+    image: "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%201.png",
+    gallery: [
+      "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%204.png",
+      "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%203.png",
+    ],
+    colorImageFolder: "/images/Natural%20Braiding%20Hair",
+    colorImageMap: {
+      "#ash": "/images/Natural%20Braiding%20Hair/ash.png",
+    },
     category: "Bulk Hair",
     description: "Soft, tangle-free bulk hair ideal for box braids and twists.",
     longDescription: "Soft, premium quality bulk braiding hair that's tangle-free and perfect for creating beautiful box braids, twists, and other protective styles.",
@@ -169,6 +177,7 @@ const allProducts = [
     name: "Wavy Bulk Premium",
     price: "$85 - $180",
     image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
+    colorImageFolder: "/images/Wavy%20Bulk%20Premium",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",
     longDescription: "Premium grade wavy bulk hair that's unprocessed and can be colored to any shade. Perfect for custom wig making and creative styling.",
@@ -263,6 +272,7 @@ export default function OrderPage({ params }: PageProps) {
   }
 
   const isVirginStraightBulk = product.slug === "virgin-straight-bulk"
+  const colorImageFolder = (product as any).colorImageFolder as string | undefined
   const colorImageMap = (product as any).colorImageMap as Record<string, string> | undefined
   const resolvedColorImageMap = useMemo(() => {
     const map: Record<string, string> = {}
@@ -271,24 +281,34 @@ export default function OrderPage({ params }: PageProps) {
       map[code.toLowerCase()] = src
     }
 
-    if (isVirginStraightBulk) {
-      const colorList = (((product as any).colors ?? []) as Array<{ code: string }>)
+    if (isVirginStraightBulk || colorImageFolder) {
+      const fallbackColorList = DEFAULT_HAIR_COLORS
+      const colorList = (((product as any).colors ?? fallbackColorList) as Array<{ code: string }>)
       for (const color of colorList) {
         const normalizedCode = (color.code ?? "").toLowerCase()
         if (!normalizedCode || map[normalizedCode]) {
           continue
         }
 
-        const fileKey = normalizedCode.replace(/[^a-z0-9]/gi, "")
+        let fileKey = normalizedCode.replace(/[^a-z0-9]/gi, "")
+        if (colorImageFolder && normalizedCode === "#ash") {
+          fileKey = "%23ash"
+        }
         if (!fileKey) {
           continue
         }
+
+        if (colorImageFolder) {
+          map[normalizedCode] = `${colorImageFolder}/${fileKey}.png`
+          continue
+        }
+
         map[normalizedCode] = `/images/${fileKey}.png`
       }
     }
 
     return map
-  }, [colorImageMap, isVirginStraightBulk, product])
+  }, [colorImageFolder, colorImageMap, isVirginStraightBulk, product])
   const [availableColorImageMap, setAvailableColorImageMap] = useState<Record<string, string>>({})
 
   useEffect(() => {

@@ -107,7 +107,7 @@ const bulkProducts = [
     name: "Natural Braiding Hair",
     slug: "natural-braiding-hair",
     price: "$60 - $140",
-    image: "/images/bulk-2.jpg",
+    image: "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%201.png",
     category: "Bulk Hair",
     description: "Soft, tangle-free bulk hair ideal for box braids and twists.",
     tag: "Popular",
@@ -131,9 +131,34 @@ export default function Page() {
       <CategoryBanner />
 
       <ProductSection
+        id="bulk"
+        title="Bulk Hair"
+        subtitle="Our Collection"
+        description="High-quality bulk hair perfect for braiding, custom wig construction, and creative styling. Available in all textures."
+        products={bulkProducts}
+      />
+
+      <div className="mx-auto max-w-7xl px-6">
+        <hr className="border-border" />
+      </div>
+
+      <ProductSection
+        id="weft"
+        title="Weft Hair"
+        subtitle="Professional Grade"
+        description="Machine-made and hand-tied weft options for professional installations. Designed for stylists who demand the best."
+        products={weftProducts}
+        reverse
+      />
+
+      <div className="mx-auto max-w-7xl px-6">
+        <hr className="border-border" />
+      </div>
+
+      <ProductSection
         id="extensions"
         title="Hair Extensions"
-        subtitle="Our Collection"
+        subtitle="Premium Selection"
         description="Premium clip-in, tape-in, and bundle extensions crafted from 100% human hair. Achieve your dream length and volume effortlessly."
         products={extensionsProducts}
       />
@@ -148,31 +173,6 @@ export default function Page() {
         subtitle="Handcrafted"
         description="From lace front to full lace, our wigs offer the most natural look and feel. Custom options available upon request."
         products={wigsProducts}
-        reverse
-      />
-
-      <div className="mx-auto max-w-7xl px-6">
-        <hr className="border-border" />
-      </div>
-
-      <ProductSection
-        id="weft"
-        title="Weft Hair"
-        subtitle="Professional Grade"
-        description="Machine-made and hand-tied weft options for professional installations. Designed for stylists who demand the best."
-        products={weftProducts}
-      />
-
-      <div className="mx-auto max-w-7xl px-6">
-        <hr className="border-border" />
-      </div>
-
-      <ProductSection
-        id="bulk"
-        title="Bulk Hair"
-        subtitle="Raw & Unprocessed"
-        description="High-quality bulk hair perfect for braiding, custom wig construction, and creative styling. Available in all textures."
-        products={bulkProducts}
         reverse
       />
 

@@ -242,6 +242,11 @@ export default function CartPage() {
   }
 
   const totalPrice = getTotalPrice()
+  const FREE_SHIPPING_THRESHOLD = 750
+  const TAX_RATE = 0.035
+  const isFreeShipping = totalPrice >= FREE_SHIPPING_THRESHOLD
+  const taxAmount = parseFloat((totalPrice * TAX_RATE).toFixed(2))
+  const finalTotal = parseFloat((totalPrice + taxAmount).toFixed(2))
 
   const getDisplayName = (item: (typeof items)[number]) => {
     const variant = item.variant?.trim()
@@ -298,8 +303,12 @@ export default function CartPage() {
       .filter(Boolean)
       .join("\n")
 
+    const shippingLine = isFreeShipping
+      ? `Shipping: Free (orders over $${FREE_SHIPPING_THRESHOLD})`
+      : "Shipping: Calculated at checkout"
+
     const message = encodeURIComponent(
-      `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nTotal: $${totalPrice.toFixed(2)}\n\nShipping details:\n${addressLines}\n\nPlease confirm availability and proceed with the order. Thank you!`
+      `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nSubtotal: $${totalPrice.toFixed(2)}\nTax (3.5%): $${taxAmount.toFixed(2)}\n${shippingLine}\nTotal: $${finalTotal.toFixed(2)}\n\nShipping details:\n${addressLines}\n\nPlease confirm availability and proceed with the order. Thank you!`
     )
 
     window.open(`https://wa.me/6282234109177?text=${message}`, "_blank")
@@ -433,18 +442,20 @@ export default function CartPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Shipping</p>
-                    <p className="text-right font-semibold text-foreground">Calculated at checkout</p>
+                    <p className="text-right font-semibold text-foreground">
+                      {isFreeShipping ? "Free" : "Calculated at checkout"}
+                    </p>
                   </div>
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Tax</p>
-                    <p className="text-right font-semibold text-foreground">Calculated at checkout</p>
+                    <p className="text-right font-semibold text-foreground">${taxAmount.toFixed(2)} (3.5%)</p>
                   </div>
                 </div>
 
                 <div className="flex justify-between pt-4">
                   <p className="font-semibold text-foreground">Total:</p>
                   <p className="font-serif text-2xl font-bold text-[#D4AF37]">
-                    ${totalPrice.toFixed(2)}
+                    ${finalTotal.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -606,8 +617,16 @@ export default function CartPage() {
                 )}
               </div>
 
-              {/* Info */}
               <div className="border-t border-[#D4AF37]/20 pt-4 text-xs text-gray-600 space-y-2">
+                <p>&#10003; 7-day return policy</p>
+                <p>&#10003; 24/7 customer service</p>
+                <p>&#10003; Fast Worldwide Delivery</p>
+                <p>&#10003; Premium Quality Guaranteed</p>
+                <p>&#10003; Free shipping on orders over $750</p>
+              </div>
+
+              {/* Info */}
+              <div className="hidden border-t border-[#D4AF37]/20 pt-4 text-xs text-gray-600 space-y-2">
                 <p>✓ Free shipping on orders over $200</p>
                 <p>✓ 30-day return policy</p>
                 <p>✓ 24/7 customer support</p>

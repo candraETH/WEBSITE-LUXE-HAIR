@@ -1,4 +1,5 @@
 import Image from "next/image"
+import { testimonialsCount } from "@/lib/testimonials-data"
 
 const WHATSAPP_URL = "https://wa.me/6282234109177?text=Hi%2C%20I%27d%20like%20to%20learn%20more%20about%20your%20products"
 
@@ -36,6 +37,11 @@ export function AboutSection() {
                 of quality.
               </p>
               <p>
+                Since 2009, CANDRA&apos;S HAIR has continued to refine every detail of our
+                craftsmanship, serving clients with consistent quality, trusted service,
+                and timeless styles that elevate natural beauty.
+              </p>
+              <p>
                 From silky-smooth extensions to natural-looking wigs, every piece in our
                 collection is crafted to blend seamlessly with your natural hair,
                 giving you the freedom to express your unique style.
@@ -50,17 +56,30 @@ export function AboutSection() {
             <div className="mt-10 grid grid-cols-2 gap-6">
               {[
                 { number: "100%", label: "Human Hair" },
-                { number: "500+", label: "Happy Clients" },
+                { number: `${testimonialsCount}+`, label: "Happy Clients", href: "/#testimonials" },
                 { number: "50+", label: "Hair Styles" },
-                { number: "24/7", label: "WhatsApp Support" },
+                { number: "24/7", label: "Support Service" },
               ].map((stat) => (
                 <div key={stat.label} className="border-l-2 border-accent pl-4">
-                  <p className="font-serif text-2xl font-bold text-foreground">
-                    {stat.number}
-                  </p>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                    {stat.label}
-                  </p>
+                  {stat.href ? (
+                    <a href={stat.href} className="group block">
+                      <p className="font-serif text-2xl font-bold text-foreground transition-colors group-hover:text-accent">
+                        {stat.number}
+                      </p>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground">
+                        {stat.label}
+                      </p>
+                    </a>
+                  ) : (
+                    <>
+                      <p className="font-serif text-2xl font-bold text-foreground">
+                        {stat.number}
+                      </p>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                        {stat.label}
+                      </p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

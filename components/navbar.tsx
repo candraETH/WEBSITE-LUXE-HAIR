@@ -8,10 +8,10 @@ import { useCart } from "@/context/CartContext"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
+  { label: "Bulk Hair", href: "/#bulk" },
+  { label: "Weft Hair", href: "/#weft" },
   { label: "Extensions", href: "/#extensions" },
   { label: "Wigs", href: "/#wigs" },
-  { label: "Weft Hair", href: "/#weft" },
-  { label: "Bulk Hair", href: "/#bulk" },
   { label: "About", href: "/#about" },
 ]
 

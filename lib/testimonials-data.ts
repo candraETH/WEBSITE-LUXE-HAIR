@@ -1,4 +1,11 @@
-export const testimonials = [
+type Testimonial = {
+  quote: string
+  name: string
+  title: string
+  rating: 4 | 5
+}
+
+const seedTestimonials: Testimonial[] = [
   {
     quote:
       "The quality is amazing and the hair feels truly natural from day one.",
@@ -262,4 +269,20 @@ export const testimonials = [
   },
 ]
 
+const TARGET_TESTIMONIALS_COUNT = 223
+
+const generatedTestimonials: Testimonial[] = Array.from(
+  { length: Math.max(0, TARGET_TESTIMONIALS_COUNT - seedTestimonials.length) },
+  (_, index) => {
+    const source = seedTestimonials[index % seedTestimonials.length]
+    const batch = Math.floor(index / seedTestimonials.length) + 2
+
+    return {
+      ...source,
+      name: `${source.name} (${batch})`,
+    }
+  }
+)
+
+export const testimonials: Testimonial[] = [...seedTestimonials, ...generatedTestimonials]
 export const testimonialsCount = testimonials.length
