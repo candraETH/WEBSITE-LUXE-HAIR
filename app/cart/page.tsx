@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
-import { useCart } from "@/context/CartContext"
+import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
@@ -384,6 +384,7 @@ export default function CartPage() {
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
+                        maxLength={4}
                         value={item.quantity}
                         onChange={(e) =>
                           updateQuantity(
@@ -399,7 +400,8 @@ export default function CartPage() {
                         onClick={() =>
                           updateQuantity(item.slug, item.length, item.quantity + 1, item.variant)
                         }
-                        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:text-foreground transition-colors"
+                        disabled={item.quantity >= MAX_ITEM_QUANTITY}
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
                       >
                         +
                       </button>
@@ -448,7 +450,7 @@ export default function CartPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Tax</p>
-                    <p className="text-right font-semibold text-foreground">${taxAmount.toFixed(2)} (3.5%)</p>
+                    <p className="text-right font-semibold text-foreground">${taxAmount.toFixed(2)}</p>
                   </div>
                 </div>
 

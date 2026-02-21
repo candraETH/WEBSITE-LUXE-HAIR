@@ -28,6 +28,7 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 const CART_STORAGE_KEY = "candrashair-cart-v1"
+export const MAX_ITEM_QUANTITY = 1000
 
 function isValidCartItem(item: unknown): item is CartItem {
   if (!item || typeof item !== "object") {
@@ -68,7 +69,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const normalizedItems = parsedItems.filter(isValidCartItem).map((item) => ({
         ...item,
         variant: item.variant?.trim() ? item.variant : undefined,
-        quantity: Math.max(1, Math.floor(item.quantity)),
+        quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(item.quantity))),
       }))
 
       setItems(normalizedItems)
@@ -101,11 +102,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existingIndex > -1) {
         // Update quantity if item exists
         const updatedItems = [...prevItems]
-        updatedItems[existingIndex].quantity += newItem.quantity
+        const mergedQuantity = updatedItems[existingIndex].quantity + Math.max(1, Math.floor(newItem.quantity))
+        updatedItems[existingIndex].quantity = Math.min(MAX_ITEM_QUANTITY, mergedQuantity)
         return updatedItems
       } else {
         // Add new item
-        return [...prevItems, newItem]
+        return [
+          ...prevItems,
+          {
+            ...newItem,
+            quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(newItem.quantity))),
+          },
+        ]
       }
     })
   }
@@ -120,7 +128,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const updateQuantity = (slug: string, length: number, quantity: number, variant = "default") => {
-    const safeQuantity = Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1
+    const safeQuantity = Number.isFinite(quantity)
+      ? Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(quantity)))
+      : 1
 
     setItems((prevItems) =>
       prevItems.map((item) =>

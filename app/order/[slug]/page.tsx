@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Footer } from "@/components/footer"
 import { Navbar } from "@/components/navbar"
-import { useCart } from "@/context/CartContext"
+import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import ProductGallery from "@/components/product-gallery"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
@@ -557,11 +557,11 @@ function SelectLengthComponent({
     selectedColorLabel && selectedColorCode
       ? `${selectedColorLabel} ${selectedColorCode}`
       : selectedColorLabel || selectedColorCode
-  const colorSurcharge =
-    slug === "virgin-straight-bulk" && normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
+  const colorSurcharge = normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
   const baseSinglePrice = parseFloat((basePrice + (currentLength - 16) * pricePerInch).toFixed(2))
   const singlePrice = parseFloat((baseSinglePrice + colorSurcharge).toFixed(2))
-  const totalPrice = (singlePrice * quantity).toFixed(2)
+  const totalOrderDisplay = `$${singlePrice.toFixed(2)} x ${quantity}`
+  const grandTotal = (singlePrice * quantity).toFixed(2)
   const reviewLabel = `${testimonialsCount} ${testimonialsCount === 1 ? "Review" : "Reviews"}`
   const selectedImage =
     normalizedColorCode && colorImageMap?.[normalizedColorCode]
@@ -569,9 +569,8 @@ function SelectLengthComponent({
       : image
 
   const handleQuantityChange = (value: number) => {
-    if (value >= 1) {
-      setQuantity(value)
-    }
+    const nextValue = Number.isFinite(value) ? Math.floor(value) : 1
+    setQuantity(Math.min(MAX_ITEM_QUANTITY, Math.max(1, nextValue)))
   }
 
   const animateFlyToCart = (sourceButton: HTMLButtonElement) => {
@@ -700,7 +699,7 @@ function SelectLengthComponent({
     const colorTag = selectedColorDisplay ? ` - Color: ${selectedColorDisplay}` : ""
     const surchargeTag = colorSurcharge > 0 ? ` Includes color surcharge (+$${colorSurcharge}/item).` : ""
     const message = encodeURIComponent(
-      `Hi, I'm interested in ordering the ${name} (${category})${colorTag} - ${currentLength}" (${quantity} ${quantity === 1 ? 'item' : 'items'}). Total: $${totalPrice}.${surchargeTag} Can you help me complete this order?`
+      `Hi, I'm interested in ordering the ${name} (${category})${colorTag} - ${currentLength}" (${quantity} ${quantity === 1 ? 'item' : 'items'}). Total: $${grandTotal}.${surchargeTag} Can you help me complete this order?`
     )
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, "_blank")
   }
@@ -749,29 +748,39 @@ function SelectLengthComponent({
           <div>
             <h4 className="mb-3 font-semibold text-foreground">Select Color</h4>
             <div className="grid w-full grid-cols-4 gap-2 sm:grid-cols-6">
-              {availableColors.map((color) => (
-                <button
-                  key={color.code}
-                  onClick={() => {
-                    setSelectedColorCode(color.code)
-                    onColorChange?.(color.code)
-                  }}
-                  className={`flex w-full min-w-0 flex-col items-center gap-1 rounded-lg p-2 transition-all duration-200 ${
-                    selectedColorCode.toLowerCase() === color.code.toLowerCase()
-                      ? "ring-2 ring-[#D4AF37] bg-[#FBF8F3]"
-                      : "hover:bg-secondary"
-                  }`}
-                >
-                  <div
-                    className="h-10 w-10 rounded-lg border-2 border-gray-300 shadow-sm"
-                    style={{ backgroundColor: color.hex }}
-                    title={color.label}
-                  />
-                  <span className="max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight text-center text-foreground md:text-[10px]">
-                    {color.code.toLowerCase() === "#2" ? "#2 ( Natural Hair )" : color.code}
-                  </span>
-                </button>
-              ))}
+              {availableColors.map((color) => {
+                const isSelectedColor =
+                  selectedColorCode.toLowerCase() === color.code.toLowerCase()
+
+                return (
+                  <button
+                    key={color.code}
+                    onClick={() => {
+                      setSelectedColorCode(color.code)
+                      onColorChange?.(color.code)
+                    }}
+                    className={`relative flex w-full min-w-0 flex-col items-center gap-1 rounded-lg border p-2 transition-all duration-200 ${
+                      isSelectedColor
+                        ? "border-[#D4AF37] bg-[#FBF8F3] shadow-[0_0_0_1px_rgba(212,175,55,0.22)]"
+                        : "border-transparent hover:border-border hover:bg-secondary/70"
+                    }`}
+                  >
+                    {isSelectedColor && (
+                      <span className="absolute right-1.5 top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#D4AF37] text-[10px] font-bold leading-none text-white">
+                        ✓
+                      </span>
+                    )}
+                    <div
+                      className="h-10 w-10 rounded-lg border-2 border-gray-300 shadow-sm"
+                      style={{ backgroundColor: color.hex }}
+                      title={color.label}
+                    />
+                    <span className="max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight text-center text-foreground md:text-[10px]">
+                      {color.code.toLowerCase() === "#2" ? "#2 ( Natural Hair )" : color.code}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -821,8 +830,8 @@ function SelectLengthComponent({
             </Link>
 
             <div className="mt-3 border-t border-[#EEE4D2] pt-3">
-              <p className="text-[15px] md:text-[16px] text-muted-foreground">Total:</p>
-              <p className="text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">${totalPrice}</p>
+              <p className="text-[15px] md:text-[16px] text-muted-foreground">Total Order:</p>
+              <p className="text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">{totalOrderDisplay}</p>
             </div>
 
             <div className="mt-3 border-t border-[#EEE4D2] pt-3">
@@ -840,13 +849,15 @@ function SelectLengthComponent({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    maxLength={4}
                     value={quantity}
                     onChange={(e) => handleQuantityChange(parseInt(e.target.value.replace(/\D/g, ""), 10) || 1)}
                     className="h-9 w-[58px] border-l border-r border-gray-300 px-2 text-center text-sm font-semibold text-foreground focus:outline-none"
                   />
                   <button
                     onClick={() => handleQuantityChange(quantity + 1)}
-                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground"
+                    disabled={quantity >= MAX_ITEM_QUANTITY}
+                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
                   >
                     +
                   </button>
@@ -858,10 +869,10 @@ function SelectLengthComponent({
 
         <div className="grid gap-3 pt-4 md:grid-cols-[1fr_1fr] md:items-start">
           <div>
-            <p className="text-[15px] md:text-[16px] text-muted-foreground">Total:</p>
-            <p className="mt-1 text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">${totalPrice}</p>
+            <p className="text-[15px] md:text-[16px] text-muted-foreground">Grand Total:</p>
+            <p className="mt-1 text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">${grandTotal}</p>
             <p className="mt-1.5 text-[10px] md:text-[11px] text-muted-foreground">
-              {quantity} {quantity === 1 ? "item" : "items"} x ${singlePrice.toFixed(2)} ({currentLength}")
+              {totalOrderDisplay} ({currentLength}")
             </p>
           </div>
 
