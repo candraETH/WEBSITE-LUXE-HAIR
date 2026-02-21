@@ -793,9 +793,10 @@ function SelectLengthComponent({
             <ul className="mt-3 space-y-1.5">
               {[
                 "100% Human Hair",
-                "Heat Resistant & Curlable",
                 "Minimal Shedding",
+                "Free Shipping Available",
                 "In Stock & Ready to Ship",
+                "Heat Resistant & Curlable",
               ].map((feature) => (
                 <li key={feature} className="flex items-center gap-2.5">
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#EAF5E7] text-[#4D9A47]">
@@ -830,11 +831,6 @@ function SelectLengthComponent({
             </Link>
 
             <div className="mt-3 border-t border-[#EEE4D2] pt-3">
-              <p className="text-[15px] md:text-[16px] text-muted-foreground">Total Order:</p>
-              <p className="text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">{totalOrderDisplay}</p>
-            </div>
-
-            <div className="mt-3 border-t border-[#EEE4D2] pt-3">
               <div className="flex flex-col items-start gap-1.5">
                 <span className="text-[13px] font-medium text-foreground">Order Quantity</span>
                 <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
@@ -864,18 +860,18 @@ function SelectLengthComponent({
                 </div>
               </div>
             </div>
+
+            <div className="mt-3 border-t border-[#EEE4D2] pt-3">
+              <p className="text-[15px] md:text-[16px] text-muted-foreground">Sub Total:</p>
+              <p className="text-[20px] md:text-[24px] font-bold leading-none text-[#C89E33]">${grandTotal}</p>
+              <p className="mt-1.5 text-[10px] md:text-[11px] text-muted-foreground">
+                {totalOrderDisplay} ({currentLength}")
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-3 pt-4 md:grid-cols-[1fr_1fr] md:items-start">
-          <div>
-            <p className="text-[15px] md:text-[16px] text-muted-foreground">Grand Total:</p>
-            <p className="mt-1 text-[24px] md:text-[30px] font-bold leading-none text-[#C89E33]">${grandTotal}</p>
-            <p className="mt-1.5 text-[10px] md:text-[11px] text-muted-foreground">
-              {totalOrderDisplay} ({currentLength}")
-            </p>
-          </div>
-
+        <div className="pt-4">
           <div className="space-y-3">
             <div className="grid grid-cols-[auto_1fr] gap-2">
               <Link
