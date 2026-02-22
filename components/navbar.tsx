@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Menu, X, ShoppingBag } from "lucide-react"
 import { useCart } from "@/context/CartContext"
+import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
@@ -15,7 +16,7 @@ const navLinks = [
   { label: "About", href: "/#about" },
 ]
 
-const WHATSAPP_URL = "https://wa.me/6282234109177?text=Hi%2C%20I%27m%20interested%20in%20your%20hair%20products"
+const WHATSAPP_CONTACT_MESSAGE = "Hi, I'm interested in your hair products"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -66,10 +67,14 @@ export function Navbar() {
           </Link>
 
           <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-none border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            href={getWhatsAppHref(WHATSAPP_CONTACT_MESSAGE)}
+            target={WHATSAPP_ENABLED ? "_blank" : undefined}
+            rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
+            aria-disabled={!WHATSAPP_ENABLED}
+            title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
+            className={`flex items-center gap-2 rounded-none border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${
+              !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-55" : ""
+            }`}
           >
             <WhatsAppIcon />
             Contact Us
@@ -114,10 +119,14 @@ export function Navbar() {
             </li>
           </ul>
           <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 flex w-full items-center justify-center gap-2 border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground"
+            href={getWhatsAppHref(WHATSAPP_CONTACT_MESSAGE)}
+            target={WHATSAPP_ENABLED ? "_blank" : undefined}
+            rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
+            aria-disabled={!WHATSAPP_ENABLED}
+            title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
+            className={`mt-4 flex w-full items-center justify-center gap-2 border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground ${
+              !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-55" : ""
+            }`}
           >
             <WhatsAppIcon />
             Contact Us

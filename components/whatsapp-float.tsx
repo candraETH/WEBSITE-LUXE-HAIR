@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { X } from "lucide-react"
+import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 
-const WHATSAPP_URL = "https://wa.me/6282234109177?text=Hi%2C%20I%27m%20interested%20in%20your%20hair%20products"
+const WHATSAPP_FLOAT_MESSAGE = "Hi, I'm interested in your hair products"
 
 export function WhatsAppFloat() {
   const [isVisible, setIsVisible] = useState(false)
@@ -21,7 +22,7 @@ export function WhatsAppFloat() {
     }
   }, [isVisible])
 
-  if (!isVisible) return null
+  if (!WHATSAPP_ENABLED || !isVisible) return null
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-end gap-3">
@@ -43,7 +44,7 @@ export function WhatsAppFloat() {
 
       {/* Button */}
       <a
-        href={WHATSAPP_URL}
+        href={getWhatsAppHref(WHATSAPP_FLOAT_MESSAGE)}
         target="_blank"
         rel="noopener noreferrer"
         className="flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-[#fff] shadow-lg transition-transform hover:scale-110"
