@@ -24,11 +24,7 @@ export async function POST(request: Request) {
 
     const { orderId } = parsed.data
     const stored = getPayPalOrder(orderId)
-    if (!stored) {
-      return NextResponse.json({ error: "Order not found." }, { status: 404 })
-    }
-
-    if (stored.status === "PAID") {
+    if (stored?.status === "PAID") {
       return NextResponse.json({
         orderId,
         status: "PAID",
@@ -36,14 +32,18 @@ export async function POST(request: Request) {
       })
     }
 
-    updatePayPalOrderStatus(orderId, "CAPTURE_REQUESTED")
+    if (stored) {
+      updatePayPalOrderStatus(orderId, "CAPTURE_REQUESTED")
+    }
 
     const capture = await paypalRequest<CaptureOrderResponse>(`/v2/checkout/orders/${orderId}/capture`, {
       method: "POST",
       body: JSON.stringify({}),
     })
 
-    updatePayPalOrderStatus(orderId, "CAPTURED_PENDING_WEBHOOK")
+    if (stored) {
+      updatePayPalOrderStatus(orderId, "CAPTURED_PENDING_WEBHOOK")
+    }
 
     return NextResponse.json({
       orderId: capture.id,
@@ -61,4 +61,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to capture order." }, { status: 500 })
   }
 }
-

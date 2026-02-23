@@ -25,10 +25,23 @@ function getPayPalEnv() {
   return { clientId, secret }
 }
 
+function getPayPalMode() {
+  const rawMode = process.env.PAYPAL_ENV?.trim().toLowerCase()
+
+  if (rawMode === "live" || rawMode === "production") {
+    return "live"
+  }
+
+  if (rawMode === "sandbox" || rawMode === "test" || rawMode === "development") {
+    return "sandbox"
+  }
+
+  // Safe default for deployments that only configure sandbox credentials.
+  return "sandbox"
+}
+
 export function getPayPalApiBaseUrl() {
-  return process.env.NODE_ENV === "production"
-    ? "https://api-m.paypal.com"
-    : "https://api-m.sandbox.paypal.com"
+  return getPayPalMode() === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com"
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
