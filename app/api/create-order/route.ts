@@ -8,6 +8,7 @@ import {
 } from "@/lib/paypal/catalog"
 import { paypalRequest, PayPalHttpError } from "@/lib/paypal/client"
 import { savePayPalOrder } from "@/lib/paypal/order-store"
+import { hasSupabaseEnv, supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
 
@@ -97,6 +98,25 @@ export async function POST(request: Request) {
       currencyCode: "USD",
     })
 
+    const totalAmount = Number(centsToDollars(calculated.totalCents))
+    if (!hasSupabaseEnv) {
+      return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
+    }
+
+    const { error: insertError } = await supabase.from("orders").insert([
+      {
+        paypal_order_id: response.id,
+        amount: totalAmount,
+        currency: "USD",
+        status: "PENDING",
+      },
+    ])
+
+    if (insertError) {
+      console.error("Supabase insert order failed:", insertError.message)
+      return NextResponse.json({ error: "Unable to save order." }, { status: 500 })
+    }
+
     return NextResponse.json({
       orderId: response.id,
       status: response.status,
@@ -112,4 +132,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to create order." }, { status: 500 })
   }
 }
-

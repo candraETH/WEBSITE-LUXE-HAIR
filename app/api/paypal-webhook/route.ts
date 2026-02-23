@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { centsToDollars, dollarsToCents } from "@/lib/paypal/catalog"
 import { PayPalHttpError, verifyWebhookSignature } from "@/lib/paypal/client"
 import { getPayPalOrder, updatePayPalOrderStatus } from "@/lib/paypal/order-store"
+import { hasSupabaseEnv, supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
 
@@ -51,12 +52,11 @@ export async function POST(request: Request) {
     }
 
     const stored = getPayPalOrder(orderId)
-    if (!stored) {
-      return NextResponse.json({ ok: true, message: "Webhook verified for unknown order id." })
-    }
 
     if (eventType === "CHECKOUT.ORDER.APPROVED") {
-      updatePayPalOrderStatus(orderId, "CAPTURE_REQUESTED")
+      if (stored) {
+        updatePayPalOrderStatus(orderId, "CAPTURE_REQUESTED")
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -66,21 +66,40 @@ export async function POST(request: Request) {
       const receivedAmountCents =
         typeof amountValue === "string" ? dollarsToCents(Number.parseFloat(amountValue)) : NaN
 
-      if (!Number.isFinite(receivedAmountCents) || currencyCode !== stored.currencyCode) {
-        updatePayPalOrderStatus(orderId, "FAILED")
-        return NextResponse.json({ ok: true, message: "Webhook verified but payment payload invalid." })
+      if (stored) {
+        if (!Number.isFinite(receivedAmountCents) || currencyCode !== stored.currencyCode) {
+          updatePayPalOrderStatus(orderId, "FAILED")
+          return NextResponse.json({ ok: true, message: "Webhook verified but payment payload invalid." })
+        }
+
+        if (receivedAmountCents !== stored.totalCents) {
+          console.error(
+            "PayPal amount mismatch:",
+            `order=${orderId} expected=${centsToDollars(stored.totalCents)} got=${centsToDollars(receivedAmountCents)}`
+          )
+          updatePayPalOrderStatus(orderId, "FAILED")
+          return NextResponse.json({ ok: true, message: "Webhook verified but amount mismatch." })
+        }
       }
 
-      if (receivedAmountCents !== stored.totalCents) {
-        console.error(
-          "PayPal amount mismatch:",
-          `order=${orderId} expected=${centsToDollars(stored.totalCents)} got=${centsToDollars(receivedAmountCents)}`
-        )
-        updatePayPalOrderStatus(orderId, "FAILED")
-        return NextResponse.json({ ok: true, message: "Webhook verified but amount mismatch." })
+      if (!hasSupabaseEnv) {
+        return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
       }
 
-      updatePayPalOrderStatus(orderId, "PAID")
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ status: "PAID" })
+        .eq("paypal_order_id", orderId)
+
+      if (updateError) {
+        console.error("Supabase update order failed:", updateError.message, `order=${orderId}`)
+        return NextResponse.json({ error: "Failed to update order status." }, { status: 500 })
+      }
+
+      if (stored) {
+        updatePayPalOrderStatus(orderId, "PAID")
+      }
+      console.log("Order marked as PAID:", orderId)
       return NextResponse.json({ ok: true })
     }
 
@@ -89,7 +108,9 @@ export async function POST(request: Request) {
       eventType === "PAYMENT.CAPTURE.REVERSED" ||
       eventType === "PAYMENT.CAPTURE.REFUNDED"
     ) {
-      updatePayPalOrderStatus(orderId, "FAILED")
+      if (stored) {
+        updatePayPalOrderStatus(orderId, "FAILED")
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -104,4 +125,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Webhook handling failed." }, { status: 500 })
   }
 }
-
