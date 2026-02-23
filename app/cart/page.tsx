@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
@@ -135,6 +135,10 @@ export default function CartPage() {
   const [continueShoppingHref, setContinueShoppingHref] = useState("/")
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
   const [checkoutError, setCheckoutError] = useState("")
+  const [paypalError, setPaypalError] = useState("")
+  const [paypalInfo, setPaypalInfo] = useState("")
+  const [paypalLoading, setPaypalLoading] = useState(false)
+  const processedPayPalTokenRef = useRef<string | null>(null)
   const countryOptions = useMemo(() => getCountryOptions(), [])
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails>(EMPTY_CUSTOMER_DETAILS)
 
@@ -199,6 +203,53 @@ export default function CartPage() {
       JSON.stringify({ ...customerDetails, showCheckoutForm })
     )
   }, [customerDetails, showCheckoutForm])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paypalStatus = params.get("paypal")
+    const paypalOrderId = params.get("token")
+
+    if (paypalStatus === "cancel") {
+      setPaypalInfo("PayPal payment was cancelled.")
+      setPaypalError("")
+      window.history.replaceState({}, "", "/cart")
+      return
+    }
+
+    if (paypalStatus !== "success" || !paypalOrderId) {
+      return
+    }
+
+    if (processedPayPalTokenRef.current === paypalOrderId) {
+      return
+    }
+
+    processedPayPalTokenRef.current = paypalOrderId
+    setPaypalLoading(true)
+    setPaypalError("")
+    setPaypalInfo("")
+
+    fetch("/api/capture-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: paypalOrderId }),
+    })
+      .then(async (response) => {
+        const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to capture PayPal payment.")
+        }
+        setPaypalInfo(data.message || "Payment captured. Waiting for secure webhook confirmation.")
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Failed to capture PayPal payment."
+        setPaypalError(message)
+      })
+      .finally(() => {
+        setPaypalLoading(false)
+        window.history.replaceState({}, "", "/cart")
+      })
+  }, [])
 
   if (!isCartReady) {
     return (
@@ -323,6 +374,47 @@ export default function CartPage() {
       `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nSubtotal: $${totalPrice.toFixed(2)}\nTax (3.5%): $${taxAmount.toFixed(2)}\n${shippingLine}\nTotal: $${finalTotal.toFixed(2)}\n\nShipping details:\n${addressLines}\n\nPlease confirm availability and proceed with the order. Thank you!`
 
     window.open(buildWhatsAppUrl(message), "_blank", "noopener,noreferrer")
+  }
+
+  const handlePayPalCheckout = async () => {
+    if (items.length === 0) {
+      setPaypalError("Your cart is empty.")
+      return
+    }
+
+    setPaypalLoading(true)
+    setPaypalError("")
+    setPaypalInfo("")
+
+    try {
+      const response = await fetch("/api/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            slug: item.slug,
+            length: item.length,
+            quantity: item.quantity,
+            variant: item.variant,
+          })),
+        }),
+      })
+
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string
+        approveUrl?: string
+      }
+
+      if (!response.ok || !data.approveUrl) {
+        throw new Error(data.error || "Unable to initialize PayPal checkout.")
+      }
+
+      window.location.href = data.approveUrl
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to initialize PayPal checkout."
+      setPaypalError(message)
+      setPaypalLoading(false)
+    }
   }
 
   return (
@@ -475,6 +567,28 @@ export default function CartPage() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
+                <button
+                  onClick={() => void handlePayPalCheckout()}
+                  disabled={paypalLoading}
+                  className={`w-full group flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1B63D0] to-[#174EA6] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95 ${
+                    paypalLoading ? "cursor-not-allowed opacity-75 hover:scale-100 hover:shadow-lg" : ""
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    shapeRendering="geometricPrecision"
+                    className="h-5 w-5 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill="currentColor"
+                      d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513c-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541c-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"
+                    />
+                  </svg>
+                  <span>{paypalLoading ? "Processing PayPal..." : "Pay with PayPal"}</span>
+                </button>
+
                 <button
                   onClick={handleCheckoutButtonClick}
                   disabled={!WHATSAPP_ENABLED}
@@ -635,6 +749,13 @@ export default function CartPage() {
                   >
                     Clear Cart
                   </button>
+                )}
+
+                {paypalInfo && (
+                  <p className="text-xs font-medium text-[#1B63D0]">{paypalInfo}</p>
+                )}
+                {paypalError && (
+                  <p className="text-xs font-medium text-red-500">{paypalError}</p>
                 )}
               </div>
 
