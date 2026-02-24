@@ -23,6 +23,23 @@ type CheckoutOtpChallenge = {
 
 const OTP_TTL_SECONDS = 10 * 60
 
+function mapOtpErrorToMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : ""
+  const message = raw.toLowerCase()
+
+  if (message.includes("brevo otp delivery failed with status 401") || message.includes("status 403")) {
+    return "OTP email authentication failed. Please contact support."
+  }
+  if (message.includes("sender")) {
+    return "OTP sender email is not verified. Please contact support."
+  }
+  if (message.includes("not configured")) {
+    return "OTP delivery is not configured."
+  }
+
+  return "Unable to send verification code."
+}
+
 export async function POST(request: Request) {
   try {
     const rateLimit = await enforceRateLimit(request, "api:checkout:request-verification", {
@@ -78,7 +95,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("Checkout request-verification error:", error instanceof Error ? error.message : "Unknown error")
-    return NextResponse.json({ error: "Unable to send verification code." }, { status: 500 })
+    return NextResponse.json({ error: mapOtpErrorToMessage(error) }, { status: 500 })
   }
 }
-

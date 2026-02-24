@@ -32,6 +32,23 @@ type OrderRow = {
 const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,phone_number,cart_json"
 const OTP_TTL_SECONDS = 10 * 60
 
+function mapOtpErrorToMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : ""
+  const message = raw.toLowerCase()
+
+  if (message.includes("brevo otp delivery failed with status 401") || message.includes("status 403")) {
+    return "OTP email authentication failed. Please contact support."
+  }
+  if (message.includes("sender")) {
+    return "OTP sender email is not verified. Please contact support."
+  }
+  if (message.includes("not configured")) {
+    return "OTP delivery is not configured."
+  }
+
+  return "Unable to send OTP."
+}
+
 function extractCustomerPhone(row: OrderRow): string {
   if (row.phone_number?.trim()) {
     return row.phone_number.trim()
@@ -120,6 +137,13 @@ export async function POST(request: Request) {
 
     const customerPhone = extractCustomerPhone(data) || phoneNumber
     const customerEmail = extractCustomerEmail(data)
+    if (!customerEmail && !process.env.OTP_DELIVERY_WEBHOOK_URL?.trim()) {
+      return NextResponse.json(
+        { error: "No email is available for this order. Please contact support to verify your order." },
+        { status: 400 }
+      )
+    }
+
     const delivery = await deliverOtpCode({
       purpose: "track_order",
       orderId,
@@ -138,7 +162,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("Order-tracking request-otp error:", error instanceof Error ? error.message : "Unknown error")
-    return NextResponse.json({ error: "Unable to send OTP." }, { status: 500 })
+    return NextResponse.json({ error: mapOtpErrorToMessage(error) }, { status: 500 })
   }
 }
-

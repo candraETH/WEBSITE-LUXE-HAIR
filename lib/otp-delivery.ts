@@ -122,43 +122,60 @@ async function deliverOtpViaBrevo(input: OtpDeliveryInput, destination: string):
   }
 }
 
+async function deliverOtpViaWebhook(input: OtpDeliveryInput, destination: string): Promise<OtpDeliveryResult> {
+  const webhookUrl = process.env.OTP_DELIVERY_WEBHOOK_URL?.trim()
+  const webhookBearer = process.env.OTP_DELIVERY_WEBHOOK_BEARER?.trim()
+  if (!webhookUrl) {
+    throw new Error("OTP delivery webhook is not configured.")
+  }
+
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(webhookBearer ? { Authorization: `Bearer ${webhookBearer}` } : {}),
+    },
+    body: JSON.stringify({
+      type: "otp_delivery",
+      purpose: input.purpose,
+      orderId: input.orderId ?? "",
+      code: input.code,
+      customerName: input.customerName ?? "",
+      customerEmail: input.customerEmail ?? "",
+      customerPhone: input.customerPhone ?? "",
+    }),
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    throw new Error(`OTP delivery webhook failed with status ${response.status}`)
+  }
+
+  return {
+    destination,
+    channel: "webhook",
+  }
+}
+
 export async function deliverOtpCode(input: OtpDeliveryInput): Promise<OtpDeliveryResult> {
   const destination = buildDestinationLabel(input)
   const brevoConfig = getBrevoConfig()
+  const webhookUrl = process.env.OTP_DELIVERY_WEBHOOK_URL?.trim()
   if (brevoConfig && input.customerEmail?.trim()) {
-    return deliverOtpViaBrevo(input, destination)
+    try {
+      return await deliverOtpViaBrevo(input, destination)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown"
+      console.error("Brevo OTP delivery failed:", message)
+      if (webhookUrl) {
+        return deliverOtpViaWebhook(input, destination)
+      }
+      throw error
+    }
   }
 
-  const webhookUrl = process.env.OTP_DELIVERY_WEBHOOK_URL?.trim()
-  const webhookBearer = process.env.OTP_DELIVERY_WEBHOOK_BEARER?.trim()
-
   if (webhookUrl) {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(webhookBearer ? { Authorization: `Bearer ${webhookBearer}` } : {}),
-      },
-      body: JSON.stringify({
-        type: "otp_delivery",
-        purpose: input.purpose,
-        orderId: input.orderId ?? "",
-        code: input.code,
-        customerName: input.customerName ?? "",
-        customerEmail: input.customerEmail ?? "",
-        customerPhone: input.customerPhone ?? "",
-      }),
-      cache: "no-store",
-    })
-
-    if (!response.ok) {
-      throw new Error(`OTP delivery webhook failed with status ${response.status}`)
-    }
-
-    return {
-      destination,
-      channel: "webhook",
-    }
+    return deliverOtpViaWebhook(input, destination)
   }
 
   if (process.env.NODE_ENV !== "production") {
