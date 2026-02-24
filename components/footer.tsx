@@ -74,14 +74,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="https://www.dhl.com/global-en/home/tracking.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href="/track-order"
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Shipping Info
-                </a>
+                  Track Order
+                </Link>
               </li>
               <li>
                 <Link

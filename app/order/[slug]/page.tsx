@@ -5,19 +5,37 @@ import Link from "next/link"
 import { use, useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
 import { Footer } from "@/components/footer"
 import { Navbar } from "@/components/navbar"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
-import ProductGallery from "@/components/product-gallery"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
-import { WHATSAPP_ENABLED, buildWhatsAppUrl, getWhatsAppHref } from "@/lib/whatsapp-config"
+
+type ProductColor = {
+  code: string
+  label: string
+  hex: string
+}
+
+type ProductItem = {
+  slug: string
+  name: string
+  price: string
+  image: string
+  category: string
+  description: string
+  longDescription: string
+  basePrice: number
+  pricePerInch: number
+  tag?: string
+  gallery?: string[]
+  colorImageFolder?: string
+  colorImageMap?: Record<string, string>
+  colors?: ProductColor[]
+}
 
 // Product data
-const allProducts = [
+const allProducts: ProductItem[] = [
   // Hair Extensions
   {
     slug: "silky-straight-clip-ins",
@@ -252,29 +270,14 @@ export default function OrderPage({ params }: PageProps) {
     router.push(backToShopHref)
   }
 
-  if (!product) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="flex flex-col items-center justify-center px-6 py-24">
-          <h1 className="mb-4 text-3xl font-serif font-bold">Product Not Found</h1>
-          <p className="mb-8 text-muted-foreground">The product you're looking for doesn't exist.</p>
-          <Link href={backToShopHref} onClick={handleBackToShopClick}>
-            <Button className="inline-flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
-                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Back to Shop
-            </Button>
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  const isVirginStraightBulk = product.slug === "virgin-straight-bulk"
-  const colorImageFolder = (product as any).colorImageFolder as string | undefined
-  const colorImageMap = (product as any).colorImageMap as Record<string, string> | undefined
+  const isVirginStraightBulk = product?.slug === "virgin-straight-bulk"
+  const colorImageFolder = product?.colorImageFolder
+  const colorImageMap = product?.colorImageMap
   const resolvedColorImageMap = useMemo(() => {
+    if (!product) {
+      return {}
+    }
+
     const map: Record<string, string> = {}
 
     for (const [code, src] of Object.entries(colorImageMap ?? {})) {
@@ -282,8 +285,7 @@ export default function OrderPage({ params }: PageProps) {
     }
 
     if (isVirginStraightBulk || colorImageFolder) {
-      const fallbackColorList = DEFAULT_HAIR_COLORS
-      const colorList = (((product as any).colors ?? fallbackColorList) as Array<{ code: string }>)
+      const colorList = product.colors ?? DEFAULT_HAIR_COLORS
       for (const color of colorList) {
         const normalizedCode = (color.code ?? "").toLowerCase()
         if (!normalizedCode || map[normalizedCode]) {
@@ -312,6 +314,11 @@ export default function OrderPage({ params }: PageProps) {
   const [availableColorImageMap, setAvailableColorImageMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
+    if (!product) {
+      setAvailableColorImageMap({})
+      return
+    }
+
     let mounted = true
     const entries = Object.entries(resolvedColorImageMap)
 
@@ -328,7 +335,7 @@ export default function OrderPage({ params }: PageProps) {
             if (response.ok) {
               return [code, src] as const
             }
-          } catch (_error) {
+          } catch {
             // ignore missing files
           }
           return null
@@ -353,10 +360,14 @@ export default function OrderPage({ params }: PageProps) {
     return () => {
       mounted = false
     }
-  }, [resolvedColorImageMap])
+  }, [product, resolvedColorImageMap])
 
   const galleryImages = useMemo(() => {
-    const productGallery = ((product as any).gallery ?? []) as string[]
+    if (!product) {
+      return []
+    }
+
+    const productGallery = product.gallery ?? []
     const mergedImages = [product.image, ...productGallery, ...Object.values(availableColorImageMap)]
     return Array.from(new Set(mergedImages.filter(Boolean)))
   }, [product, availableColorImageMap])
@@ -367,6 +378,10 @@ export default function OrderPage({ params }: PageProps) {
   }, [slug])
 
   useEffect(() => {
+    if (!product) {
+      return
+    }
+
     if (!selectedColorCode) {
       setActiveImageIndex(0)
       return
@@ -381,142 +396,123 @@ export default function OrderPage({ params }: PageProps) {
         return
       }
     }
-  }, [selectedColorCode, availableColorImageMap, galleryImages])
+  }, [product, selectedColorCode, availableColorImageMap, galleryImages])
 
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="flex flex-col items-center justify-center px-6 py-24">
+          <h1 className="mb-4 text-3xl font-serif font-bold">Product Not Found</h1>
+          <p className="mb-8 text-muted-foreground">The product you&apos;re looking for doesn&apos;t exist.</p>
+          <Link href={backToShopHref} onClick={handleBackToShopClick}>
+            <Button className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Shop
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const activeImageSrc = galleryImages[activeImageIndex] ?? product.image
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-[#eeeeef] pt-[72px] lg:pt-[78px]">
       <Navbar />
 
-      {/* Back Button */}
-      <div className="mx-auto max-w-7xl px-6 py-3 lg:py-4">
-        <Link href={backToShopHref} onClick={handleBackToShopClick}>
-          <Button
-            variant="ghost"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Back to Shop
-          </Button>
-        </Link>
-      </div>
+      <div className="mx-auto max-w-[980px] px-4 pb-12 sm:px-6">
+        <div className="py-3 lg:py-4">
+          <Link href={backToShopHref} onClick={handleBackToShopClick}>
+            <Button
+              variant="ghost"
+              className="inline-flex items-center gap-2 px-0 text-sm text-muted-foreground/80 transition-colors hover:text-foreground"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Shop
+            </Button>
+          </Link>
+        </div>
 
-      {/* Order Section */}
-      <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 pb-10 lg:pb-16">
-        {/* Product Info */}
-        <div className="mb-8 grid items-start lg:mb-10 lg:grid-cols-2 lg:gap-12">
-          <div className="hidden lg:block" />
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-accent/80">
-              {product.category}
-            </p>
-            {product.tag && (
-              <span className="mb-6 inline-block bg-accent/10 border border-accent/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-accent rounded-full">
-                {product.tag}
-              </span>
+        <article className="overflow-hidden bg-white shadow-[0_26px_60px_-38px_rgba(0,0,0,0.55)]">
+          <div className="relative aspect-[3/4] w-full bg-[#d8d8da]">
+            <Image
+              src={activeImageSrc}
+              alt={product.name}
+              fill
+              sizes="(max-width: 1024px) 100vw, 980px"
+              className={isVirginStraightBulk ? "object-contain p-6" : "object-cover"}
+              priority
+            />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/20 to-transparent" />
+
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))
+                  }
+                  className="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/60"
+                  aria-label="Previous image"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+                    <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
+                  }
+                  className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/60"
+                  aria-label="Next image"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+                    <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
             )}
-            <h1 className="mb-5 font-serif text-4xl font-bold leading-tight text-foreground lg:text-5xl">
+
+            <div className="absolute bottom-6 left-6 inline-flex h-14 w-14 items-center justify-center rounded-full bg-black text-white">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-7 w-7" aria-hidden="true">
+                <path d="M4 18h16M7 18l5-7 5 7M9 8a3 3 0 1 1 6 0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/55 px-4 py-2 text-lg font-medium text-white">
+              {activeImageIndex + 1}/{galleryImages.length}
+            </div>
+
+          </div>
+
+          <div className="px-6 py-7 sm:px-8 sm:py-10">
+            <h1 className="font-serif text-4xl font-semibold leading-tight text-[#101010] sm:text-5xl">
               {product.name}
             </h1>
-            <p className="mb-5 text-2xl font-semibold text-accent">{product.price}</p>
-            <p className="mb-0 text-base leading-relaxed text-muted-foreground/90">
+            <p className="mt-5 max-w-3xl text-base leading-relaxed text-[#555]">
               {product.longDescription}
             </p>
-          </div>
-        </div>
 
-        <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          {/* Product Image */}
-          <div className="order-2 min-w-0 lg:order-1">
-            <ProductGallery
-              images={galleryImages}
-              alt={product.name}
-              useContainFit={isVirginStraightBulk}
-              selectedIndex={activeImageIndex}
-              onIndexChange={(i) => setActiveImageIndex(i)}
+            <SelectLengthComponent
+              basePrice={product.basePrice}
+              pricePerInch={product.pricePerInch}
+              slug={product.slug}
+              name={product.name}
+              category={product.category}
+              image={product.image}
+              colorImageMap={availableColorImageMap}
+              onColorChange={setSelectedColorCode}
+              colors={product.colors}
             />
           </div>
-
-          {/* Order Form */}
-          <div className="order-1 min-w-0 lg:order-2">
-            <div className="overflow-hidden rounded-2xl border border-border/30 bg-gradient-to-b from-card to-card/50 px-4 py-6 sm:px-5 md:px-6 md:py-7 shadow-lg backdrop-blur-sm">
-              <div>
-                <h3 className="mb-4 font-serif text-2xl font-semibold text-foreground">
-                  Select Your Length
-                </h3>
-                <p className="mb-6 text-sm text-muted-foreground/90">
-                  Available in professional sizes
-                </p>
-                <SelectLengthComponent 
-                  basePrice={product.basePrice} 
-                  pricePerInch={product.pricePerInch}
-                  slug={product.slug}
-                  name={product.name}
-                  category={product.category}
-                  image={product.image}
-                  colorImageMap={availableColorImageMap}
-                  onColorChange={setSelectedColorCode}
-                  colors={(product as any).colors}
-                />
-              </div>
-
-          </div>
-        </div>
+        </article>
       </div>
 
-        <div className="mt-8 rounded-2xl border border-border/30 bg-gradient-to-b from-card to-card/50 p-6 lg:p-8 shadow-sm">
-          <h3 className="mb-5 font-serif text-lg font-semibold text-foreground">
-            What's Included
-          </h3>
-          <div className="grid gap-3 text-sm text-muted-foreground/90 md:grid-cols-3">
-            <p>Premium materials with quality guarantee</p>
-            <p>Color and customization options available</p>
-            <p>Expert consultation & support</p>
-          </div>
-          <p className="mt-6 border-t border-border/30 pt-5 text-center text-xs text-muted-foreground/70">
-            Add items to your cart or order directly
-          </p>
-        </div>
-      </div>
-
-      {/* CTA Section */}
-      <section className="mt-24 bg-gradient-to-b from-foreground/95 to-foreground py-16 lg:py-24">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent/70 mb-4">
-            Ready to Order?
-          </p>
-          <h2 className="mb-6 font-serif text-4xl lg:text-5xl font-bold text-background">
-            Get Your Dream Hair Today
-          </h2>
-          <p className="mb-8 text-base text-background/80 leading-relaxed max-w-2xl mx-auto">
-            Browse our collection, choose your favorites, and reach out to us via WhatsApp to place your order. We offer fast shipping and personalized consultations.
-          </p>
-          
-          <a
-            href={getWhatsAppHref("Hi, I'd like to know more about your hair products and place an order. Thank you!")}
-            target={WHATSAPP_ENABLED ? "_blank" : undefined}
-            rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
-            aria-disabled={!WHATSAPP_ENABLED}
-            title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
-            className={`inline-flex items-center justify-center gap-2 bg-background text-foreground px-8 py-4 font-semibold rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95 ${
-              !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-60 hover:scale-100 hover:shadow-none" : ""
-            }`}
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
-            Contact Us on WhatsApp
-          </a>
-
-          <div className="mt-8 pt-8 border-t border-background/20 text-sm text-background/70 space-y-2">
-            <p>âœ“ Available 24/7 for your convenience</p>
-            <p>âœ“ Fast replies guaranteed</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
       <Footer />
     </main>
   )
@@ -547,7 +543,7 @@ function SelectLengthComponent({
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const { addToCart, getTotalItems } = useCart()
+  const { addToCart } = useCart()
   const supportsColorSelection = ["Hair Extensions", "Weft Hair", "Bulk Hair"].includes(category)
   const availableColors =
     colors && colors.length > 0 ? colors : supportsColorSelection ? DEFAULT_HAIR_COLORS : []
@@ -564,7 +560,6 @@ function SelectLengthComponent({
   const colorSurcharge = normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
   const baseSinglePrice = parseFloat((basePrice + (currentLength - 16) * pricePerInch).toFixed(2))
   const singlePrice = parseFloat((baseSinglePrice + colorSurcharge).toFixed(2))
-  const totalOrderDisplay = `$${singlePrice.toFixed(2)} x ${quantity}`
   const grandTotal = (singlePrice * quantity).toFixed(2)
   const reviewLabel = `${testimonialsCount} ${testimonialsCount === 1 ? "Review" : "Reviews"}`
   const selectedImage =
@@ -699,233 +694,141 @@ function SelectLengthComponent({
     setIsAddingToCart(false)
   }
 
-  const handleDirectWhatsApp = () => {
-    if (!WHATSAPP_ENABLED) {
-      return
-    }
-
-    const colorTag = selectedColorDisplay ? ` - Color: ${selectedColorDisplay}` : ""
-    const surchargeTag = colorSurcharge > 0 ? ` Includes color surcharge (+$${colorSurcharge}/item).` : ""
-    const message =
-      `Hi, I'm interested in ordering the ${name} (${category})${colorTag} - ${currentLength}" (${quantity} ${quantity === 1 ? 'item' : 'items'}). Total: $${grandTotal}.${surchargeTag} Can you help me complete this order?`
-    window.open(buildWhatsAppUrl(message), "_blank", "noopener,noreferrer")
-  }
-
   return (
-    <div className="w-full min-w-0 space-y-4 overflow-x-hidden">
-      <RadioGroup value={selectedLength} onValueChange={setSelectedLength}>
-        <div className="grid gap-1.5 grid-cols-3 sm:grid-cols-3">
-          {lengths.map((length) => {
-            const price = (basePrice + (length - 16) * pricePerInch + colorSurcharge).toFixed(2)
-            const isSelected = selectedLength === length.toString()
-            return (
-              <div key={length}>
-                <RadioGroupItem value={length.toString()} id={`length-${length}`} className="hidden" />
-                <Label 
-                  htmlFor={`length-${length}`} 
-                  className={`flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 text-center transition-all duration-200 ${
-                    isSelected
-                      ? "border-[#D4AF37] bg-[#FBF8F3] shadow-md hover:shadow-lg"
-                      : "border-gray-200 bg-white text-muted-foreground hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-0.5">
-                    <span className={`text-sm font-semibold ${isSelected ? "text-foreground" : "text-gray-700"}`}>
-                      {length}"
-                    </span>
-                    {isSelected && (
-                      <svg className="w-3 h-3 text-[#D4AF37]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-bold ${isSelected ? "text-[#D4AF37]" : "text-gray-500"}`}>
-                    ${price}
-                  </span>
-                </Label>
-              </div>
-            )
-          })}
-        </div>
-      </RadioGroup>
-
-      {/* Color Selection - Only for products with colors */}
+    <div className="mt-8 w-full min-w-0 space-y-8 overflow-x-hidden">
       {availableColors.length > 0 && (
-        <div className="space-y-3 border-t border-border/30 pt-4">
-          <div>
-            <h4 className="mb-3 font-semibold text-foreground">Select Color</h4>
-            <div className="grid w-full grid-cols-4 gap-2 sm:grid-cols-6">
-              {availableColors.map((color) => {
-                const isSelectedColor =
-                  selectedColorCode.toLowerCase() === color.code.toLowerCase()
-
-                return (
-                  <button
-                    key={color.code}
-                    onClick={() => {
-                      setSelectedColorCode(color.code)
-                      onColorChange?.(color.code)
-                    }}
-                    className={`relative flex w-full min-w-0 flex-col items-center gap-1 rounded-lg border p-2 transition-all duration-200 ${
-                      isSelectedColor
-                        ? "border-[#D4AF37] bg-[#FBF8F3] shadow-[0_0_0_1px_rgba(212,175,55,0.22)]"
-                        : "border-transparent hover:border-border hover:bg-secondary/70"
-                    }`}
-                  >
-                    {isSelectedColor && (
-                      <span className="absolute right-1.5 top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#D4AF37] text-[10px] font-bold leading-none text-white">
-                        ✓
-                      </span>
-                    )}
-                    <div
-                      className="h-10 w-10 rounded-lg border-2 border-gray-300 shadow-sm"
-                      style={{ backgroundColor: color.hex }}
-                      title={color.label}
-                    />
-                    <span className="max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight text-center text-foreground md:text-[10px]">
-                      {color.code.toLowerCase() === "#2" ? "#2 ( Natural Hair )" : color.code}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+        <div>
+          <p className="text-2xl font-normal text-[#5f5f61] sm:text-[45px]">Color: {selectedColorDisplay || "Default"}</p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            {availableColors.map((color) => {
+              const isSelectedColor = selectedColorCode.toLowerCase() === color.code.toLowerCase()
+              return (
+                <button
+                  key={color.code}
+                  type="button"
+                  onClick={() => {
+                    setSelectedColorCode(color.code)
+                    onColorChange?.(color.code)
+                  }}
+                  className={`relative h-16 w-16 rounded-full border-2 transition-all ${
+                    isSelectedColor ? "border-black p-1 shadow-[0_0_0_2px_rgba(0,0,0,0.2)]" : "border-[#7c7c7f]"
+                  }`}
+                  title={`${color.label} (${color.code})`}
+                  aria-label={`Select color ${color.label}`}
+                >
+                  <span
+                    className="block h-full w-full rounded-full border border-black/10"
+                    style={{ backgroundColor: color.hex }}
+                  />
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
-      {/* Premium Selection + Action Panel */}
-      <div className="rounded-2xl border border-[#EADCC2] bg-gradient-to-r from-[#FFFDF8] to-[#FAF6EE] px-4 py-4 md:px-5 md:py-5 shadow-[0_25px_45px_-35px_rgba(0,0,0,0.45)]">
-        <div className="grid gap-3 border-b border-[#EEE4D2] pb-4 md:grid-cols-[1.05fr_1fr]">
-          <div>
-            <p className="text-[14px] md:text-[17px] font-semibold uppercase tracking-[0.08em] text-[#C89E33]">Your Selection</p>
-            <ul className="mt-3 space-y-1.5">
-              {[
-                "100% Human Hair",
-                "Minimal Shedding",
-                "Free Shipping Available",
-                "In Stock & Ready to Ship",
-                "Heat Resistant & Curlable",
-              ].map((feature) => (
-                <li key={feature} className="flex items-center gap-2.5">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#EAF5E7] text-[#4D9A47]">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3 w-3" strokeWidth="3">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                    </svg>
-                  </span>
-                  <span className="text-[14px] md:text-[16px] font-normal leading-[1.55] text-foreground">
-                    {feature}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
 
-          <div className="md:border-l md:border-[#EEE4D2] md:pl-5">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <div className="flex items-center">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <svg key={index} viewBox="0 0 24 24" className="h-4 w-4 md:h-5 md:w-5 fill-[#D4AF37]" aria-hidden="true">
-                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                  </svg>
-                ))}
-              </div>
-              <span className="text-[16px] md:text-[18px] font-semibold leading-none text-foreground">(4.9/5)</span>
-            </div>
-            <Link
-              href="/#testimonials"
-              className="mt-1.5 inline-block text-[13px] md:text-[15px] leading-none text-[#8D8A84] transition-colors hover:text-foreground"
-            >
-              {reviewLabel}
-            </Link>
-
-            <div className="mt-3 border-t border-[#EEE4D2] pt-3">
-              <div className="flex flex-col items-start gap-1.5">
-                <span className="text-[13px] font-medium text-foreground">Order Quantity</span>
-                <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
-                  <button
-                    onClick={() => handleQuantityChange(quantity - 1)}
-                    disabled={quantity <= 1}
-                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    value={quantity}
-                    onChange={(e) => handleQuantityChange(parseInt(e.target.value.replace(/\D/g, ""), 10) || 1)}
-                    className="h-9 w-[58px] border-l border-r border-gray-300 px-2 text-center text-sm font-semibold text-foreground focus:outline-none"
-                  />
-                  <button
-                    onClick={() => handleQuantityChange(quantity + 1)}
-                    disabled={quantity >= MAX_ITEM_QUANTITY}
-                    className="flex h-9 w-9 items-center justify-center text-base text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 border-t border-[#EEE4D2] pt-3">
-              <p className="text-[15px] md:text-[16px] text-muted-foreground">Sub Total:</p>
-              <p className="text-[20px] md:text-[24px] font-bold leading-none text-[#C89E33]">${grandTotal}</p>
-              <p className="mt-1.5 text-[10px] md:text-[11px] text-muted-foreground">
-                {totalOrderDisplay} ({currentLength}")
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4">
-          <div className="space-y-3">
-            <div className="grid grid-cols-[auto_1fr] gap-2">
-              <Link
-                href="/cart"
-                className="relative inline-flex h-full min-w-[54px] items-center justify-center rounded-xl border border-[#D4AF37]/35 bg-white px-3 text-[#5a4a2f] shadow-[0_10px_20px_-16px_rgba(0,0,0,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D4AF37] hover:text-[#C4951F]"
-                aria-label="Open cart"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {getTotalItems() > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#D4AF37] px-1 text-[10px] font-bold leading-none text-white">
-                    {getTotalItems()}
-                  </span>
-                )}
-              </Link>
-
+      <div>
+        <p className="text-2xl font-normal text-[#5f5f61] sm:text-[45px]">Size: {currentLength}&quot;</p>
+        <div className="mt-5 grid grid-cols-6 gap-1.5 sm:flex sm:flex-wrap sm:gap-3">
+          {lengths.map((length) => {
+            const isSelected = selectedLength === length.toString()
+            return (
               <button
-                onClick={(event) => void handleAddToCart(event.currentTarget)}
-                disabled={isAddingToCart}
-                className="group w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9B24A] to-[#BE8C23] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(190,140,35,0.85)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-85 disabled:hover:translate-y-0 disabled:hover:scale-100"
-              >
-                <svg data-fly-source="true" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span>{isAddingToCart ? "Adding..." : "Add to Cart"}</span>
-              </button>
-
-            </div>
-
-            <div className="grid grid-cols-[auto_1fr] gap-2">
-              <span className="min-w-[54px]" aria-hidden="true" />
-              <button
-                onClick={handleDirectWhatsApp}
-                disabled={!WHATSAPP_ENABLED}
-                className={`w-full group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2CC96D] to-[#21B25A] px-5 py-3 text-[15px] md:text-[17px] font-semibold leading-none text-white shadow-[0_14px_24px_-18px_rgba(0,0,0,0.45)] transition-all duration-300 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.01] hover:brightness-105 hover:shadow-[0_20px_34px_-20px_rgba(33,178,90,0.75)] active:translate-y-0 active:scale-[0.99] ${
-                  !WHATSAPP_ENABLED ? "cursor-not-allowed opacity-60 hover:translate-y-0 hover:scale-100 hover:brightness-100 hover:shadow-[0_14px_24px_-18px_rgba(0,0,0,0.45)]" : ""
+                key={length}
+                type="button"
+                onClick={() => setSelectedLength(length.toString())}
+                className={`w-full border px-1 py-3 text-center text-xl font-semibold transition-all sm:min-w-[84px] sm:w-auto sm:px-5 sm:text-[32px] ${
+                  isSelected
+                    ? "border-black bg-black text-white shadow-[0_0_0_4px_rgba(0,0,0,0.12)]"
+                    : "border-[#7d7d80] bg-white text-[#121212] hover:bg-[#f6f6f6]"
                 }`}
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 md:h-5 md:w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
-                <span>Order via WhatsApp</span>
+                {length}
               </button>
-            </div>
-          </div>
+            )
+          })}
         </div>
+      </div>
+
+      <div className="space-y-4 border-y border-[#d6d6d8] py-5">
+        <ul className="space-y-1.5 rounded-lg border border-[#cfcfd2] bg-[#f8f8f8] px-4 py-3 text-[17px] text-[#232323]">
+          {[
+            "100% Human Hair",
+            "Minimal Shedding",
+            "Free Shipping Available",
+            "In Stock & Ready to Ship",
+            "Heat Resistant & Curlable",
+          ].map((feature) => (
+            <li key={feature} className="flex items-center gap-2">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#d9ead7] text-[#2f7a38]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3 w-3" strokeWidth="3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+                </svg>
+              </span>
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Link
+          href="/#testimonials"
+          className="block rounded-lg border border-[#cfcfd2] bg-white px-4 py-3 transition-colors hover:bg-[#f7f7f7]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#77777a]">Customer Reviews</p>
+          <div className="mt-2 flex items-center gap-1">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <svg key={index} viewBox="0 0 24 24" className="h-4 w-4 fill-[#111]" aria-hidden="true">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+              </svg>
+            ))}
+            <span className="ml-2 text-sm font-semibold text-[#121212]">{reviewLabel}</span>
+          </div>
+          <p className="mt-1 text-sm text-[#6a6a6d]">Tap to read testimonials</p>
+        </Link>
+
+        <div className="rounded-lg border border-[#cfcfd2] bg-white px-4 py-3">
+          <p className="text-sm text-[#6a6a6d]">Subtotal</p>
+          <p className="mt-1 text-xl font-semibold leading-none text-[#121212]">${grandTotal}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1fr_1.2fr] items-center gap-4">
+        <div className="flex h-16 items-center rounded-full bg-[#ececee] px-3 sm:h-20 sm:px-4">
+          <button
+            type="button"
+            onClick={() => handleQuantityChange(quantity - 1)}
+            disabled={quantity <= 1}
+            className="h-10 w-10 text-2xl font-light leading-none text-[#8f8f92] transition-colors hover:text-[#5a5a5d] disabled:cursor-not-allowed disabled:opacity-35 sm:h-12 sm:w-12"
+          >
+            -
+          </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            value={quantity}
+            onChange={(event) => handleQuantityChange(parseInt(event.target.value.replace(/\D/g, ""), 10) || 1)}
+            className="h-full w-full bg-transparent text-center text-2xl font-semibold text-[#111] focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => handleQuantityChange(quantity + 1)}
+            disabled={quantity >= MAX_ITEM_QUANTITY}
+            className="h-10 w-10 text-2xl font-light leading-none text-[#8f8f92] transition-colors hover:text-[#5a5a5d] disabled:cursor-not-allowed disabled:opacity-35 sm:h-12 sm:w-12"
+          >
+            +
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => void handleAddToCart(event.currentTarget)}
+          disabled={isAddingToCart}
+          className="h-16 rounded-full bg-black px-6 text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#202022] disabled:cursor-not-allowed disabled:opacity-70 sm:h-20 sm:text-base"
+        >
+          {isAddingToCart ? "ADDING..." : "ADD TO CART"}
+        </button>
       </div>
     </div>
   )

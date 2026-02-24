@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Menu, X, ShoppingBag } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Menu, X, ShoppingBag, Search } from "lucide-react"
 import { useCart } from "@/context/CartContext"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 
@@ -18,10 +19,65 @@ const navLinks = [
 
 const WHATSAPP_CONTACT_MESSAGE = "Hi, I'm interested in your hair products"
 
+const searchableProducts = [
+  { name: "Silky Straight Clip-Ins", slug: "silky-straight-clip-ins" },
+  { name: "Honey Blonde Tape-Ins", slug: "honey-blonde-tape-ins" },
+  { name: "Body Wave Bundles", slug: "body-wave-bundles" },
+  { name: "Straight Lace Front Wig", slug: "straight-lace-front-wig" },
+  { name: "Deep Wave Closure Wig", slug: "deep-wave-closure-wig" },
+  { name: "Burgundy Bob Wig", slug: "burgundy-bob-wig" },
+  { name: "Machine Weft Straight", slug: "machine-weft-straight" },
+  { name: "Hand-Tied Loose Wave", slug: "hand-tied-loose-wave" },
+  { name: "Flat Weft Platinum", slug: "flat-weft-platinum" },
+  { name: "Virgin Straight Bulk", slug: "virgin-straight-bulk" },
+  { name: "Natural Braiding Hair", slug: "natural-braiding-hair" },
+  { name: "Wavy Bulk Premium", slug: "wavy-bulk-premium" },
+]
+
+function resolveSearchTarget(query: string): string {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) {
+    return "/#home"
+  }
+
+  const byProduct = searchableProducts.find(
+    (product) =>
+      product.name.toLowerCase().includes(normalizedQuery) || product.slug.includes(normalizedQuery)
+  )
+  if (byProduct) {
+    return `/order/${byProduct.slug}`
+  }
+
+  if (normalizedQuery.includes("bulk")) {
+    return "/#bulk"
+  }
+  if (normalizedQuery.includes("weft")) {
+    return "/#weft"
+  }
+  if (normalizedQuery.includes("extension") || normalizedQuery.includes("clip") || normalizedQuery.includes("tape")) {
+    return "/#extensions"
+  }
+  if (normalizedQuery.includes("wig")) {
+    return "/#wigs"
+  }
+
+  return "/#home"
+}
+
 export function Navbar() {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const { getTotalItems } = useCart()
   const totalItems = getTotalItems()
+
+  const handleSearchClick = () => {
+    const query = window.prompt("Search product:")
+    if (query === null) {
+      return
+    }
+    router.push(resolveSearchTarget(query))
+    setIsOpen(false)
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -52,6 +108,16 @@ export function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-4 md:flex">
+          <button
+            type="button"
+            onClick={handleSearchClick}
+            className="inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
+            aria-label="Search products"
+            title="Search"
+          >
+            <Search size={22} strokeWidth={1.8} />
+          </button>
+
           <Link
             href="/cart"
             data-cart-target="true"
@@ -81,14 +147,26 @@ export function Navbar() {
           </a>
         </div>
 
-        {/* Mobile Toggle */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="text-foreground md:hidden"
-          aria-label="Toggle navigation"
-        >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-1 md:hidden">
+          <button
+            type="button"
+            onClick={handleSearchClick}
+            className="inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
+            aria-label="Search products"
+            title="Search"
+          >
+            <Search size={22} strokeWidth={1.8} />
+          </button>
+
+          {/* Mobile Toggle */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="text-foreground"
+            aria-label="Toggle navigation"
+          >
+            {isOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </nav>
 
       {/* Mobile Nav */}

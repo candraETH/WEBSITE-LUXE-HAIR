@@ -1,0 +1,144 @@
+import { NextResponse } from "next/server"
+import { z } from "zod"
+import { hasSupabaseEnv } from "@/lib/supabase-server"
+import { enforceRateLimit } from "@/lib/rate-limit"
+import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
+import { deliverOtpCode } from "@/lib/otp-delivery"
+import { generateOtpCode, hashOtpCode, maskEmail, maskPhone } from "@/lib/otp-utils"
+import { setSecurityStoreValue } from "@/lib/security-store"
+import { queryOrderByOrderAndPhone } from "@/lib/order-lookup"
+
+export const runtime = "nodejs"
+
+const requestOtpSchema = z.object({
+  orderId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .transform((value) => value.toUpperCase())
+    .refine((value) => isValidPayPalOrderId(value), "Invalid order id."),
+  phoneNumber: z.string().trim().regex(/^\+\d{8,15}$/),
+})
+
+type OrderRow = {
+  paypal_order_id?: string | null
+  customer_name?: string | null
+  customer_email?: string | null
+  phone_number?: string | null
+  cart_json?: unknown
+}
+
+const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,phone_number,cart_json"
+const OTP_TTL_SECONDS = 10 * 60
+
+function extractCustomerPhone(row: OrderRow): string {
+  if (row.phone_number?.trim()) {
+    return row.phone_number.trim()
+  }
+
+  const root = row.cart_json
+  if (!root || typeof root !== "object" || Array.isArray(root)) {
+    return ""
+  }
+  const customer = (root as Record<string, unknown>).customer
+  if (!customer || typeof customer !== "object" || Array.isArray(customer)) {
+    return ""
+  }
+  const direct = (customer as Record<string, unknown>).phone_number
+  return typeof direct === "string" ? direct.trim() : ""
+}
+
+function extractCustomerEmail(row: OrderRow): string {
+  if (row.customer_email?.trim()) {
+    return row.customer_email.trim()
+  }
+
+  const root = row.cart_json
+  if (!root || typeof root !== "object" || Array.isArray(root)) {
+    return ""
+  }
+  const customer = (root as Record<string, unknown>).customer
+  if (!customer || typeof customer !== "object" || Array.isArray(customer)) {
+    return ""
+  }
+  const direct = (customer as Record<string, unknown>).email
+  return typeof direct === "string" ? direct.trim() : ""
+}
+
+export async function POST(request: Request) {
+  try {
+    const rateLimit = await enforceRateLimit(request, "api:order-tracking:request-otp", {
+      max: 8,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+      )
+    }
+
+    if (!isAllowedRequestOrigin(request)) {
+      return NextResponse.json({ error: "Forbidden origin." }, { status: 403 })
+    }
+
+    if (!hasSupabaseEnv) {
+      return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
+    }
+
+    const body = await request.json()
+    const parsed = requestOtpSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid request payload." }, { status: 400 })
+    }
+
+    const { orderId, phoneNumber } = parsed.data
+    const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(orderId, phoneNumber, ORDER_SELECT)
+    if (error) {
+      console.error("Order-tracking request-otp query failed:", error, `order=${orderId}`)
+      return NextResponse.json({ error: "Unable to read order data." }, { status: 500 })
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: "Order not found for the provided details." }, { status: 404 })
+    }
+
+    const otpCode = generateOtpCode()
+    const challengeId = crypto.randomUUID()
+    const context = `${orderId}|${phoneNumber}`
+    const otpHash = hashOtpCode(otpCode, context)
+    const challengePayload = {
+      orderId,
+      phoneNumber,
+      otpHash,
+      attemptsLeft: 5,
+      expiresAt: Date.now() + OTP_TTL_SECONDS * 1000,
+    }
+
+    await setSecurityStoreValue(`track-otp:${challengeId}`, challengePayload, OTP_TTL_SECONDS)
+
+    const customerPhone = extractCustomerPhone(data) || phoneNumber
+    const customerEmail = extractCustomerEmail(data)
+    const delivery = await deliverOtpCode({
+      purpose: "track_order",
+      orderId,
+      code: otpCode,
+      customerName: data.customer_name ?? "",
+      customerEmail,
+      customerPhone,
+    })
+
+    return NextResponse.json({
+      challengeId,
+      expiresInSeconds: OTP_TTL_SECONDS,
+      destination: customerEmail ? `${maskEmail(customerEmail)} / ${maskPhone(customerPhone)}` : maskPhone(customerPhone),
+      channel: delivery.channel,
+      devOtpCode: delivery.devOtpCode,
+    })
+  } catch (error) {
+    console.error("Order-tracking request-otp error:", error instanceof Error ? error.message : "Unknown error")
+    return NextResponse.json({ error: "Unable to send OTP." }, { status: 500 })
+  }
+}
+

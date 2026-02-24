@@ -2,145 +2,50 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
-import { WHATSAPP_ENABLED, buildWhatsAppUrl } from "@/lib/whatsapp-config"
+import {
+  EMPTY_CHECKOUT_DETAILS,
+  isValidEmail,
+  loadCheckoutDetails,
+  saveCheckoutDetails,
+  savePaymentDraft,
+  type CheckoutDetails,
+} from "@/lib/payment-draft"
+import { containsDisallowedAddressMarker, hasAddressLettersAndNumbers } from "@/lib/checkout-customer"
 
-const FALLBACK_COUNTRIES = [
-  "Afghanistan",
-  "Albania",
-  "Algeria",
-  "Argentina",
-  "Australia",
-  "Austria",
-  "Bahrain",
-  "Bangladesh",
-  "Belgium",
-  "Brazil",
-  "Brunei",
-  "Bulgaria",
-  "Cambodia",
-  "Canada",
-  "Chile",
-  "China",
-  "Colombia",
-  "Croatia",
-  "Czech Republic",
-  "Denmark",
-  "Egypt",
-  "Finland",
-  "France",
-  "Germany",
-  "Greece",
-  "Hong Kong",
-  "Hungary",
-  "India",
-  "Indonesia",
-  "Ireland",
-  "Israel",
-  "Italy",
-  "Japan",
-  "Jordan",
-  "Kenya",
-  "Kuwait",
-  "Laos",
-  "Lebanon",
-  "Luxembourg",
-  "Malaysia",
-  "Mexico",
-  "Morocco",
-  "Myanmar",
-  "Netherlands",
-  "New Zealand",
-  "Nigeria",
-  "Norway",
-  "Pakistan",
-  "Philippines",
-  "Poland",
-  "Portugal",
-  "Qatar",
-  "Romania",
-  "Saudi Arabia",
-  "Singapore",
-  "South Africa",
-  "South Korea",
-  "Spain",
-  "Sri Lanka",
-  "Sweden",
-  "Switzerland",
-  "Taiwan",
-  "Thailand",
-  "Turkey",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Vietnam",
-]
-
-const CHECKOUT_FORM_STORAGE_KEY = "candrashair-checkout-form-v1"
-
-type CustomerDetails = {
-  fullName: string
-  phoneNumber: string
-  addressLine: string
-  country: string
-  city: string
-  province: string
-  postalCode: string
-  notes: string
+type RequestVerificationResponse = {
+  error?: string
+  challengeId?: string
+  destination?: string
+  devOtpCode?: string
 }
 
-const EMPTY_CUSTOMER_DETAILS: CustomerDetails = {
-  fullName: "",
-  phoneNumber: "",
-  addressLine: "",
-  country: "",
-  city: "",
-  province: "",
-  postalCode: "",
-  notes: "",
-}
-
-function getCountryOptions(): string[] {
-  const intlWithRegions = Intl as unknown as {
-    DisplayNames?: typeof Intl.DisplayNames
-    supportedValuesOf?: (type: string) => string[]
-  }
-
-  if (intlWithRegions.supportedValuesOf && intlWithRegions.DisplayNames) {
-    try {
-      const display = new Intl.DisplayNames(["en"], { type: "region" })
-      const countryNames = intlWithRegions
-        .supportedValuesOf("region")
-        .filter((code) => /^[A-Z]{2}$/.test(code))
-        .map((code) => display.of(code) ?? "")
-        .filter((name) => Boolean(name) && name !== "Unknown Region")
-
-      if (countryNames.length > 0) {
-        return Array.from(new Set(countryNames)).sort((a, b) => a.localeCompare(b))
-      }
-    } catch {
-      // fallback to static list when region key is not supported
-    }
-  }
-
-  return [...FALLBACK_COUNTRIES]
+type VerifyVerificationResponse = {
+  error?: string
+  verificationToken?: string
 }
 
 export default function CartPage() {
   const { items, isCartReady, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
   const [continueShoppingHref, setContinueShoppingHref] = useState("/")
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
+  const [checkoutDetails, setCheckoutDetails] = useState<CheckoutDetails>(EMPTY_CHECKOUT_DETAILS)
+  const [isCheckoutDetailsReady, setIsCheckoutDetailsReady] = useState(false)
   const [checkoutError, setCheckoutError] = useState("")
   const [paypalError, setPaypalError] = useState("")
   const [paypalInfo, setPaypalInfo] = useState("")
   const [paypalLoading, setPaypalLoading] = useState(false)
-  const processedPayPalTokenRef = useRef<string | null>(null)
-  const countryOptions = useMemo(() => getCountryOptions(), [])
-  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>(EMPTY_CUSTOMER_DETAILS)
+  const [verificationChallengeId, setVerificationChallengeId] = useState("")
+  const [verificationCode, setVerificationCode] = useState("")
+  const [verificationToken, setVerificationToken] = useState("")
+  const [verificationLoading, setVerificationLoading] = useState(false)
+  const [verificationInfo, setVerificationInfo] = useState("")
+  const [verificationError, setVerificationError] = useState("")
+  const [verificationDevCode, setVerificationDevCode] = useState("")
 
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
@@ -165,49 +70,39 @@ export default function CartPage() {
   }, [])
 
   useEffect(() => {
-    try {
-      const savedCheckoutState = window.localStorage.getItem(CHECKOUT_FORM_STORAGE_KEY)
-      if (!savedCheckoutState) {
-        return
-      }
-
-      const parsedData: unknown = JSON.parse(savedCheckoutState)
-      if (!parsedData || typeof parsedData !== "object") {
-        return
-      }
-
-      const saved = parsedData as Partial<CustomerDetails> & { showCheckoutForm?: boolean }
-
-      setCustomerDetails({
-        fullName: typeof saved.fullName === "string" ? saved.fullName : "",
-        phoneNumber: typeof saved.phoneNumber === "string" ? saved.phoneNumber : "",
-        addressLine: typeof saved.addressLine === "string" ? saved.addressLine : "",
-        country: typeof saved.country === "string" ? saved.country : "",
-        city: typeof saved.city === "string" ? saved.city : "",
-        province: typeof saved.province === "string" ? saved.province : "",
-        postalCode: typeof saved.postalCode === "string" ? saved.postalCode : "",
-        notes: typeof saved.notes === "string" ? saved.notes : "",
-      })
-
-      if (typeof saved.showCheckoutForm === "boolean") {
-        setShowCheckoutForm(saved.showCheckoutForm)
-      }
-    } catch {
-      // ignore invalid checkout draft data
-    }
+    setCheckoutDetails(loadCheckoutDetails())
+    setIsCheckoutDetailsReady(true)
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(
-      CHECKOUT_FORM_STORAGE_KEY,
-      JSON.stringify({ ...customerDetails, showCheckoutForm })
-    )
-  }, [customerDetails, showCheckoutForm])
+    if (!isCheckoutDetailsReady) {
+      return
+    }
+
+    saveCheckoutDetails(checkoutDetails)
+  }, [checkoutDetails, isCheckoutDetailsReady])
+
+  useEffect(() => {
+    setVerificationToken("")
+    setVerificationChallengeId("")
+    setVerificationCode("")
+    setVerificationInfo("")
+    setVerificationError("")
+    setVerificationDevCode("")
+  }, [
+    checkoutDetails.fullName,
+    checkoutDetails.email,
+    checkoutDetails.whatsapp,
+    checkoutDetails.addressLine,
+    checkoutDetails.city,
+    checkoutDetails.province,
+    checkoutDetails.postalCode,
+    checkoutDetails.country,
+  ])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const paypalStatus = params.get("paypal")
-    const paypalOrderId = params.get("token")
 
     if (paypalStatus === "cancel") {
       setPaypalInfo("PayPal payment was cancelled.")
@@ -215,40 +110,6 @@ export default function CartPage() {
       window.history.replaceState({}, "", "/cart")
       return
     }
-
-    if (paypalStatus !== "success" || !paypalOrderId) {
-      return
-    }
-
-    if (processedPayPalTokenRef.current === paypalOrderId) {
-      return
-    }
-
-    processedPayPalTokenRef.current = paypalOrderId
-    setPaypalLoading(true)
-    setPaypalError("")
-    setPaypalInfo("")
-
-    fetch("/api/capture-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: paypalOrderId }),
-    })
-      .then(async (response) => {
-        const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to capture PayPal payment.")
-        }
-        setPaypalInfo(data.message || "Payment captured. Waiting for secure webhook confirmation.")
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : "Failed to capture PayPal payment."
-        setPaypalError(message)
-      })
-      .finally(() => {
-        setPaypalLoading(false)
-        window.history.replaceState({}, "", "/cart")
-      })
   }, [])
 
   if (!isCartReady) {
@@ -299,6 +160,8 @@ export default function CartPage() {
   const isFreeShipping = totalPrice >= FREE_SHIPPING_THRESHOLD
   const taxAmount = parseFloat((totalPrice * TAX_RATE).toFixed(2))
   const finalTotal = parseFloat((totalPrice + taxAmount).toFixed(2))
+  const CHECKOUT_OTP_THRESHOLD_DOLLARS = 2500
+  const requiresCheckoutOtp = finalTotal >= CHECKOUT_OTP_THRESHOLD_DOLLARS
 
   const getDisplayName = (item: (typeof items)[number]) => {
     const variant = item.variant?.trim()
@@ -313,67 +176,167 @@ export default function CartPage() {
     return `${item.name} ${variant}`
   }
 
-  const handleCheckoutButtonClick = () => {
-    if (!WHATSAPP_ENABLED) {
-      setShowCheckoutForm(false)
-      setCheckoutError("WhatsApp checkout is temporarily disabled.")
-      return
+  const updateCheckoutField = (field: keyof CheckoutDetails, value: string) => {
+    setCheckoutDetails((previous) => ({ ...previous, [field]: value }))
+    if (checkoutError) {
+      setCheckoutError("")
     }
-
-    setShowCheckoutForm((prev) => !prev)
-    setCheckoutError("")
   }
 
-  const handleCheckout = () => {
-    if (!WHATSAPP_ENABLED) {
-      setCheckoutError("WhatsApp checkout is temporarily disabled.")
+  const normalizeWhatsAppInput = (value: string) => {
+    const digits = value.replace(/\D/g, "")
+    if (!digits) {
+      return ""
+    }
+    return `+${digits}`
+  }
+
+  const getNormalizedCheckoutDetails = (): CheckoutDetails => ({
+    fullName: checkoutDetails.fullName.trim(),
+    email: checkoutDetails.email.trim(),
+    whatsapp: checkoutDetails.whatsapp.replace(/[\s()-]/g, ""),
+    addressLine: checkoutDetails.addressLine.trim(),
+    city: checkoutDetails.city.trim(),
+    province: checkoutDetails.province.trim(),
+    postalCode: checkoutDetails.postalCode.trim(),
+    country: checkoutDetails.country.trim(),
+  })
+
+  const validateCheckoutDetails = () => {
+    if (!checkoutDetails.fullName.trim()) {
+      return "Full name is required before payment."
+    }
+
+    if (!checkoutDetails.email.trim()) {
+      return "Email is required before payment."
+    }
+
+    if (!isValidEmail(checkoutDetails.email)) {
+      return "Please enter a valid email address."
+    }
+
+    const compactWhatsApp = checkoutDetails.whatsapp.replace(/[\s()-]/g, "")
+    if (!compactWhatsApp) {
+      return "WhatsApp number is required before payment."
+    }
+
+    if (!/^\+\d{8,15}$/.test(compactWhatsApp)) {
+      return "Use WhatsApp format with country code, e.g. +62812xxxxxxx."
+    }
+
+    if (checkoutDetails.country.trim().toLowerCase() === "indonesia" && !compactWhatsApp.startsWith("+62")) {
+      return "For Indonesia, WhatsApp number must start with +62."
+    }
+
+    if (!checkoutDetails.addressLine.trim()) {
+      return "Shipping address is required before payment."
+    }
+    if (!hasAddressLettersAndNumbers(checkoutDetails.addressLine)) {
+      return "Shipping address must include letters and numbers."
+    }
+    if (containsDisallowedAddressMarker(checkoutDetails.addressLine)) {
+      return "Please enter a valid shipping address."
+    }
+
+    if (!checkoutDetails.city.trim()) {
+      return "City is required before payment."
+    }
+
+    if (!checkoutDetails.province.trim()) {
+      return "Province is required before payment."
+    }
+
+    if (!checkoutDetails.postalCode.trim()) {
+      return "Postal code is required before payment."
+    }
+
+    if (!checkoutDetails.country.trim()) {
+      return "Country is required before payment."
+    }
+
+    return ""
+  }
+
+  const handleRequestVerificationCode = async () => {
+    const checkoutValidationError = validateCheckoutDetails()
+    if (checkoutValidationError) {
+      setCheckoutError(checkoutValidationError)
       return
     }
 
-    const requiredFields: Array<{ key: keyof typeof customerDetails; label: string }> = [
-      { key: "fullName", label: "Full Name" },
-      { key: "phoneNumber", label: "Phone Number" },
-      { key: "addressLine", label: "Address" },
-      { key: "country", label: "Country" },
-      { key: "city", label: "City" },
-      { key: "province", label: "Province" },
-      { key: "postalCode", label: "Postal Code" },
-    ]
+    setVerificationLoading(true)
+    setVerificationError("")
+    setVerificationInfo("")
+    setVerificationDevCode("")
 
-    const missingField = requiredFields.find(({ key }) => !customerDetails[key].trim())
-    if (missingField) {
-      setCheckoutError(`Please fill ${missingField.label} before sending your order.`)
+    try {
+      const normalizedDetails = getNormalizedCheckoutDetails()
+      const response = await fetch("/api/checkout/request-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: normalizedDetails,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => ({}))) as RequestVerificationResponse
+      if (!response.ok || !payload.challengeId) {
+        throw new Error(payload.error || "Unable to send verification code.")
+      }
+
+      setVerificationChallengeId(payload.challengeId)
+      setVerificationCode("")
+      setVerificationInfo(payload.destination ? `Verification code sent to ${payload.destination}.` : "Verification code sent.")
+      setVerificationDevCode(payload.devOtpCode ?? "")
+      setCheckoutError("")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send verification code."
+      setVerificationError(message)
+    } finally {
+      setVerificationLoading(false)
+    }
+  }
+
+  const handleVerifyCheckoutCode = async () => {
+    if (!verificationChallengeId) {
+      setVerificationError("Request a verification code first.")
       return
     }
 
-    const itemsList = items
-      .map(
-        (item) =>
-          `\u2022 ${getDisplayName(item)} - ${item.quantity}x - $${(item.price * item.quantity).toFixed(2)} (${item.length}")`
-      )
-      .join("\n")
+    if (!/^\d{6}$/.test(verificationCode.trim())) {
+      setVerificationError("Enter a valid 6-digit verification code.")
+      return
+    }
 
-    const addressLines = [
-      `Name: ${customerDetails.fullName.trim()}`,
-      `Phone: ${customerDetails.phoneNumber.trim()}`,
-      `Address: ${customerDetails.addressLine.trim()}`,
-      `Country: ${customerDetails.country.trim()}`,
-      `City: ${customerDetails.city.trim()}`,
-      `Province: ${customerDetails.province.trim()}`,
-      `Postal Code: ${customerDetails.postalCode.trim()}`,
-      customerDetails.notes.trim() ? `Notes: ${customerDetails.notes.trim()}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n")
+    setVerificationLoading(true)
+    setVerificationError("")
+    setVerificationInfo("")
 
-    const shippingLine = isFreeShipping
-      ? `Shipping: Free (orders over $${FREE_SHIPPING_THRESHOLD})`
-      : "Shipping: Calculated at checkout"
+    try {
+      const response = await fetch("/api/checkout/verify-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: verificationChallengeId,
+          otpCode: verificationCode.trim(),
+        }),
+      })
 
-    const message =
-      `Hi, I'd like to place an order with the following items:\n\n${itemsList}\n\nSubtotal: $${totalPrice.toFixed(2)}\nTax (3.5%): $${taxAmount.toFixed(2)}\n${shippingLine}\nTotal: $${finalTotal.toFixed(2)}\n\nShipping details:\n${addressLines}\n\nPlease confirm availability and proceed with the order. Thank you!`
+      const payload = (await response.json().catch(() => ({}))) as VerifyVerificationResponse
+      if (!response.ok || !payload.verificationToken) {
+        throw new Error(payload.error || "Unable to verify code.")
+      }
 
-    window.open(buildWhatsAppUrl(message), "_blank", "noopener,noreferrer")
+      setVerificationToken(payload.verificationToken)
+      setVerificationInfo("Phone and shipping details verified.")
+      setVerificationError("")
+      setCheckoutError("")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to verify code."
+      setVerificationError(message)
+    } finally {
+      setVerificationLoading(false)
+    }
   }
 
   const handlePayPalCheckout = async () => {
@@ -382,31 +345,91 @@ export default function CartPage() {
       return
     }
 
+    if (!showCheckoutForm) {
+      setShowCheckoutForm(true)
+      setCheckoutError("")
+      setPaypalError("")
+      setPaypalInfo("")
+      return
+    }
+
+    const checkoutValidationError = validateCheckoutDetails()
+    if (checkoutValidationError) {
+      setCheckoutError(checkoutValidationError)
+      setPaypalError("")
+      return
+    }
+
+    if (requiresCheckoutOtp && !verificationToken) {
+      setCheckoutError("Verification code is required for orders of $2500 or more.")
+      setPaypalError("")
+      return
+    }
+
     setPaypalLoading(true)
+    setCheckoutError("")
     setPaypalError("")
     setPaypalInfo("")
 
     try {
+      const normalizedDetails = getNormalizedCheckoutDetails()
+
+      const checkoutItemsPayload = items.map((item) => ({
+        slug: item.slug,
+        length: item.length,
+        quantity: item.quantity,
+        variant: item.variant,
+      }))
+
       const response = await fetch("/api/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            slug: item.slug,
-            length: item.length,
-            quantity: item.quantity,
-            variant: item.variant,
-          })),
-        }),
+        body: JSON.stringify(
+          requiresCheckoutOtp
+            ? {
+                items: checkoutItemsPayload,
+                customer: normalizedDetails,
+                verificationToken,
+              }
+            : {
+                items: checkoutItemsPayload,
+                customer: normalizedDetails,
+              }
+        ),
       })
 
       const data = (await response.json().catch(() => ({}))) as {
         error?: string
+        orderId?: string
         approveUrl?: string
       }
 
-      if (!response.ok || !data.approveUrl) {
+      if (!response.ok || !data.approveUrl || !data.orderId) {
         throw new Error(data.error || "Unable to initialize PayPal checkout.")
+      }
+
+      savePaymentDraft({
+        orderId: data.orderId,
+        status: "PENDING",
+        currency: "USD",
+        subtotal: totalPrice,
+        tax: taxAmount,
+        total: finalTotal,
+        customer: normalizedDetails,
+        items: items.map((item) => ({
+          slug: item.slug,
+          name: getDisplayName(item),
+          length: item.length,
+          variant: item.variant,
+          quantity: item.quantity,
+          unitPrice: item.price,
+        })),
+        createdAt: Date.now(),
+      })
+
+      const cartData = JSON.parse(window.localStorage.getItem("candrashair-cart-v1") || "[]") || []
+      if (Array.isArray(cartData)) {
+        window.localStorage.setItem("candrashair-cart-v1", JSON.stringify(cartData))
       }
 
       window.location.href = data.approveUrl
@@ -416,6 +439,12 @@ export default function CartPage() {
       setPaypalLoading(false)
     }
   }
+
+  const liveCheckoutValidationError = showCheckoutForm ? validateCheckoutDetails() : ""
+  const isCheckoutReadyForPayment =
+    showCheckoutForm &&
+    liveCheckoutValidationError === "" &&
+    (!requiresCheckoutOtp || Boolean(verificationToken))
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
@@ -468,7 +497,7 @@ export default function CartPage() {
                       {getDisplayName(item)}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Length: <span className="font-semibold text-foreground">{item.length}"</span>
+                      Length: <span className="font-semibold text-foreground">{item.length}&quot;</span>
                     </p>
                   </div>
 
@@ -565,13 +594,177 @@ export default function CartPage() {
                 </div>
               </div>
 
+              {showCheckoutForm && (
+                <div className="space-y-3 rounded-xl border border-[#D4AF37]/25 bg-white/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[#A77B15]">
+                    Contact & Shipping (All fields are required)
+                  </p>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Full Name *
+                    <input
+                      type="text"
+                      value={checkoutDetails.fullName}
+                      onChange={(event) => updateCheckoutField("fullName", event.target.value)}
+                      placeholder="Your full name"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Email *
+                    <input
+                      type="email"
+                      value={checkoutDetails.email}
+                      onChange={(event) => updateCheckoutField("email", event.target.value)}
+                      placeholder="you@example.com"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    WhatsApp Number *
+                    <input
+                      type="tel"
+                      value={checkoutDetails.whatsapp}
+                      onChange={(event) => updateCheckoutField("whatsapp", normalizeWhatsAppInput(event.target.value))}
+                      placeholder="Country code + WhatsApp number"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Shipping Address *
+                    <textarea
+                      value={checkoutDetails.addressLine}
+                      onChange={(event) => updateCheckoutField("addressLine", event.target.value)}
+                      rows={3}
+                      placeholder="Street, building, district, and notes for delivery"
+                      className="mt-1 w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    City *
+                    <input
+                      type="text"
+                      value={checkoutDetails.city}
+                      onChange={(event) => updateCheckoutField("city", event.target.value)}
+                      placeholder="City"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Province *
+                    <input
+                      type="text"
+                      value={checkoutDetails.province}
+                      onChange={(event) => updateCheckoutField("province", event.target.value)}
+                      placeholder="Province"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Postal Code *
+                    <input
+                      type="text"
+                      value={checkoutDetails.postalCode}
+                      onChange={(event) => updateCheckoutField("postalCode", event.target.value)}
+                      placeholder="Postal code"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Country *
+                    <input
+                      type="text"
+                      value={checkoutDetails.country}
+                      onChange={(event) => updateCheckoutField("country", event.target.value)}
+                      placeholder="Country"
+                      className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                  </label>
+
+                  {requiresCheckoutOtp ? (
+                    <div className="space-y-2 rounded-lg border border-[#D4AF37]/20 bg-[#FFFDF8] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-[#A77B15]">
+                        Security Verification Required
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Orders of $2500 or more must be verified before final checkout.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleRequestVerificationCode()}
+                        disabled={verificationLoading}
+                        className={`w-full rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors ${
+                          verificationLoading ? "cursor-not-allowed opacity-70" : "hover:bg-secondary"
+                        }`}
+                      >
+                        {verificationLoading ? "Sending..." : "Send Verification Code"}
+                      </button>
+
+                      {verificationChallengeId && (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            value={verificationCode}
+                            onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
+                            placeholder="Enter 6-digit code"
+                            className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => void handleVerifyCheckoutCode()}
+                            disabled={verificationLoading}
+                            className={`w-full rounded-md bg-foreground px-3 py-2 text-xs font-semibold uppercase tracking-widest text-background transition-colors ${
+                              verificationLoading ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
+                            }`}
+                          >
+                            {verificationLoading ? "Verifying..." : "Verify Code"}
+                          </button>
+                        </div>
+                      )}
+
+                      {verificationInfo && (
+                        <p className="text-xs font-medium text-[#2E7D32]">{verificationInfo}</p>
+                      )}
+                      {verificationDevCode && (
+                        <p className="text-xs font-medium text-amber-700">
+                          Dev verification code: {verificationDevCode}
+                        </p>
+                      )}
+                      {verificationError && (
+                        <p className="text-xs font-medium text-red-500">{verificationError}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-[#D4AF37]/20 bg-[#FFFDF8] p-3">
+                      <p className="text-xs text-muted-foreground">
+                        OTP verification applies only to orders of $2500 or more.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="space-y-3">
                 <button
                   onClick={() => void handlePayPalCheckout()}
-                  disabled={paypalLoading}
+                  disabled={paypalLoading || (showCheckoutForm && !isCheckoutReadyForPayment)}
                   className={`w-full group flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1B63D0] to-[#174EA6] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95 ${
-                    paypalLoading ? "cursor-not-allowed opacity-75 hover:scale-100 hover:shadow-lg" : ""
+                    paypalLoading || (showCheckoutForm && !isCheckoutReadyForPayment)
+                      ? "cursor-not-allowed opacity-75 hover:scale-100 hover:shadow-lg"
+                      : ""
                   }`}
                 >
                   <svg
@@ -586,154 +779,28 @@ export default function CartPage() {
                       d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513c-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541c-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"
                     />
                   </svg>
-                  <span>{paypalLoading ? "Processing PayPal..." : "Pay with PayPal"}</span>
-                </button>
-
-                <button
-                  onClick={handleCheckoutButtonClick}
-                  disabled={!WHATSAPP_ENABLED}
-                  className={`w-full group flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#25D366] to-[#20BA5A] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95 ${
-                    !WHATSAPP_ENABLED ? "cursor-not-allowed opacity-60 hover:scale-100 hover:shadow-lg" : ""
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 transition-transform group-hover:scale-110">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                  </svg>
                   <span>
-                    {WHATSAPP_ENABLED ? (showCheckoutForm ? "Hide Address Form" : "Checkout via WhatsApp") : "WhatsApp Temporarily Disabled"}
+                    {paypalLoading
+                      ? "Processing PayPal..."
+                      : showCheckoutForm
+                        ? "Continue to PayPal"
+                        : "Pay with PayPal"}
                   </span>
                 </button>
 
-                {showCheckoutForm && (
-                  <div className="space-y-4 rounded-xl border border-[#D4AF37]/30 bg-gradient-to-b from-white to-[#FFFCF6] p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#C89E33]">
-                      Shipping Details
-                    </p>
+                {!showCheckoutForm && (
+                  <p className="text-xs font-medium text-amber-700">
+                    Click &quot;Pay with PayPal&quot; first to open the required checkout form.
+                  </p>
+                )}
 
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">Full Name</span>
-                          <input
-                            type="text"
-                            value={customerDetails.fullName}
-                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, fullName: e.target.value }))}
-                            placeholder="Enter full name"
-                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                          />
-                        </label>
-
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">Phone Number</span>
-                          <input
-                            type="text"
-                            value={customerDetails.phoneNumber}
-                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                            placeholder="Enter phone number"
-                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">Country</span>
-                        <select
-                          value={customerDetails.country}
-                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, country: e.target.value }))}
-                          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                        >
-                          <option value="">Select country</option>
-                          {countryOptions.map((country) => (
-                            <option key={country} value={country}>
-                              {country}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Complete Address
-                          <span className="ml-1 text-[11px] text-muted-foreground/70">
-                            ({customerDetails.addressLine.length}/220)
-                          </span>
-                        </span>
-                        <textarea
-                          value={customerDetails.addressLine}
-                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, addressLine: e.target.value }))}
-                          placeholder="Street, building, district, and additional details"
-                          rows={3}
-                          maxLength={220}
-                          className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                        />
-                      </label>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">City</span>
-                          <input
-                            type="text"
-                            value={customerDetails.city}
-                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, city: e.target.value }))}
-                            placeholder="City"
-                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                          />
-                        </label>
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">Postal Code</span>
-                          <input
-                            type="text"
-                            value={customerDetails.postalCode}
-                            onChange={(e) => setCustomerDetails((prev) => ({ ...prev, postalCode: e.target.value }))}
-                            placeholder="Postal code"
-                            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">Province</span>
-                        <input
-                          type="text"
-                          value={customerDetails.province}
-                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, province: e.target.value }))}
-                          placeholder="Province"
-                          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                        />
-                      </label>
-
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Notes
-                          <span className="ml-1 text-[11px] text-muted-foreground/70">
-                            ({customerDetails.notes.length}/140)
-                          </span>
-                        </span>
-                        <textarea
-                          value={customerDetails.notes}
-                          onChange={(e) => setCustomerDetails((prev) => ({ ...prev, notes: e.target.value }))}
-                          placeholder="Optional instructions for CS"
-                          rows={2}
-                          maxLength={140}
-                          className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                        />
-                      </label>
-                    </div>
-
-                    {checkoutError && (
-                      <p className="text-xs font-medium text-red-500">{checkoutError}</p>
-                    )}
-
-                    <button
-                      onClick={handleCheckout}
-                      disabled={!WHATSAPP_ENABLED}
-                      className={`w-full rounded-lg bg-gradient-to-r from-[#25D366] to-[#20BA5A] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:brightness-105 ${
-                        !WHATSAPP_ENABLED ? "cursor-not-allowed opacity-60 hover:brightness-100" : ""
-                      }`}
-                    >
-                      Send Order + Address to WhatsApp
-                    </button>
-                  </div>
+                {showCheckoutForm && !isCheckoutReadyForPayment && !checkoutError && (
+                  <p className="text-xs font-medium text-amber-600">
+                    {liveCheckoutValidationError ||
+                      (requiresCheckoutOtp
+                        ? "Complete verification to continue payment."
+                        : "Complete contact and shipping details to continue payment.")}
+                  </p>
                 )}
 
                 <Link href={continueShoppingHref} className="block">
@@ -753,6 +820,9 @@ export default function CartPage() {
 
                 {paypalInfo && (
                   <p className="text-xs font-medium text-[#1B63D0]">{paypalInfo}</p>
+                )}
+                {checkoutError && (
+                  <p className="text-xs font-medium text-red-500">{checkoutError}</p>
                 )}
                 {paypalError && (
                   <p className="text-xs font-medium text-red-500">{paypalError}</p>
