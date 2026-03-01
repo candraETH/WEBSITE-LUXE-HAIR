@@ -10,6 +10,8 @@ type TrackedOrder = {
   amount: number
   currency: string
   customerName: string
+  customerEmailMasked?: string
+  canSendInvoice?: boolean
   phoneNumber: string
   trackingNumber: string
   shippingCarrier: string
@@ -21,18 +23,10 @@ type TrackReadResponse = {
   orders?: TrackedOrder[]
 }
 
-type RequestOtpResponse = {
+type SendInvoiceResponse = {
   error?: string
-  challengeId?: string
-  expiresInSeconds?: number
+  message?: string
   destination?: string
-  channel?: string
-  devOtpCode?: string
-}
-
-type VerifyOtpResponse = {
-  error?: string
-  sessionToken?: string
 }
 
 const DHL_TRACKING_BASE_URL = "https://www.dhl.com/global-en/home/tracking.html"
@@ -238,19 +232,17 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
 export default function TrackOrderPage() {
   const [orderId, setOrderId] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
-  const [otpChallengeId, setOtpChallengeId] = useState("")
-  const [otpCode, setOtpCode] = useState("")
-  const [otpInfo, setOtpInfo] = useState("")
-  const [otpDevCode, setOtpDevCode] = useState("")
-  const [trackingSessionToken, setTrackingSessionToken] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [orders, setOrders] = useState<TrackedOrder[]>([])
   const [searched, setSearched] = useState(false)
+  const [invoiceOptInByOrder, setInvoiceOptInByOrder] = useState<Record<string, boolean>>({})
+  const [invoiceLoadingByOrder, setInvoiceLoadingByOrder] = useState<Record<string, boolean>>({})
+  const [invoiceSuccessByOrder, setInvoiceSuccessByOrder] = useState<Record<string, string>>({})
+  const [invoiceErrorByOrder, setInvoiceErrorByOrder] = useState<Record<string, string>>({})
   const primaryOrder = orders[0] ?? null
 
-  const canRequestOtp = useMemo(() => Boolean(orderId.trim() && phoneNumber.trim()), [orderId, phoneNumber])
-  const canVerifyOtp = useMemo(() => Boolean(otpChallengeId && /^\d{6}$/.test(otpCode.trim())), [otpChallengeId, otpCode])
+  const canTrackOrder = useMemo(() => Boolean(orderId.trim() && phoneNumber.trim()), [orderId, phoneNumber])
 
   const normalizePhone = () => {
     const normalizedPhoneDigits = phoneNumber.replace(/\D/g, "")
@@ -258,39 +250,19 @@ export default function TrackOrderPage() {
   }
 
   const resetTrackingState = () => {
-    setOtpChallengeId("")
-    setOtpCode("")
-    setOtpInfo("")
-    setOtpDevCode("")
-    setTrackingSessionToken("")
     setOrders([])
     setSearched(false)
+    setError("")
+    setInvoiceOptInByOrder({})
+    setInvoiceLoadingByOrder({})
+    setInvoiceSuccessByOrder({})
+    setInvoiceErrorByOrder({})
   }
 
-  const fetchTrackedOrder = async (sessionToken: string) => {
-    const response = await fetch("/api/order-tracking", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionToken }),
-    })
-
-    const data = (await response.json().catch(() => ({}))) as TrackReadResponse
-    if (!response.ok) {
-      throw new Error(data.error || "Unable to track order.")
-    }
-
-    const nextOrders = Array.isArray(data.orders) ? data.orders : []
-    setOrders(nextOrders)
-    setSearched(true)
-    if (nextOrders.length === 0) {
-      setError("No order found.")
-    }
-  }
-
-  const handleRequestOtp = async (event: FormEvent<HTMLFormElement>) => {
+  const handleTrackOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!canRequestOtp) {
+    if (!canTrackOrder) {
       setError("Enter both Order ID and Phone Number.")
       return
     }
@@ -305,76 +277,102 @@ export default function TrackOrderPage() {
     setError("")
     setOrders([])
     setSearched(false)
+    setInvoiceOptInByOrder({})
+    setInvoiceLoadingByOrder({})
+    setInvoiceSuccessByOrder({})
+    setInvoiceErrorByOrder({})
 
     try {
-      const response = await fetch("/api/order-tracking/request-otp", {
+      const response = await fetch("/api/order-tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId: orderId.trim(),
+          orderId: orderId.trim().toUpperCase(),
           phoneNumber: normalizedPhone,
         }),
       })
 
-      const data = (await response.json().catch(() => ({}))) as RequestOtpResponse
+      const data = (await response.json().catch(() => ({}))) as TrackReadResponse
       if (!response.ok) {
-        throw new Error(data.error || "Unable to send OTP.")
+        throw new Error(data.error || "Unable to track order.")
       }
 
-      if (!data.challengeId) {
-        throw new Error("Unable to initialize OTP verification.")
+      const nextOrders = Array.isArray(data.orders) ? data.orders : []
+      setOrders(nextOrders)
+      setSearched(true)
+      if (nextOrders.length === 0) {
+        setError("No order found.")
       }
-
-      setOtpChallengeId(data.challengeId)
-      setOtpCode("")
-      setOtpInfo(data.destination ? `Verification code sent to ${data.destination}.` : "Verification code sent.")
-      setOtpDevCode(data.devOtpCode ?? "")
-      setTrackingSessionToken("")
     } catch (requestError) {
-      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to send OTP."
+      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to track order."
       setError(safeMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerifyOtp = async () => {
-    if (!canVerifyOtp) {
-      setError("Enter the 6-digit OTP code.")
+  const handleSendInvoice = async (targetOrderId: string) => {
+    if (!invoiceOptInByOrder[targetOrderId]) {
+      setInvoiceErrorByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: "Select the invoice option first.",
+      }))
       return
     }
 
-    setLoading(true)
-    setError("")
-    setOrders([])
+    const normalizedPhone = normalizePhone()
+    if (!normalizedPhone) {
+      setInvoiceErrorByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: "Phone number is missing. Please search the order again.",
+      }))
+      return
+    }
+
+    setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: true }))
+    setInvoiceErrorByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+    setInvoiceSuccessByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
 
     try {
-      const verifyResponse = await fetch("/api/order-tracking/verify-otp", {
+      const response = await fetch("/api/order-tracking/send-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          challengeId: otpChallengeId,
-          otpCode: otpCode.trim(),
+          orderId: targetOrderId,
+          phoneNumber: normalizedPhone,
         }),
       })
 
-      const verifyData = (await verifyResponse.json().catch(() => ({}))) as VerifyOtpResponse
-      if (!verifyResponse.ok || !verifyData.sessionToken) {
-        throw new Error(verifyData.error || "Unable to verify OTP.")
+      const data = (await response.json().catch(() => ({}))) as SendInvoiceResponse
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to send invoice.")
       }
 
-      setTrackingSessionToken(verifyData.sessionToken)
-      await fetchTrackedOrder(verifyData.sessionToken)
+      const successMessage = data.destination
+        ? `${data.message || "Invoice sent successfully."} (${data.destination})`
+        : data.message || "Invoice sent successfully."
+
+      setInvoiceSuccessByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: successMessage,
+      }))
+      setInvoiceOptInByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: false,
+      }))
     } catch (requestError) {
-      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to verify OTP."
-      setError(safeMessage)
+      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to send invoice."
+      setInvoiceErrorByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: safeMessage,
+      }))
     } finally {
-      setLoading(false)
+      setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: false }))
     }
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       <Navbar />
 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:py-14">
@@ -398,10 +396,10 @@ export default function TrackOrderPage() {
           </p>
           <h1 className="mt-3 font-serif text-3xl font-bold text-foreground sm:text-4xl">Track Your Order</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Enter your PayPal Order ID and WhatsApp number, then verify OTP before viewing order details.
+            Enter your PayPal Order ID and WhatsApp number to view order details.
           </p>
 
-          <form className="mt-6 space-y-4" onSubmit={handleRequestOtp}>
+          <form className="mt-6 space-y-4" onSubmit={handleTrackOrder}>
             <label className="block text-xs font-medium text-muted-foreground">
               Order ID
               <input
@@ -432,58 +430,14 @@ export default function TrackOrderPage() {
 
             <button
               type="submit"
-              disabled={loading || !canRequestOtp}
+              disabled={loading || !canTrackOrder}
               className={`w-full rounded-lg bg-foreground px-5 py-3 text-sm font-semibold uppercase tracking-widest text-background transition-colors ${
-                loading || !canRequestOtp ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
+                loading || !canTrackOrder ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
               }`}
             >
-              {loading ? "Sending OTP..." : "Send OTP Code"}
+              {loading ? "Checking..." : "Track Order"}
             </button>
           </form>
-
-          {otpInfo && (
-            <div className="mt-4 rounded-md border border-[#D4AF37]/30 bg-[#FFFDF8] p-3">
-              <p className="text-sm font-medium text-foreground">{otpInfo}</p>
-              {otpDevCode && (
-                <p className="mt-1 text-xs text-amber-700">
-                  Dev OTP code: <span className="font-semibold">{otpDevCode}</span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {otpChallengeId && (
-            <div className="mt-4 space-y-3 rounded-md border border-border/40 bg-white p-4">
-              <label className="block text-xs font-medium text-muted-foreground">
-                Verification Code (OTP)
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ""))}
-                  placeholder="Enter 6-digit code"
-                  className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={() => void handleVerifyOtp()}
-                disabled={loading || !canVerifyOtp}
-                className={`w-full rounded-lg border border-border px-5 py-3 text-sm font-semibold uppercase tracking-widest text-foreground transition-colors ${
-                  loading || !canVerifyOtp ? "cursor-not-allowed opacity-70" : "hover:bg-secondary"
-                }`}
-              >
-                {loading ? "Verifying..." : "Verify OTP & Track Order"}
-              </button>
-            </div>
-          )}
-
-          {trackingSessionToken && orders.length > 0 && (
-            <p className="mt-3 text-xs font-medium text-[#2E7D32]">OTP verified successfully.</p>
-          )}
 
           {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
 
@@ -544,6 +498,66 @@ export default function TrackOrderPage() {
                       </p>
                     )}
                   </section>
+
+                  <section className="mt-4 rounded-xl border border-border/40 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Invoice</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {order.canSendInvoice
+                        ? "If you need an invoice, we can send it to your registered email."
+                        : "Invoice email is not available for this order."}
+                    </p>
+
+                    <label
+                      className={`mt-3 flex items-start gap-2 text-sm ${
+                        order.canSendInvoice ? "text-foreground" : "cursor-not-allowed text-muted-foreground"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(invoiceOptInByOrder[order.orderId])}
+                        onChange={(event) =>
+                          setInvoiceOptInByOrder((prev) => ({
+                            ...prev,
+                            [order.orderId]: event.target.checked,
+                          }))
+                        }
+                        disabled={!order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#1f1f1f] focus:ring-[#D4AF37]/40"
+                      />
+                      <span>
+                        {order.canSendInvoice
+                          ? `Send invoice to ${order.customerEmailMasked || "your registered email"}`
+                          : "Please contact support if you need manual invoice assistance."}
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleSendInvoice(order.orderId)}
+                      disabled={
+                        !order.canSendInvoice ||
+                        !invoiceOptInByOrder[order.orderId] ||
+                        Boolean(invoiceLoadingByOrder[order.orderId])
+                      }
+                      className={`mt-3 w-full rounded-lg border border-border px-5 py-3 text-sm font-semibold uppercase tracking-widest text-foreground transition-colors ${
+                        !order.canSendInvoice ||
+                        !invoiceOptInByOrder[order.orderId] ||
+                        Boolean(invoiceLoadingByOrder[order.orderId])
+                          ? "cursor-not-allowed opacity-70"
+                          : "hover:bg-secondary"
+                      }`}
+                    >
+                      {invoiceLoadingByOrder[order.orderId] ? "Sending Invoice..." : "Send Invoice to Email"}
+                    </button>
+
+                    {invoiceSuccessByOrder[order.orderId] && (
+                      <p className="mt-2 text-xs font-medium text-[#2E7D32]">{invoiceSuccessByOrder[order.orderId]}</p>
+                    )}
+
+                    {invoiceErrorByOrder[order.orderId] && (
+                      <p className="mt-2 text-xs font-medium text-red-500">{invoiceErrorByOrder[order.orderId]}</p>
+                    )}
+                  </section>
                 </article>
               ))}
             </div>
@@ -555,4 +569,3 @@ export default function TrackOrderPage() {
     </main>
   )
 }
-

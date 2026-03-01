@@ -291,7 +291,7 @@ function PaymentSuccessContent() {
   }, [sendWhatsAppNotifications, uiState])
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       <Navbar />
 
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-14">
@@ -367,7 +367,7 @@ function PaymentSuccessContent() {
 
 function PaymentSuccessFallback() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       <Navbar />
 
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-14">

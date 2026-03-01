@@ -59,7 +59,7 @@ export default function ProductGallery({
 
   if (!hasImages) {
     return (
-      <div className="relative aspect-[3/4] w-full rounded-2xl bg-secondary shadow-2xl">
+      <div className="relative aspect-[15/14] w-full rounded-2xl bg-secondary shadow-2xl">
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No image available</div>
       </div>
     )
@@ -72,11 +72,12 @@ export default function ProductGallery({
           <div className="flex">
             {images.map((src, i) => (
               <div key={i} className="min-w-full shrink-0 grow-0 basis-full">
-                <div className="relative aspect-[3/4] bg-secondary">
+                <div className="relative aspect-[15/14] bg-secondary">
                   <Image
                     src={src}
                     alt={alt ?? `Image ${i + 1}`}
                     fill
+                    unoptimized
                     sizes="(max-width: 768px) 100vw, 50vw"
                     className={cn(
                       "transition-transform duration-700 ease-out hover:scale-110",
@@ -140,6 +141,7 @@ export default function ProductGallery({
                   src={src}
                   alt={alt ?? `Thumb ${i + 1}`}
                   fill
+                  unoptimized
                   className={useContainFit ? "object-contain p-1" : "object-cover"}
                 />
               </button>

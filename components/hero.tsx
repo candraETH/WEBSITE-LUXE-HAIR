@@ -1,46 +1,107 @@
+"use client"
+
 import Image from "next/image"
+import Link from "next/link"
+import { useEffect, useState } from "react"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 
 const WHATSAPP_SUPPORT_MESSAGE = "Hi, I need help choosing the right hair product."
+const AUTO_SLIDE_MS = 6000
+
+type HeroSlide = {
+  id: string
+  image: string
+  alt: string
+  eyebrow: string
+  title: string
+  description: string
+  ctaLabel: string
+  ctaHref: string
+}
+
+const HERO_SLIDES: HeroSlide[] = [
+  {
+    id: "main",
+    image: "/images/hero.jpg",
+    alt: "Luxurious hair extensions on silk fabric",
+    eyebrow: "Premium Quality Hair",
+    title: "Elevate Your\nNatural Beauty",
+    description:
+      "Discover our curated collection of premium hair extensions, wigs, weft hair, and bulk hair. Luxury you can feel.",
+    ctaLabel: "Explore Collection",
+    ctaHref: "#extensions",
+  },
+  {
+    id: "promo",
+    image: "/images/about.jpg",
+    alt: "Premium hair promotion banner",
+    eyebrow: "Limited Time Offer",
+    title: "Get 25% Off\nAll Collections",
+    description:
+      "Upgrade your look with salon-quality bulk hair, weft hair, extensions, and wigs. Promo is available for all categories.",
+    ctaLabel: "Shop 25% Off",
+    ctaHref: "/bulk-hair",
+  },
+]
 
 export function Hero() {
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0)
+  const activeSlide = HERO_SLIDES[activeSlideIndex]
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveSlideIndex((prev) => (prev + 1) % HERO_SLIDES.length)
+    }, AUTO_SLIDE_MS)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
   return (
-    <section id="home" className="relative min-h-[84vh] overflow-hidden pt-20 lg:pt-24">
-      {/* Background Image */}
+    <section id="home" className="relative min-h-[84vh] overflow-hidden pt-28 lg:pt-32">
       <div className="absolute inset-0">
-        <Image
-          src="/images/hero.jpg"
-          alt="Luxurious hair extensions on silk fabric"
-          fill
-          sizes="100vw"
-          className="object-cover object-center"
-          priority
-        />
-        <div className="absolute inset-0 bg-foreground/45" />
+        {HERO_SLIDES.map((slide, index) => (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 transition-opacity duration-700 ${
+              index === activeSlideIndex ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <Image
+              src={slide.image}
+              alt={slide.alt}
+              fill
+              sizes="100vw"
+              className="object-cover object-center"
+              priority={index === 0}
+            />
+            <div className="absolute inset-0 bg-foreground/45" />
+          </div>
+        ))}
       </div>
 
-      {/* Content */}
       <div className="relative z-10 flex min-h-[84vh] flex-col items-center justify-center px-6 py-14 text-center md:py-20">
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.3em] text-background/80">
-          Premium Quality Hair
+          {activeSlide.eyebrow}
         </p>
         <h1 className="font-serif text-4xl font-bold leading-tight text-background md:text-6xl lg:text-7xl text-balance">
-          Elevate Your
-          <br />
-          Natural Beauty
+          {activeSlide.title.split("\n").map((line, index, lines) => (
+            <span key={`${activeSlide.id}-${line}`}>
+              {line}
+              {index < lines.length - 1 && <br />}
+            </span>
+          ))}
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-background/80 md:text-base">
-          Discover our curated collection of premium hair extensions, wigs, weft
-          hair, and bulk hair. Luxury you can feel.
+          {activeSlide.description}
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-          <a
-            href="#extensions"
+          <Link
+            href={activeSlide.ctaHref}
             className="border border-background bg-background px-7 py-3 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-background/90"
           >
-            Explore Collection
-          </a>
+            {activeSlide.ctaLabel}
+          </Link>
           <a
             href={getWhatsAppHref(WHATSAPP_SUPPORT_MESSAGE)}
             target={WHATSAPP_ENABLED ? "_blank" : undefined}
@@ -57,9 +118,22 @@ export function Hero() {
             WhatsApp Support
           </a>
         </div>
+
+        <div className="mt-6 flex items-center gap-2">
+          {HERO_SLIDES.map((slide, index) => (
+            <button
+              key={`dot-${slide.id}`}
+              type="button"
+              onClick={() => setActiveSlideIndex(index)}
+              aria-label={`Show slide ${index + 1}`}
+              className={`h-2.5 rounded-full transition-all ${
+                index === activeSlideIndex ? "w-8 bg-white" : "w-2.5 bg-white/50 hover:bg-white/70"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Scroll Indicator */}
       <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2">
         <div className="flex flex-col items-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.2em] text-background/60">Scroll</span>

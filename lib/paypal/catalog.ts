@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { applyProductDiscount } from "@/lib/pricing"
+import { calculateCouponDiscountCents, getCouponByCode } from "@/lib/coupon"
 
 export const MAX_CHECKOUT_ITEMS = 100
 export const MAX_ITEM_QUANTITY = 1000
@@ -68,6 +70,78 @@ const PRODUCT_PRICING: Record<
     pricePerInch: 5.2,
     category: "Weft Hair",
   },
+  "natural-wave-weft": {
+    name: "Natural Wave",
+    basePrice: 95,
+    pricePerInch: 5.6,
+    category: "Weft Hair",
+  },
+  "body-wave-weft": {
+    name: "Body Wave",
+    basePrice: 98,
+    pricePerInch: 5.9,
+    category: "Weft Hair",
+  },
+  "curly-weft": {
+    name: "Curly",
+    basePrice: 105,
+    pricePerInch: 6.3,
+    category: "Weft Hair",
+  },
+  "deep-curly-weft": {
+    name: "Deep Curly",
+    basePrice: 110,
+    pricePerInch: 6.5,
+    category: "Weft Hair",
+  },
+  "deep-wave-weft": {
+    name: "Deep Wave",
+    basePrice: 108,
+    pricePerInch: 6.2,
+    category: "Weft Hair",
+  },
+  "fumi-weft": {
+    name: "Fumi",
+    basePrice: 125,
+    pricePerInch: 7,
+    category: "Weft Hair",
+  },
+  "natural-curly-weft": {
+    name: "Natural Curly",
+    basePrice: 112,
+    pricePerInch: 6.4,
+    category: "Weft Hair",
+  },
+  "water-wave-weft": {
+    name: "Water Wave",
+    basePrice: 107,
+    pricePerInch: 6.1,
+    category: "Weft Hair",
+  },
+  "kinky-curl-weft": {
+    name: "Kinky Curl",
+    basePrice: 118,
+    pricePerInch: 6.8,
+    category: "Weft Hair",
+  },
+  "loose-wave-weft": {
+    name: "Loose Wave",
+    basePrice: 102,
+    pricePerInch: 6,
+    category: "Weft Hair",
+  },
+  "jerry-curly-weft": {
+    name: "Jerry Curly",
+    basePrice: 114,
+    pricePerInch: 6.6,
+    category: "Weft Hair",
+  },
+  "brazilian-curly-weft": {
+    name: "Brazilian Curly",
+    basePrice: 120,
+    pricePerInch: 6.9,
+    category: "Weft Hair",
+  },
   "virgin-straight-bulk": {
     name: "Virgin Straight Bulk",
     basePrice: 70,
@@ -128,16 +202,34 @@ function normalizeVariant(value?: string): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
-function hasNoColorSurcharge(normalizedVariant: string | null): boolean {
+function normalizeColorCodeVariant(normalizedVariant: string | null): string | null {
   if (!normalizedVariant || normalizedVariant === "default") {
+    return null
+  }
+
+  if (normalizedVariant.startsWith("#")) {
+    return normalizedVariant
+  }
+
+  if (/^(ash|\d{1,3})$/.test(normalizedVariant)) {
+    return `#${normalizedVariant}`
+  }
+
+  return null
+}
+
+function hasNoColorSurcharge(normalizedVariant: string | null): boolean {
+  const colorCode = normalizeColorCodeVariant(normalizedVariant)
+  if (!colorCode) {
+    // Variants like "Body Wave" or "Curly 1" are texture/type, not color.
     return true
   }
 
-  if (normalizedVariant.startsWith("#2")) {
+  if (colorCode.startsWith("#2")) {
     return true
   }
 
-  if (normalizedVariant.includes("natural hair")) {
+  if (normalizedVariant?.includes("natural hair")) {
     return true
   }
 
@@ -192,7 +284,18 @@ export function buildDisplayName(productName: string, variant?: string): string 
   return colorDisplay ? `${productName} - ${colorDisplay}` : productName
 }
 
-export function calculateOrderFromItems(items: CheckoutItemInput[]) {
+type CheckoutUnitPriceInput = Pick<CheckoutItemInput, "slug" | "length" | "variant">
+
+export function calculateCheckoutUnitPrice(input: CheckoutUnitPriceInput): number {
+  assertValidLength(input.length)
+  const product = resolveProduct(input.slug)
+  const surchargeCents = getColorSurchargeCents(input.variant)
+  const baseUnitPrice = product.basePrice + (input.length - 16) * product.pricePerInch
+  const originalUnitPriceDollars = Number((baseUnitPrice + surchargeCents / 100).toFixed(2))
+  return applyProductDiscount(originalUnitPriceDollars)
+}
+
+export function calculateOrderFromItems(items: CheckoutItemInput[], couponCode?: string) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error("Cart items are required")
   }
@@ -207,8 +310,7 @@ export function calculateOrderFromItems(items: CheckoutItemInput[]) {
 
     const product = resolveProduct(item.slug)
     const surchargeCents = getColorSurchargeCents(item.variant)
-    const baseUnitPrice = product.basePrice + (item.length - 16) * product.pricePerInch
-    const unitPriceDollars = Number((baseUnitPrice + surchargeCents / 100).toFixed(2))
+    const unitPriceDollars = calculateCheckoutUnitPrice(item)
     const unitPriceCents = dollarsToCents(unitPriceDollars)
     const lineTotalCents = unitPriceCents * item.quantity
 
@@ -226,17 +328,35 @@ export function calculateOrderFromItems(items: CheckoutItemInput[]) {
     }
   })
 
-  const subtotalCents = lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0)
+  const lineItemsSubtotalCents = lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0)
+  const resolvedCoupon = getCouponByCode(couponCode)
+  const couponMeetsMinimum =
+    resolvedCoupon ? lineItemsSubtotalCents >= dollarsToCents(resolvedCoupon.minimumSubtotal) : false
+  const eligibleCoupon = couponMeetsMinimum ? resolvedCoupon : null
+  const couponDiscountCents = eligibleCoupon
+    ? Math.min(
+        lineItemsSubtotalCents,
+        calculateCouponDiscountCents(lineItemsSubtotalCents, eligibleCoupon.discountRate)
+      )
+    : 0
+  const subtotalCents = lineItemsSubtotalCents - couponDiscountCents
   const taxCents = Math.round(subtotalCents * TAX_RATE)
   const shippingCents = subtotalCents >= dollarsToCents(FREE_SHIPPING_THRESHOLD_DOLLARS) ? 0 : dollarsToCents(SHIPPING_DOLLARS)
   const totalCents = subtotalCents + taxCents + shippingCents
 
   return {
     lineItems,
+    lineItemsSubtotalCents,
+    couponDiscountCents,
+    appliedCoupon: eligibleCoupon && couponDiscountCents > 0
+      ? {
+          code: eligibleCoupon.code,
+          discountRate: eligibleCoupon.discountRate,
+        }
+      : null,
     subtotalCents,
     taxCents,
     shippingCents,
     totalCents,
   }
 }
-

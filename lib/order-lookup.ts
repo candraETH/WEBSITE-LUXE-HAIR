@@ -60,6 +60,26 @@ export function extractPhoneFromCartJson(value: unknown): string | null {
   return null
 }
 
+export function extractEmailFromCartJson(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  const root = value as Record<string, unknown>
+  const customer = root.customer
+  if (!customer || typeof customer !== "object" || Array.isArray(customer)) {
+    return null
+  }
+
+  const customerObj = customer as Record<string, unknown>
+  const directEmail = customerObj.email
+  if (typeof directEmail === "string" && directEmail.trim()) {
+    return directEmail.trim()
+  }
+
+  return null
+}
+
 export async function queryOrderByOrderAndPhone<T extends Record<string, unknown>>(
   orderId: string,
   phoneNumber: string,

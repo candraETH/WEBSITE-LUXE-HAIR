@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 
 // Toggle this flag to enable/disable global maintenance mode.
 // Set to `false` to return the website to normal operation.
-const MAINTENANCE_MODE = true
+const MAINTENANCE_MODE = false
 
 export function middleware(request: NextRequest) {
   if (!MAINTENANCE_MODE) {

@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { use, useEffect, useMemo, useState, type MouseEvent } from "react"
+import { use, useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
@@ -10,6 +10,7 @@ import { Navbar } from "@/components/navbar"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
+import { applyProductDiscount, formatUsdPrice, getDiscountedPriceLabel } from "@/lib/pricing"
 
 type ProductColor = {
   code: string
@@ -142,6 +143,172 @@ const allProducts: ProductItem[] = [
     basePrice: 110,
     pricePerInch: 5.2,
   },
+  {
+    slug: "natural-wave-weft",
+    name: "Natural Wave",
+    price: "$95 - $151",
+    image: "/images/texture/natural%20wave%201.png",
+    gallery: [
+      "/images/texture/natural%20wave%202.png",
+      "/images/model%20finis/model%20natural%20wave%202.png",
+    ],
+    category: "Weft Hair",
+    description: "Soft flowing natural wave texture with lightweight movement and a seamless finish.",
+    longDescription: "Natural Wave Weft is designed for soft movement and a natural look. This style blends easily, holds shape well, and works beautifully for everyday wear or glam styling.",
+    basePrice: 95,
+    pricePerInch: 5.6,
+  },
+  {
+    slug: "body-wave-weft",
+    name: "Body Wave",
+    price: "$98 - $157",
+    image: "/images/texture/body%20wave.png",
+    gallery: ["/images/model%20finis/model%20body%20wave.png"],
+    category: "Weft Hair",
+    description: "Classic body wave for everyday elegance, volume, and easy styling flexibility.",
+    longDescription: "Body Wave Weft gives a classic flowing texture with balanced volume. It can be styled straight or curled while keeping a soft, premium finish.",
+    basePrice: 98,
+    pricePerInch: 5.9,
+  },
+  {
+    slug: "curly-weft",
+    name: "Curly",
+    price: "$105 - $168",
+    image: "/images/texture/curly%201.png",
+    gallery: [
+      "/images/texture/curly%202.png",
+      "/images/model%20finis/model%20curly%201.png",
+      "/images/model%20finis/model%20curly%202.png",
+    ],
+    category: "Weft Hair",
+    description: "Defined curly pattern with natural bounce and fullness for statement looks.",
+    longDescription: "Curly Weft delivers defined curls with a lively, voluminous look. Perfect for customers who want full-body texture and long-lasting shape.",
+    basePrice: 105,
+    pricePerInch: 6.3,
+  },
+  {
+    slug: "deep-curly-weft",
+    name: "Deep Curly",
+    price: "$110 - $175",
+    image: "/images/texture/deep%20curly.png",
+    gallery: ["/images/model%20finis/model%20deep%20curly.png"],
+    category: "Weft Hair",
+    description: "Dense deep curly texture with rich volume and long-lasting curl definition.",
+    longDescription: "Deep Curly Weft provides a tighter curl pattern with rich volume and a luxurious finish. Great for bold styles and statement installs.",
+    basePrice: 110,
+    pricePerInch: 6.5,
+  },
+  {
+    slug: "deep-wave-weft",
+    name: "Deep Wave",
+    price: "$108 - $170",
+    image: "/images/texture/deep%20wave.png",
+    gallery: ["/images/model%20finis/model%20deep%20wave.png"],
+    category: "Weft Hair",
+    description: "Deep wave pattern crafted for dramatic texture, softness, and body.",
+    longDescription: "Deep Wave Weft combines softness and texture for a dramatic but wearable look. Ideal for defined waves with premium movement.",
+    basePrice: 108,
+    pricePerInch: 6.2,
+  },
+  {
+    slug: "fumi-weft",
+    name: "Fumi",
+    price: "$125 - $195",
+    image: "/images/texture/fumi%201.png",
+    gallery: [
+      "/images/texture/fumi%202.png",
+      "/images/texture/fumi%203.png",
+      "/images/model%20finis/model%20fumi%201.png",
+      "/images/model%20finis/model%20fumi%202.png",
+      "/images/model%20finis/model%20fumi%203.png",
+    ],
+    category: "Weft Hair",
+    description: "Signature fumi texture with premium body and luxury finish.",
+    longDescription: "Fumi Weft is a premium signature texture with elegant fullness and smooth blending. This style is ideal for luxury installs and polished looks.",
+    tag: "Best Seller",
+    basePrice: 125,
+    pricePerInch: 7.0,
+  },
+  {
+    slug: "natural-curly-weft",
+    name: "Natural Curly",
+    price: "$112 - $176",
+    image: "/images/texture/natural%20curly.png",
+    gallery: ["/images/model%20finis/model%20natural%20curly.png"],
+    category: "Weft Hair",
+    description: "Natural curly pattern designed for soft volume and realistic movement.",
+    longDescription: "Natural Curly Weft offers soft, realistic curl definition that blends naturally and keeps volume without feeling heavy.",
+    basePrice: 112,
+    pricePerInch: 6.4,
+  },
+  {
+    slug: "water-wave-weft",
+    name: "Water Wave",
+    price: "$107 - $168",
+    image: "/images/texture/water%20wave%201.png",
+    gallery: ["/images/model%20finis/model%20water%20wave%201.png"],
+    category: "Weft Hair",
+    description: "Water wave texture with smooth S-waves and lightweight wear.",
+    longDescription: "Water Wave Weft delivers smooth S-pattern waves with excellent softness and movement. Easy to maintain and style.",
+    basePrice: 107,
+    pricePerInch: 6.1,
+  },
+  {
+    slug: "kinky-curl-weft",
+    name: "Kinky Curl",
+    price: "$118 - $186",
+    image: "/images/texture/kinky%20curl.png",
+    gallery: [
+      "/images/texture/kinky%20curl%203.png",
+      "/images/model%20finis/model%20kinky%20curl.png",
+      "/images/model%20finis/model%20kinky%20curl%203.png",
+    ],
+    category: "Weft Hair",
+    description: "Kinky curl texture with maximum fullness and strong curl character.",
+    longDescription: "Kinky Curl Weft creates a fuller, textured look with standout curl personality. Ideal for high-volume styles and natural-texture blending.",
+    basePrice: 118,
+    pricePerInch: 6.8,
+  },
+  {
+    slug: "loose-wave-weft",
+    name: "Loose Wave",
+    price: "$102 - $162",
+    image: "/images/texture/loose%20wave%201.png",
+    gallery: [
+      "/images/texture/loose%20wave%202.png",
+      "/images/model%20finis/model%20lose%20wave%201.png",
+      "/images/model%20finis/model%20lose%20wave%202.png",
+    ],
+    category: "Weft Hair",
+    description: "Relaxed loose wave texture that blends naturally with versatile styling.",
+    longDescription: "Loose Wave Weft gives a relaxed, effortless look with soft body and smooth blending. Great for natural everyday styling.",
+    basePrice: 102,
+    pricePerInch: 6.0,
+  },
+  {
+    slug: "jerry-curly-weft",
+    name: "Jerry Curly",
+    price: "$114 - $180",
+    image: "/images/texture/jerry%20curly.png",
+    gallery: ["/images/model%20finis/model%20jerry%20curly.png"],
+    category: "Weft Hair",
+    description: "Springy jerry curly pattern with vibrant volume and defined curls.",
+    longDescription: "Jerry Curly Weft features springy, defined curls that create strong volume and lively movement for standout styling.",
+    basePrice: 114,
+    pricePerInch: 6.6,
+  },
+  {
+    slug: "brazilian-curly-weft",
+    name: "Brazilian Curly",
+    price: "$120 - $189",
+    image: "/images/texture/brazilian%20curly.png",
+    gallery: ["/images/model%20finis/model%20brazilian.png"],
+    category: "Weft Hair",
+    description: "Brazilian curly texture with premium softness and rich curl shape.",
+    longDescription: "Brazilian Curly Weft combines rich curl shape and softness with a premium finish, ideal for elegant volume and texture.",
+    basePrice: 120,
+    pricePerInch: 6.9,
+  },
   // Bulk Hair
   {
     slug: "virgin-straight-bulk",
@@ -221,6 +388,32 @@ const DEFAULT_HAIR_COLORS = [
   { code: "#2", label: "Natural Hair", hex: "#1a1a1a" },
 ]
 
+function formatTextureLabel(imageSrc: string, fallbackName: string): string {
+  const fileNameWithExt = imageSrc.split("/").pop() ?? ""
+  let decoded = fileNameWithExt
+
+  try {
+    decoded = decodeURIComponent(fileNameWithExt)
+  } catch {
+    decoded = fileNameWithExt
+  }
+
+  const withoutExt = decoded.replace(/\.[^.]+$/, "")
+  const normalized = withoutExt.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim()
+  const baseLabel = normalized || fallbackName
+
+  return baseLabel
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => {
+      if (/^\d+$/.test(word)) {
+        return word
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    })
+    .join(" ")
+}
+
 interface PageProps {
   params: Promise<{
     slug: string
@@ -231,9 +424,16 @@ export default function OrderPage({ params }: PageProps) {
   const router = useRouter()
   const { slug } = use(params)
   const product = allProducts.find((p) => p.slug === slug)
+  const suggestedScrollRef = useRef<HTMLDivElement | null>(null)
+  const thumbnailRailRef = useRef<HTMLDivElement | null>(null)
+  const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const mainImageFrameRef = useRef<HTMLDivElement | null>(null)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [backToShopHref, setBackToShopHref] = useState("/")
+  const [isHoverZoomActive, setIsHoverZoomActive] = useState(false)
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 })
+  const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false)
 
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
@@ -371,10 +571,46 @@ export default function OrderPage({ params }: PageProps) {
     const mergedImages = [product.image, ...productGallery, ...Object.values(availableColorImageMap)]
     return Array.from(new Set(mergedImages.filter(Boolean)))
   }, [product, availableColorImageMap])
+  const activeImageSrc = galleryImages[activeImageIndex] ?? product?.image ?? ""
+
+  const textureOptions = useMemo(() => {
+    if (!product || product.category !== "Weft Hair") {
+      return [] as Array<{ key: string; image: string; label: string }>
+    }
+
+    const hairOnlyImages = galleryImages.filter((src) => !src.toLowerCase().includes("/model"))
+    const textureImages = hairOnlyImages.length > 0 ? hairOnlyImages : galleryImages
+
+    return textureImages.map((imageSrc) => ({
+      key: imageSrc,
+      image: imageSrc,
+      label: formatTextureLabel(imageSrc, product.name),
+    }))
+  }, [galleryImages, product])
+
+  const activeTextureOption = useMemo(() => {
+    if (textureOptions.length === 0) {
+      return null
+    }
+    const exactMatch = textureOptions.find((option) => option.image === activeImageSrc)
+    if (exactMatch) {
+      return exactMatch
+    }
+
+    const activeLabel = formatTextureLabel(activeImageSrc, "")
+    const relatedMatch = textureOptions.find((option) => {
+      const optionLabel = option.label.toLowerCase()
+      const targetLabel = activeLabel.toLowerCase()
+      return targetLabel.includes(optionLabel) || optionLabel.includes(targetLabel)
+    })
+
+    return relatedMatch ?? textureOptions[0]
+  }, [activeImageSrc, textureOptions])
 
   useEffect(() => {
     setSelectedColorCode("")
     setActiveImageIndex(0)
+    setIsHoverZoomActive(false)
   }, [slug])
 
   useEffect(() => {
@@ -398,6 +634,137 @@ export default function OrderPage({ params }: PageProps) {
     }
   }, [product, selectedColorCode, availableColorImageMap, galleryImages])
 
+  useEffect(() => {
+    thumbnailRefs.current = thumbnailRefs.current.slice(0, galleryImages.length)
+  }, [galleryImages.length])
+
+  useEffect(() => {
+    const rail = thumbnailRailRef.current
+    const targetThumb = thumbnailRefs.current[activeImageIndex]
+
+    if (!rail || !targetThumb) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const railRect = rail.getBoundingClientRect()
+      const thumbRect = targetThumb.getBoundingClientRect()
+
+      const isAbove = thumbRect.top < railRect.top
+      const isBelow = thumbRect.bottom > railRect.bottom
+      const isLeft = thumbRect.left < railRect.left
+      const isRight = thumbRect.right > railRect.right
+
+      if (isAbove || isBelow || isLeft || isRight) {
+        targetThumb.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        })
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [activeImageIndex, galleryImages.length])
+
+  const suggestedProducts = useMemo(() => {
+    if (!product) {
+      return []
+    }
+
+    const sameCategory = allProducts.filter((item) => item.slug !== product.slug && item.category === product.category)
+    const otherProducts = allProducts.filter((item) => item.slug !== product.slug && item.category !== product.category)
+    return [...sameCategory, ...otherProducts]
+  }, [product])
+
+  const scrollSuggestedProducts = (direction: "prev" | "next") => {
+    const container = suggestedScrollRef.current
+    if (!container) {
+      return
+    }
+
+    const firstCard = container.querySelector<HTMLElement>('[data-suggest-card="true"]')
+    const cardWidth = firstCard?.getBoundingClientRect().width ?? 220
+    const gap = 12
+    const step = cardWidth + gap
+    const left = direction === "next" ? step : -step
+    container.scrollBy({ left, behavior: "smooth" })
+  }
+
+  const goToPrevImage = () => {
+    if (galleryImages.length <= 1) {
+      return
+    }
+    setActiveImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))
+  }
+
+  const goToNextImage = () => {
+    if (galleryImages.length <= 1) {
+      return
+    }
+    setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
+  }
+
+  const handleMainImageMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    const frame = mainImageFrameRef.current
+    if (!frame) {
+      return
+    }
+
+    const rect = frame.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) {
+      return
+    }
+
+    const x = ((event.clientX - rect.left) / rect.width) * 100
+    const y = ((event.clientY - rect.top) / rect.height) * 100
+
+    setZoomOrigin({
+      x: Math.max(0, Math.min(100, x)),
+      y: Math.max(0, Math.min(100, y)),
+    })
+  }
+
+  useEffect(() => {
+    if (!isImageLightboxOpen) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isImageLightboxOpen])
+
+  useEffect(() => {
+    if (!isImageLightboxOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsImageLightboxOpen(false)
+        return
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault()
+        setActiveImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))
+        return
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault()
+        setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isImageLightboxOpen, galleryImages.length])
+
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
@@ -417,12 +784,11 @@ export default function OrderPage({ params }: PageProps) {
     )
   }
 
-  const activeImageSrc = galleryImages[activeImageIndex] ?? product.image
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#eeeeef] pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-[#eeeeef] pt-[102px] lg:pt-[108px]">
       <Navbar />
 
-      <div className="mx-auto max-w-[980px] px-4 pb-12 sm:px-6">
+      <div className="mx-auto w-full max-w-[1520px] px-4 pb-12 sm:px-6 lg:px-8 xl:px-10">
         <div className="py-3 lg:py-4">
           <Link href={backToShopHref} onClick={handleBackToShopClick}>
             <Button
@@ -437,64 +803,116 @@ export default function OrderPage({ params }: PageProps) {
           </Link>
         </div>
 
-        <article className="overflow-hidden bg-white shadow-[0_26px_60px_-38px_rgba(0,0,0,0.55)]">
-          <div className="relative aspect-[3/4] w-full bg-[#d8d8da]">
-            <Image
-              src={activeImageSrc}
-              alt={product.name}
-              fill
-              sizes="(max-width: 1024px) 100vw, 980px"
-              className={isVirginStraightBulk ? "object-contain p-6" : "object-cover"}
-              priority
-            />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/20 to-transparent" />
-
-            {galleryImages.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))
-                  }
-                  className="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/60"
-                  aria-label="Previous image"
+        <article className="lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-start lg:gap-4">
+          <div className="p-0">
+            <div
+              className={`lg:grid lg:h-[min(74vh,680px)] lg:items-start lg:gap-3 ${
+                galleryImages.length > 1 ? "lg:grid-cols-[74px_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)]"
+              }`}
+            >
+              {galleryImages.length > 1 && (
+                <div
+                  ref={thumbnailRailRef}
+                  className={`mb-3 flex gap-2 overflow-x-auto pb-1 lg:mb-0 lg:h-full lg:self-start lg:flex-col lg:items-center lg:overflow-x-hidden lg:pb-0 lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden ${
+                    galleryImages.length < 5
+                      ? "lg:justify-center lg:overflow-y-hidden lg:-translate-y-20"
+                      : "lg:justify-start lg:overflow-y-auto"
+                  }`}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
-                    <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
-                  }
-                  className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/60"
-                  aria-label="Next image"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
-                    <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </>
-            )}
+                  {galleryImages.map((imageSrc, index) => {
+                    const isActive = index === activeImageIndex
+                    return (
+                      <button
+                        key={`${imageSrc}-${index}`}
+                        ref={(node) => {
+                          thumbnailRefs.current[index] = node
+                        }}
+                        type="button"
+                        onClick={() => setActiveImageIndex(index)}
+                        className={`relative h-[68px] w-[56px] shrink-0 overflow-hidden rounded-md transition-all ${
+                          isActive ? "ring-2 ring-[#262626]/45" : "hover:scale-[1.02]"
+                        }`}
+                        aria-label={`View image ${index + 1}`}
+                      >
+                        <Image
+                          src={imageSrc}
+                          alt={`${product.name} thumbnail ${index + 1}`}
+                          fill
+                          unoptimized
+                          sizes="74px"
+                          className="object-contain object-center p-0.5"
+                        />
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
-            <div className="absolute bottom-6 left-6 inline-flex h-14 w-14 items-center justify-center rounded-full bg-black text-white">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-7 w-7" aria-hidden="true">
-                <path d="M4 18h16M7 18l5-7 5 7M9 8a3 3 0 1 1 6 0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <div
+                ref={mainImageFrameRef}
+                className="relative aspect-[4/5] cursor-zoom-in overflow-hidden rounded-2xl bg-transparent lg:h-full lg:aspect-auto"
+                onMouseEnter={() => setIsHoverZoomActive(true)}
+                onMouseLeave={() => setIsHoverZoomActive(false)}
+                onMouseMove={handleMainImageMouseMove}
+                onClick={() => setIsImageLightboxOpen(true)}
+              >
+                <Image
+                  src={activeImageSrc}
+                  alt={product.name}
+                  fill
+                  unoptimized
+                  sizes="(max-width: 1024px) 100vw, 42vw"
+                  style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}
+                  className={`object-contain object-center p-1 transition-transform duration-200 ease-out sm:p-2 ${
+                    isHoverZoomActive ? "scale-[1.6]" : "scale-100"
+                  }`}
+                  priority
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/18 to-transparent" />
+
+                {galleryImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        goToPrevImage()
+                      }}
+                      className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#d4d4d7] bg-white/90 text-[#111] transition-colors hover:bg-white"
+                      aria-label="Previous image"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                        <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        goToNextImage()
+                      }}
+                      className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#d4d4d7] bg-white/90 text-[#111] transition-colors hover:bg-white"
+                      aria-label="Next image"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                        <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+
+                <div className="absolute right-3 top-3 rounded-full bg-black/58 px-2.5 py-1 text-xs font-semibold text-white">
+                  {activeImageIndex + 1}/{galleryImages.length}
+                </div>
+              </div>
             </div>
-
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/55 px-4 py-2 text-lg font-medium text-white">
-              {activeImageIndex + 1}/{galleryImages.length}
-            </div>
-
           </div>
 
-          <div className="px-6 py-7 sm:px-8 sm:py-10">
-            <h1 className="font-serif text-4xl font-semibold leading-tight text-[#101010] sm:text-5xl">
+          <div className="px-4 py-5 sm:px-6 sm:py-6 lg:max-h-[calc(100vh-126px)] lg:overflow-y-auto lg:px-7 lg:py-7 lg:pr-2 lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden xl:px-8">
+            <h1 className="font-serif text-2xl font-semibold leading-tight text-[#101010] sm:text-3xl">
               {product.name}
             </h1>
-            <p className="mt-5 max-w-3xl text-base leading-relaxed text-[#555]">
+            <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-[#555] sm:text-xs">
               {product.longDescription}
             </p>
 
@@ -508,9 +926,145 @@ export default function OrderPage({ params }: PageProps) {
               colorImageMap={availableColorImageMap}
               onColorChange={setSelectedColorCode}
               colors={product.colors}
+              activePreviewImage={activeImageSrc}
+              textureOptions={textureOptions}
+              activeTextureKey={activeTextureOption?.key}
+              activeTextureLabel={activeTextureOption?.label}
+              onTextureSelect={(nextTextureKey) => {
+                const nextIndex = galleryImages.findIndex((imageSrc) => imageSrc === nextTextureKey)
+                if (nextIndex >= 0) {
+                  setActiveImageIndex(nextIndex)
+                }
+              }}
             />
           </div>
         </article>
+
+        {isImageLightboxOpen && (
+          <div className="fixed inset-0 z-[130] bg-black/95">
+            <button
+              type="button"
+              onClick={() => setIsImageLightboxOpen(false)}
+              className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white transition-colors hover:bg-white/30"
+              aria-label="Close image preview"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-6 w-6" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-white/35 px-3 py-1 text-sm font-semibold text-white">
+              {activeImageIndex + 1}/{galleryImages.length}
+            </div>
+
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={goToPrevImage}
+                  className="absolute left-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white text-[#111] transition-colors hover:bg-[#f3f3f4]"
+                  aria-label="Previous image"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+                    <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={goToNextImage}
+                  className="absolute right-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white text-[#111] transition-colors hover:bg-[#f3f3f4]"
+                  aria-label="Next image"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+                    <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            <div className="flex h-full w-full items-center justify-center px-8 py-8 sm:px-16 sm:py-12">
+              <div className="relative h-full w-full">
+                <Image
+                  src={activeImageSrc}
+                  alt={`${product.name} full preview`}
+                  fill
+                  unoptimized
+                  sizes="100vw"
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {suggestedProducts.length > 0 && (
+          <section className="mt-5 border-t border-[#d8d8db] px-0 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7b7b80]">You might also like</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => scrollSuggestedProducts("prev")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d0d3] bg-white text-[#444] transition-colors hover:bg-[#f4f4f5]"
+                  aria-label="Previous recommended products"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                    <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollSuggestedProducts("next")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d0d3] bg-white text-[#444] transition-colors hover:bg-[#f4f4f5]"
+                  aria-label="Next recommended products"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                    <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div
+              ref={suggestedScrollRef}
+              className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {suggestedProducts.map((item) => {
+                const suggestedPrice = getDiscountedPriceLabel(item.price)
+
+                return (
+                  <Link
+                    key={item.slug}
+                    href={`/order/${item.slug}`}
+                    data-suggest-card="true"
+                    className="group w-[190px] min-w-[190px] shrink-0 snap-start rounded-xl border border-[#e0e0e3] bg-[#fcfcfd] p-2 transition-colors hover:border-[#c8c8cc] hover:bg-white sm:w-[210px] sm:min-w-[210px]"
+                  >
+                    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-[#ececef]">
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        fill
+                        unoptimized
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                    <div className="px-0.5 pt-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7b7b80]">
+                        {item.category}
+                      </p>
+                      <h3 className="mt-1 text-sm font-semibold leading-snug text-[#111]">{item.name}</h3>
+                      <div className="mt-1 flex items-baseline gap-2">
+                        <p className="text-sm font-semibold leading-none text-[#111] tabular-nums">{suggestedPrice.discountedLabel}</p>
+                        <p className="text-xs font-medium leading-none text-[#6f6f73] line-through tabular-nums">{suggestedPrice.originalLabel}</p>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       <Footer />
@@ -528,6 +1082,11 @@ function SelectLengthComponent({
   colorImageMap,
   onColorChange,
   colors,
+  activePreviewImage,
+  textureOptions = [],
+  activeTextureKey,
+  activeTextureLabel,
+  onTextureSelect,
 }: { 
   basePrice: number
   pricePerInch: number
@@ -538,13 +1097,21 @@ function SelectLengthComponent({
   colorImageMap?: Record<string, string>
   onColorChange?: (colorCode: string) => void
   colors?: Array<{ code: string; label: string; hex: string }>
+  activePreviewImage?: string
+  textureOptions?: Array<{ key: string; image: string; label: string }>
+  activeTextureKey?: string
+  activeTextureLabel?: string
+  onTextureSelect?: (textureKey: string) => void
 }) {
   const [selectedLength, setSelectedLength] = useState<string>("18")
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
+  const [isBenefitsOpen, setIsBenefitsOpen] = useState(true)
+  const [isSpecsOpen, setIsSpecsOpen] = useState(true)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const { addToCart } = useCart()
-  const supportsColorSelection = ["Hair Extensions", "Weft Hair", "Bulk Hair"].includes(category)
+  const hasTextureOptions = textureOptions.length > 0
+  const supportsColorSelection = ["Hair Extensions", "Bulk Hair"].includes(category) && !hasTextureOptions
   const availableColors =
     colors && colors.length > 0 ? colors : supportsColorSelection ? DEFAULT_HAIR_COLORS : []
   
@@ -557,13 +1124,29 @@ function SelectLengthComponent({
     selectedColorLabel && selectedColorCode
       ? `${selectedColorLabel} ${selectedColorCode}`
       : selectedColorLabel || selectedColorCode
-  const colorSurcharge = normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
+  const selectedTextureOption =
+    textureOptions.find((option) => option.key === activeTextureKey) ?? textureOptions[0]
+  const activeTextureValue = activeTextureKey ?? selectedTextureOption?.key ?? ""
+  const selectedTextureLabel = activeTextureLabel ?? selectedTextureOption?.label ?? ""
+  const selectedOptionSuffix = hasTextureOptions ? selectedTextureLabel : selectedColorDisplay
+  const textureLabel = name
+    .replace(/\s*weft\s*/gi, " ")
+    .replace(/\s*bulk\s*/gi, " ")
+    .replace(/\s*wig\s*/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+  const colorSurcharge = supportsColorSelection && normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
   const baseSinglePrice = parseFloat((basePrice + (currentLength - 16) * pricePerInch).toFixed(2))
-  const singlePrice = parseFloat((baseSinglePrice + colorSurcharge).toFixed(2))
-  const grandTotal = (singlePrice * quantity).toFixed(2)
+  const originalSinglePrice = parseFloat((baseSinglePrice + colorSurcharge).toFixed(2))
+  const discountedSinglePrice = applyProductDiscount(originalSinglePrice)
+  const originalGrandTotal = originalSinglePrice * quantity
+  const discountedGrandTotal = discountedSinglePrice * quantity
+  const discountedPriceClass = "text-xl font-semibold leading-none text-[#111] tabular-nums sm:text-2xl"
+  const originalPriceClass = "text-sm font-medium leading-none text-[#7a7a7d] line-through tabular-nums sm:text-base"
   const reviewLabel = `${testimonialsCount} ${testimonialsCount === 1 ? "Review" : "Reviews"}`
-  const selectedImage =
-    normalizedColorCode && colorImageMap?.[normalizedColorCode]
+  const selectedImage = hasTextureOptions
+    ? activePreviewImage || selectedTextureOption?.image || image
+    : normalizedColorCode && colorImageMap?.[normalizedColorCode]
       ? colorImageMap[normalizedColorCode]
       : image
 
@@ -681,25 +1264,58 @@ function SelectLengthComponent({
     await animateFlyToCart(sourceButton)
     addToCart({
       slug,
-      name: selectedColorDisplay ? `${name} - ${selectedColorDisplay}` : name,
+      name: selectedOptionSuffix ? `${name} - ${selectedOptionSuffix}` : name,
       category,
       length: currentLength,
       quantity,
-      price: singlePrice,
+      price: discountedSinglePrice,
       basePrice,
       pricePerInch,
       image: selectedImage,
-      variant: selectedColorCode || "default",
+      variant: hasTextureOptions ? selectedTextureLabel || "default" : selectedColorCode || "default",
     })
     setIsAddingToCart(false)
   }
 
   return (
-    <div className="mt-8 w-full min-w-0 space-y-8 overflow-x-hidden">
-      {availableColors.length > 0 && (
+    <div className="mt-5 w-full min-w-0 space-y-5 overflow-x-hidden">
+      <div>
+        <div className="flex items-baseline gap-3">
+          <p className={discountedPriceClass}>{formatUsdPrice(discountedSinglePrice)}</p>
+          <p className={originalPriceClass}>{formatUsdPrice(originalSinglePrice)}</p>
+        </div>
+      </div>
+
+      {hasTextureOptions && (
         <div>
-          <p className="text-2xl font-normal text-[#5f5f61] sm:text-[45px]">Color: {selectedColorDisplay || "Default"}</p>
-          <div className="mt-5 flex flex-wrap gap-3">
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Type: {selectedTextureLabel || "Default"}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {textureOptions.map((option) => {
+              const isSelectedTexture = option.key === activeTextureValue
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => onTextureSelect?.(option.key)}
+                  className={`inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-all sm:h-11 sm:text-base ${
+                    isSelectedTexture
+                      ? "border-black bg-black text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,0.6)]"
+                      : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
+                  }`}
+                  aria-label={`Select texture ${option.label}`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {!hasTextureOptions && availableColors.length > 0 && (
+        <div>
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Color: {selectedColorDisplay || "Default"}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
             {availableColors.map((color) => {
               const isSelectedColor = selectedColorCode.toLowerCase() === color.code.toLowerCase()
               return (
@@ -710,7 +1326,7 @@ function SelectLengthComponent({
                     setSelectedColorCode(color.code)
                     onColorChange?.(color.code)
                   }}
-                  className={`relative h-16 w-16 rounded-full border-2 transition-all ${
+                  className={`relative h-10 w-10 rounded-full border transition-all sm:h-11 sm:w-11 ${
                     isSelectedColor ? "border-black p-1 shadow-[0_0_0_2px_rgba(0,0,0,0.2)]" : "border-[#7c7c7f]"
                   }`}
                   title={`${color.label} (${color.code})`}
@@ -728,8 +1344,8 @@ function SelectLengthComponent({
       )}
 
       <div>
-        <p className="text-2xl font-normal text-[#5f5f61] sm:text-[45px]">Size: {currentLength}&quot;</p>
-        <div className="mt-5 grid grid-cols-6 gap-1.5 sm:flex sm:flex-wrap sm:gap-3">
+        <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Size: {currentLength}&quot;</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {lengths.map((length) => {
             const isSelected = selectedLength === length.toString()
             return (
@@ -737,10 +1353,10 @@ function SelectLengthComponent({
                 key={length}
                 type="button"
                 onClick={() => setSelectedLength(length.toString())}
-                className={`w-full border px-1 py-3 text-center text-xl font-semibold transition-all sm:min-w-[84px] sm:w-auto sm:px-5 sm:text-[32px] ${
+                className={`inline-flex h-10 min-w-[48px] items-center justify-center rounded-full px-3 text-sm font-semibold transition-all sm:h-11 sm:min-w-[54px] sm:text-[15px] ${
                   isSelected
-                    ? "border-black bg-black text-white shadow-[0_0_0_4px_rgba(0,0,0,0.12)]"
-                    : "border-[#7d7d80] bg-white text-[#121212] hover:bg-[#f6f6f6]"
+                    ? "bg-black text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,0.6)]"
+                    : "bg-[#ececee] text-[#121212] hover:bg-[#e2e2e4]"
                 }`}
               >
                 {length}
@@ -750,8 +1366,8 @@ function SelectLengthComponent({
         </div>
       </div>
 
-      <div className="space-y-4 border-y border-[#d6d6d8] py-5">
-        <ul className="space-y-1.5 rounded-lg border border-[#cfcfd2] bg-[#f8f8f8] px-4 py-3 text-[17px] text-[#232323]">
+      <div className="space-y-3 border-y border-[#d6d6d8] py-4">
+        <ul className="space-y-1.5 rounded-lg border border-[#cfcfd2] bg-[#f8f8f8] px-3 py-2.5 text-[14px] text-[#232323]">
           {[
             "100% Human Hair",
             "Minimal Shedding",
@@ -772,7 +1388,7 @@ function SelectLengthComponent({
 
         <Link
           href="/#testimonials"
-          className="block rounded-lg border border-[#cfcfd2] bg-white px-4 py-3 transition-colors hover:bg-[#f7f7f7]"
+          className="block rounded-lg border border-[#cfcfd2] bg-white px-3 py-2.5 transition-colors hover:bg-[#f7f7f7]"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-[#77777a]">Customer Reviews</p>
           <div className="mt-2 flex items-center gap-1">
@@ -783,52 +1399,132 @@ function SelectLengthComponent({
             ))}
             <span className="ml-2 text-sm font-semibold text-[#121212]">{reviewLabel}</span>
           </div>
-          <p className="mt-1 text-sm text-[#6a6a6d]">Tap to read testimonials</p>
+          <p className="mt-1 text-xs text-[#6a6a6d] sm:text-sm">Tap to read testimonials</p>
         </Link>
 
         <div className="rounded-lg border border-[#cfcfd2] bg-white px-4 py-3">
           <p className="text-sm text-[#6a6a6d]">Subtotal</p>
-          <p className="mt-1 text-xl font-semibold leading-none text-[#121212]">${grandTotal}</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <p className={discountedPriceClass}>{formatUsdPrice(discountedGrandTotal)}</p>
+            <p className={originalPriceClass}>{formatUsdPrice(originalGrandTotal)}</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_1.2fr] items-center gap-4">
-        <div className="flex h-16 items-center rounded-full bg-[#ececee] px-3 sm:h-20 sm:px-4">
-          <button
-            type="button"
-            onClick={() => handleQuantityChange(quantity - 1)}
-            disabled={quantity <= 1}
-            className="h-10 w-10 text-2xl font-light leading-none text-[#8f8f92] transition-colors hover:text-[#5a5a5d] disabled:cursor-not-allowed disabled:opacity-35 sm:h-12 sm:w-12"
-          >
-            -
-          </button>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={4}
-            value={quantity}
-            onChange={(event) => handleQuantityChange(parseInt(event.target.value.replace(/\D/g, ""), 10) || 1)}
-            className="h-full w-full bg-transparent text-center text-2xl font-semibold text-[#111] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => handleQuantityChange(quantity + 1)}
-            disabled={quantity >= MAX_ITEM_QUANTITY}
-            className="h-10 w-10 text-2xl font-light leading-none text-[#8f8f92] transition-colors hover:text-[#5a5a5d] disabled:cursor-not-allowed disabled:opacity-35 sm:h-12 sm:w-12"
-          >
-            +
-          </button>
+      <div className="grid grid-cols-[1fr_1.2fr] items-end gap-3">
+        <div>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a7a7d]">Quantity</p>
+          <div className="flex h-12 items-center rounded-2xl border border-[#d4d4d8] bg-white px-2 py-1 shadow-[0_8px_22px_-18px_rgba(0,0,0,0.45)] sm:h-14 sm:px-2.5">
+            <button
+              type="button"
+              onClick={() => handleQuantityChange(quantity - 1)}
+              disabled={quantity <= 1}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-xl font-light leading-none text-[#6f6f73] transition-colors hover:border-[#dedee2] hover:bg-[#f2f2f4] hover:text-[#3f3f42] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
+            >
+              -
+            </button>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              value={quantity}
+              onChange={(event) => handleQuantityChange(parseInt(event.target.value.replace(/\D/g, ""), 10) || 1)}
+              className="h-full w-full bg-transparent text-center text-xl font-semibold text-[#111] focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => handleQuantityChange(quantity + 1)}
+              disabled={quantity >= MAX_ITEM_QUANTITY}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-xl font-light leading-none text-[#6f6f73] transition-colors hover:border-[#dedee2] hover:bg-[#f2f2f4] hover:text-[#3f3f42] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={(event) => void handleAddToCart(event.currentTarget)}
           disabled={isAddingToCart}
-          className="h-16 rounded-full bg-black px-6 text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#202022] disabled:cursor-not-allowed disabled:opacity-70 sm:h-20 sm:text-base"
+          className="h-12 rounded-full bg-black px-5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#202022] disabled:cursor-not-allowed disabled:opacity-70 sm:h-14 sm:text-sm"
         >
           {isAddingToCart ? "ADDING..." : "ADD TO CART"}
         </button>
+      </div>
+
+      <div className="border-t border-[#d8d8db] pt-4">
+        <section className="px-0 py-3">
+          <button
+            type="button"
+            onClick={() => setIsBenefitsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <h3 className="text-lg font-semibold leading-none text-[#111]">Why Clients Pick This</h3>
+            <span className="text-xl font-medium text-[#1f1f1f]">{isBenefitsOpen ? "-" : "+"}</span>
+          </button>
+          {isBenefitsOpen && (
+            <ul className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-[#222]">
+              <li className="flex gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                <span><strong>Styling Freedom</strong> - Wear it sleek, wavy, or curled while keeping a natural finish.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                <span><strong>Natural Blend</strong> - Soft texture and clean movement that sits smoothly with your own hair.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                <span><strong>Built for Repeat Use</strong> - Low tangling, low shedding, and reusable with proper care.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                <span><strong>Daily-Ready Comfort</strong> - Suitable for regular wear, events, and camera-ready looks.</span>
+              </li>
+            </ul>
+          )}
+        </section>
+
+        <section className="border-t border-[#d8d8db] px-0 py-3">
+          <button
+            type="button"
+            onClick={() => setIsSpecsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <h3 className="text-lg font-semibold leading-none text-[#111]">Product Details</h3>
+            <span className="text-xl font-medium text-[#1f1f1f]">{isSpecsOpen ? "-" : "+"}</span>
+          </button>
+          {isSpecsOpen && (
+            <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[13px] leading-relaxed text-[#212121] sm:grid-cols-[160px_1fr]">
+              <dt className="font-medium text-[#111]">Texture</dt>
+              <dd>{textureLabel || name}</dd>
+
+              <dt className="font-medium text-[#111]">Color Option</dt>
+              <dd>{selectedColorDisplay || "Default / Natural"}</dd>
+
+              <dt className="font-medium text-[#111]">Hair Type</dt>
+              <dd>100% Human Hair</dd>
+
+              <dt className="font-medium text-[#111]">Category</dt>
+              <dd>{category}</dd>
+
+              <dt className="font-medium text-[#111]">Selected Size</dt>
+              <dd>{currentLength}&quot;</dd>
+
+              <dt className="font-medium text-[#111]">Single Price</dt>
+              <dd>
+                <span className={discountedPriceClass}>{formatUsdPrice(discountedSinglePrice)}</span>
+                <span className={`ml-2 ${originalPriceClass}`}>{formatUsdPrice(originalSinglePrice)}</span>
+              </dd>
+
+              <dt className="font-medium text-[#111]">Coloring</dt>
+              <dd>Suitable for professional toning or dyeing</dd>
+
+              <dt className="font-medium text-[#111]">Wear Life</dt>
+              <dd>Long-lasting with consistent maintenance</dd>
+            </dl>
+          )}
+        </section>
       </div>
     </div>
   )

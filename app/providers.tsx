@@ -2,6 +2,7 @@
 
 import { CartProvider } from "@/context/CartContext"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
+import { WelcomeCouponPopup } from "@/components/welcome-coupon-popup"
 import { usePathname } from "next/navigation"
 import { ReactNode, useEffect } from "react"
 
@@ -26,6 +27,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <CartProvider>
       <RouteMemory />
+      <WelcomeCouponPopup />
       {children}
     </CartProvider>
   )

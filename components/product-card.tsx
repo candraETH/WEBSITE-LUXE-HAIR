@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import ProductGallery from "./product-gallery"
+import { getDiscountedPriceLabel } from "@/lib/pricing"
 
 interface ProductCardProps {
   name: string
@@ -19,11 +20,12 @@ interface ProductCardProps {
 export function ProductCard({ name, slug, price, image, images, category, description, tag }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const isVirginStraightBulk = slug === "virgin-straight-bulk"
+  const { discountedLabel, originalLabel } = getDiscountedPriceLabel(price)
 
   return (
     <Link href={`/order/${slug}`}>
       <div
-        className="group relative flex flex-col cursor-pointer"
+        className="group relative flex w-full flex-col cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -32,11 +34,12 @@ export function ProductCard({ name, slug, price, image, images, category, descri
           {images && images.length > 0 ? (
             <ProductGallery images={images} alt={name} />
           ) : (
-            <div className="relative aspect-[3/4] overflow-hidden bg-secondary">
+            <div className="relative aspect-[15/14] overflow-hidden rounded-2xl bg-secondary">
               <Image
                 src={image ?? ""}
                 alt={name}
                 fill
+                unoptimized
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 className={`transition-transform duration-700 ${isHovered ? "scale-110" : "scale-100"} ${isVirginStraightBulk ? "object-contain p-2" : "object-cover"}`}
               />
@@ -58,7 +61,10 @@ export function ProductCard({ name, slug, price, image, images, category, descri
           </p>
           <h3 className="font-serif text-lg font-semibold text-foreground">{name}</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
-          <p className="mt-1 text-lg font-semibold text-foreground">{price}</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <p className="text-lg font-semibold leading-none text-foreground tabular-nums">{discountedLabel}</p>
+            <p className="text-sm font-medium leading-none text-muted-foreground line-through tabular-nums">{originalLabel}</p>
+          </div>
         </div>
       </div>
     </Link>

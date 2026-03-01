@@ -16,6 +16,17 @@ import {
   type CheckoutDetails,
 } from "@/lib/payment-draft"
 import { containsDisallowedAddressMarker, hasAddressLettersAndNumbers } from "@/lib/checkout-customer"
+import { formatUsdPrice, recoverOriginalPriceFromDiscounted } from "@/lib/pricing"
+import {
+  calculateCouponDiscount,
+  clearActiveCouponCode,
+  COUPON_UPDATED_EVENT,
+  getCouponByCode,
+  isCouponEligibleForSubtotal,
+  loadActiveCouponCode,
+  normalizeCouponCode,
+  saveActiveCouponCode,
+} from "@/lib/coupon"
 
 type RequestVerificationResponse = {
   error?: string
@@ -46,6 +57,10 @@ export default function CartPage() {
   const [verificationInfo, setVerificationInfo] = useState("")
   const [verificationError, setVerificationError] = useState("")
   const [verificationDevCode, setVerificationDevCode] = useState("")
+  const [couponInput, setCouponInput] = useState("")
+  const [appliedCouponCode, setAppliedCouponCode] = useState("")
+  const [couponInfo, setCouponInfo] = useState("")
+  const [couponError, setCouponError] = useState("")
 
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
@@ -112,9 +127,31 @@ export default function CartPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const syncCouponFromStorage = () => {
+      const activeCode = loadActiveCouponCode()
+      const resolvedCoupon = getCouponByCode(activeCode)
+      if (!resolvedCoupon) {
+        setAppliedCouponCode("")
+        setCouponInput("")
+        return
+      }
+
+      setAppliedCouponCode(resolvedCoupon.code)
+      setCouponInput(resolvedCoupon.code)
+    }
+
+    syncCouponFromStorage()
+    window.addEventListener(COUPON_UPDATED_EVENT, syncCouponFromStorage)
+
+    return () => {
+      window.removeEventListener(COUPON_UPDATED_EVENT, syncCouponFromStorage)
+    }
+  }, [])
+
   if (!isCartReady) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
+      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-24">
           <p className="text-center text-muted-foreground">Loading cart...</p>
         </div>
@@ -124,7 +161,7 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
+      <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
           <Link href={continueShoppingHref}>
             <Button
@@ -157,9 +194,20 @@ export default function CartPage() {
   const totalPrice = getTotalPrice()
   const FREE_SHIPPING_THRESHOLD = 750
   const TAX_RATE = 0.035
+  const activeCouponDefinition = getCouponByCode(appliedCouponCode)
+  const isActiveCouponEligible = activeCouponDefinition
+    ? isCouponEligibleForSubtotal(activeCouponDefinition, totalPrice)
+    : false
+  const activeCoupon = isActiveCouponEligible ? activeCouponDefinition : null
+  const couponDiscount = activeCoupon ? calculateCouponDiscount(totalPrice, activeCoupon.discountRate) : 0
+  const subtotalAfterCoupon = parseFloat((Math.max(0, totalPrice - couponDiscount)).toFixed(2))
+  const couponMinimumNotice =
+    activeCouponDefinition && !isActiveCouponEligible
+      ? `${activeCouponDefinition.code} requires minimum subtotal ${formatUsdPrice(activeCouponDefinition.minimumSubtotal)}.`
+      : ""
   const isFreeShipping = totalPrice >= FREE_SHIPPING_THRESHOLD
-  const taxAmount = parseFloat((totalPrice * TAX_RATE).toFixed(2))
-  const finalTotal = parseFloat((totalPrice + taxAmount).toFixed(2))
+  const taxAmount = parseFloat((subtotalAfterCoupon * TAX_RATE).toFixed(2))
+  const finalTotal = parseFloat((subtotalAfterCoupon + taxAmount).toFixed(2))
   const CHECKOUT_OTP_THRESHOLD_DOLLARS = 2500
   const requiresCheckoutOtp = finalTotal >= CHECKOUT_OTP_THRESHOLD_DOLLARS
 
@@ -181,6 +229,52 @@ export default function CartPage() {
     if (checkoutError) {
       setCheckoutError("")
     }
+  }
+
+  const updateCouponInput = (value: string) => {
+    setCouponInput(value.toUpperCase().replace(/\s+/g, ""))
+    if (couponError) {
+      setCouponError("")
+    }
+    if (couponInfo) {
+      setCouponInfo("")
+    }
+  }
+
+  const applyCouponCode = () => {
+    const normalizedCode = normalizeCouponCode(couponInput)
+    if (!normalizedCode) {
+      setCouponError("Enter a coupon code first.")
+      setCouponInfo("")
+      return
+    }
+
+    const coupon = getCouponByCode(normalizedCode)
+    if (!coupon) {
+      setCouponError("Coupon code is not valid.")
+      setCouponInfo("")
+      return
+    }
+
+    if (!isCouponEligibleForSubtotal(coupon, totalPrice)) {
+      setCouponError(`Coupon is valid for subtotal minimum ${formatUsdPrice(coupon.minimumSubtotal)}.`)
+      setCouponInfo("")
+      return
+    }
+
+    setAppliedCouponCode(coupon.code)
+    setCouponInput(coupon.code)
+    saveActiveCouponCode(coupon.code)
+    setCouponInfo(`${coupon.code} applied successfully.`)
+    setCouponError("")
+  }
+
+  const removeCouponCode = () => {
+    setAppliedCouponCode("")
+    setCouponInput("")
+    clearActiveCouponCode()
+    setCouponInfo("Coupon removed.")
+    setCouponError("")
   }
 
   const normalizeWhatsAppInput = (value: string) => {
@@ -390,10 +484,12 @@ export default function CartPage() {
                 items: checkoutItemsPayload,
                 customer: normalizedDetails,
                 verificationToken,
+                couponCode: activeCoupon?.code,
               }
             : {
                 items: checkoutItemsPayload,
                 customer: normalizedDetails,
+                couponCode: activeCoupon?.code,
               }
         ),
       })
@@ -412,7 +508,7 @@ export default function CartPage() {
         orderId: data.orderId,
         status: "PENDING",
         currency: "USD",
-        subtotal: totalPrice,
+        subtotal: subtotalAfterCoupon,
         tax: taxAmount,
         total: finalTotal,
         customer: normalizedDetails,
@@ -447,7 +543,7 @@ export default function CartPage() {
     (!requiresCheckoutOtp || Boolean(verificationToken))
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       {/* Back Button */}
       <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
         <Link href={continueShoppingHref}>
@@ -550,12 +646,22 @@ export default function CartPage() {
 
                 {/* Price */}
                 <div className="flex flex-row items-center justify-between sm:flex-col sm:items-end sm:justify-between">
-                  <p className="text-xs sm:text-sm text-muted-foreground/80">
-                    ${item.price.toFixed(2)} each
-                  </p>
-                  <p className="font-serif text-xl sm:text-2xl font-bold text-[#D4AF37]">
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-xs sm:text-sm text-muted-foreground/80">
+                      {formatUsdPrice(item.price)} each
+                    </p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground/70 line-through">
+                      {formatUsdPrice(recoverOriginalPriceFromDiscounted(item.price))} each
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-serif text-xl sm:text-2xl font-bold text-[#D4AF37]">
+                      {formatUsdPrice(item.price * item.quantity)}
+                    </p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground/70 line-through">
+                      {formatUsdPrice(recoverOriginalPriceFromDiscounted(item.price) * item.quantity)}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -569,11 +675,59 @@ export default function CartPage() {
                   Order Summary
                 </p>
 
+                <div className="mb-4 rounded-lg border border-[#D4AF37]/25 bg-white/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-[#8A6510]">
+                    Coupon Code
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(event) => updateCouponInput(event.target.value)}
+                      placeholder="Enter coupon"
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm font-semibold uppercase tracking-wider text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyCouponCode}
+                      className="h-10 rounded-md bg-[#1F1810] px-4 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-[#2A2218]"
+                    >
+                      Apply
+                    </button>
+                  </div>
+
+                  {activeCouponDefinition && (
+                    <button
+                      type="button"
+                      onClick={removeCouponCode}
+                      className="mt-2 text-[11px] font-semibold uppercase tracking-widest text-[#A94442] hover:text-[#7F2E2D]"
+                    >
+                      Remove coupon
+                    </button>
+                  )}
+
+                  {couponInfo && <p className="mt-2 text-xs font-medium text-[#2E7D32]">{couponInfo}</p>}
+                  {couponError && <p className="mt-2 text-xs font-medium text-red-500">{couponError}</p>}
+                  {couponMinimumNotice && <p className="mt-2 text-xs font-medium text-amber-700">{couponMinimumNotice}</p>}
+                </div>
+
                 <div className="space-y-3 border-b border-[#D4AF37]/20 pb-4">
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Subtotal</p>
                     <p className="font-semibold text-foreground">${totalPrice.toFixed(2)}</p>
                   </div>
+                  {activeCoupon && couponDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <p className="text-gray-600">Coupon ({activeCoupon.code})</p>
+                      <p className="font-semibold text-[#2E7D32]">- ${couponDiscount.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {activeCoupon && couponDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <p className="text-gray-600">Subtotal after coupon</p>
+                      <p className="font-semibold text-foreground">${subtotalAfterCoupon.toFixed(2)}</p>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <p className="text-gray-600">Shipping</p>
                     <p className="text-right font-semibold text-foreground">

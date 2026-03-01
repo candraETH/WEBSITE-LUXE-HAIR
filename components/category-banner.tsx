@@ -8,7 +8,7 @@ export function CategoryBanner() {
 
   return (
     <section className="border-y border-border bg-card py-0">
-      <div className="mx-auto grid max-w-7xl grid-cols-2 lg:grid-cols-4">
+      <div className="grid w-full grid-cols-2 lg:grid-cols-4">
         {categories.map((cat, i) => (
           <a
             key={cat.label}

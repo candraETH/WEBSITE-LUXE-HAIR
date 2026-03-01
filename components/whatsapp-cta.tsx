@@ -5,7 +5,7 @@ const WHATSAPP_CTA_MESSAGE = "Hi, I'm interested in your hair products"
 export function WhatsAppCTA() {
   return (
     <section className="bg-primary py-24 lg:py-32">
-      <div className="mx-auto max-w-4xl px-6 text-center">
+      <div className="mx-auto w-full max-w-[1120px] px-4 text-center sm:px-6 lg:px-10">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-primary-foreground/60">
           Ready to Order?
         </p>

@@ -1,37 +1,118 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, ShoppingBag, Search } from "lucide-react"
+import { ChevronDown, Menu, X, ShoppingBag, Search } from "lucide-react"
 import { useCart } from "@/context/CartContext"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "Bulk Hair", href: "/#bulk" },
-  { label: "Weft Hair", href: "/#weft" },
-  { label: "Extensions", href: "/#extensions" },
-  { label: "Wigs", href: "/#wigs" },
+  { label: "Bulk Hair", href: "/bulk-hair" },
+  { label: "Weft Hair", href: "/weft-hair" },
+  { label: "Extensions", href: "/extensions" },
+  { label: "Wigs", href: "/wigs" },
   { label: "About", href: "/#about" },
 ]
 
 const WHATSAPP_CONTACT_MESSAGE = "Hi, I'm interested in your hair products"
+const PROMO_MARQUEE_MESSAGE = "Limited Offer: 25% OFF all hair collections - Shop now"
+
+type MegaMenuItem = {
+  label: string
+  href: string
+}
+
+type MegaMenuConfig = {
+  heading: string
+  viewAllHref: string
+  viewAllLabel: string
+  previewImage: string
+  previewAlt: string
+  items: MegaMenuItem[]
+}
+
+type PreviewLightboxState = {
+  src: string
+  alt: string
+  heading: string
+}
+
+const bulkMenuItems: MegaMenuItem[] = [
+  { label: "Virgin Straight Bulk", href: "/order/virgin-straight-bulk" },
+  { label: "Natural Braiding Hair", href: "/order/natural-braiding-hair" },
+  { label: "Wavy Bulk Premium", href: "/order/wavy-bulk-premium" },
+]
+
+const weftMenuItems: MegaMenuItem[] = [
+  { label: "Natural Wave", href: "/order/natural-wave-weft" },
+  { label: "Body Wave", href: "/order/body-wave-weft" },
+  { label: "Curly", href: "/order/curly-weft" },
+  { label: "Deep Curly", href: "/order/deep-curly-weft" },
+  { label: "Deep Wave", href: "/order/deep-wave-weft" },
+  { label: "Fumi", href: "/order/fumi-weft" },
+  { label: "Natural Curly", href: "/order/natural-curly-weft" },
+  { label: "Water Wave", href: "/order/water-wave-weft" },
+  { label: "Kinky Curl", href: "/order/kinky-curl-weft" },
+  { label: "Loose Wave", href: "/order/loose-wave-weft" },
+  { label: "Jerry Curly", href: "/order/jerry-curly-weft" },
+  { label: "Brazilian Curly", href: "/order/brazilian-curly-weft" },
+]
+
+const extensionsMenuItems: MegaMenuItem[] = [
+  { label: "Silky Straight Clip-Ins", href: "/order/silky-straight-clip-ins" },
+  { label: "Honey Blonde Tape-Ins", href: "/order/honey-blonde-tape-ins" },
+  { label: "Body Wave Bundles", href: "/order/body-wave-bundles" },
+]
+
+const wigsMenuItems: MegaMenuItem[] = [
+  { label: "Straight Lace Front Wig", href: "/order/straight-lace-front-wig" },
+  { label: "Deep Wave Closure Wig", href: "/order/deep-wave-closure-wig" },
+  { label: "Burgundy Bob Wig", href: "/order/burgundy-bob-wig" },
+]
+
+const PRODUCT_MEGA_MENUS: Record<string, MegaMenuConfig> = {
+  "Bulk Hair": {
+    heading: "Bulk Hair",
+    viewAllHref: "/bulk-hair",
+    viewAllLabel: "View All Bulk Hair",
+    previewImage: "/images/images1.png",
+    previewAlt: "Bulk hair collection",
+    items: bulkMenuItems,
+  },
+  "Weft Hair": {
+    heading: "Texture Hair",
+    viewAllHref: "/weft-hair",
+    viewAllLabel: "View All Weft Hair",
+    previewImage: "/images/texture/all%20texture.png",
+    previewAlt: "All texture options",
+    items: weftMenuItems,
+  },
+  Extensions: {
+    heading: "Extensions",
+    viewAllHref: "/extensions",
+    viewAllLabel: "View All Extensions",
+    previewImage: "/images/extensions-1.jpg",
+    previewAlt: "Extensions collection",
+    items: extensionsMenuItems,
+  },
+  Wigs: {
+    heading: "Wigs",
+    viewAllHref: "/wigs",
+    viewAllLabel: "View All Wigs",
+    previewImage: "/images/wig-1.jpg",
+    previewAlt: "Wig collection",
+    items: wigsMenuItems,
+  },
+}
 
 const searchableProducts = [
-  { name: "Silky Straight Clip-Ins", slug: "silky-straight-clip-ins" },
-  { name: "Honey Blonde Tape-Ins", slug: "honey-blonde-tape-ins" },
-  { name: "Body Wave Bundles", slug: "body-wave-bundles" },
-  { name: "Straight Lace Front Wig", slug: "straight-lace-front-wig" },
-  { name: "Deep Wave Closure Wig", slug: "deep-wave-closure-wig" },
-  { name: "Burgundy Bob Wig", slug: "burgundy-bob-wig" },
-  { name: "Machine Weft Straight", slug: "machine-weft-straight" },
-  { name: "Hand-Tied Loose Wave", slug: "hand-tied-loose-wave" },
-  { name: "Flat Weft Platinum", slug: "flat-weft-platinum" },
-  { name: "Virgin Straight Bulk", slug: "virgin-straight-bulk" },
-  { name: "Natural Braiding Hair", slug: "natural-braiding-hair" },
-  { name: "Wavy Bulk Premium", slug: "wavy-bulk-premium" },
+  ...[...bulkMenuItems, ...weftMenuItems, ...extensionsMenuItems, ...wigsMenuItems].map((item) => ({
+    name: item.label,
+    slug: item.href.replace("/order/", ""),
+  })),
 ]
 
 function resolveSearchTarget(query: string): string {
@@ -49,16 +130,16 @@ function resolveSearchTarget(query: string): string {
   }
 
   if (normalizedQuery.includes("bulk")) {
-    return "/#bulk"
+    return "/bulk-hair"
   }
   if (normalizedQuery.includes("weft")) {
-    return "/#weft"
+    return "/weft-hair"
   }
   if (normalizedQuery.includes("extension") || normalizedQuery.includes("clip") || normalizedQuery.includes("tape")) {
-    return "/#extensions"
+    return "/extensions"
   }
   if (normalizedQuery.includes("wig")) {
-    return "/#wigs"
+    return "/wigs"
   }
 
   return "/#home"
@@ -67,8 +148,92 @@ function resolveSearchTarget(query: string): string {
 export function Navbar() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+  const [openDesktopMenu, setOpenDesktopMenu] = useState<string | null>(null)
+  const [openMobileMenu, setOpenMobileMenu] = useState<string | null>(null)
+  const [previewLightbox, setPreviewLightbox] = useState<PreviewLightboxState | null>(null)
+  const desktopNavRef = useRef<HTMLUListElement>(null)
+  const desktopOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const desktopCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { getTotalItems } = useCart()
   const totalItems = getTotalItems()
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!desktopNavRef.current) {
+        return
+      }
+      if (!desktopNavRef.current.contains(event.target as Node)) {
+        setOpenDesktopMenu(null)
+      }
+    }
+
+    function handleEsc(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenDesktopMenu(null)
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick)
+    document.addEventListener("keydown", handleEsc)
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick)
+      document.removeEventListener("keydown", handleEsc)
+      if (desktopOpenTimerRef.current) {
+        clearTimeout(desktopOpenTimerRef.current)
+      }
+      if (desktopCloseTimerRef.current) {
+        clearTimeout(desktopCloseTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!previewLightbox) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPreviewLightbox(null)
+      }
+    }
+
+    window.addEventListener("keydown", handleEsc)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", handleEsc)
+    }
+  }, [previewLightbox])
+
+  const handleDesktopMenuEnter = (label: string) => {
+    if (desktopCloseTimerRef.current) {
+      clearTimeout(desktopCloseTimerRef.current)
+    }
+    if (desktopOpenTimerRef.current) {
+      clearTimeout(desktopOpenTimerRef.current)
+    }
+
+    desktopOpenTimerRef.current = setTimeout(() => {
+      setOpenDesktopMenu(label)
+    }, 150)
+  }
+
+  const handleDesktopMenuLeave = () => {
+    if (desktopOpenTimerRef.current) {
+      clearTimeout(desktopOpenTimerRef.current)
+    }
+    if (desktopCloseTimerRef.current) {
+      clearTimeout(desktopCloseTimerRef.current)
+    }
+
+    desktopCloseTimerRef.current = setTimeout(() => {
+      setOpenDesktopMenu(null)
+    }, 150)
+  }
 
   const handleSearchClick = () => {
     const query = window.prompt("Search product:")
@@ -80,8 +245,21 @@ export function Navbar() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <>
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+      <div className="promo-marquee border-b border-[#3a2e20] bg-[#1f1810] text-[#f6ddb3]">
+        <div className="promo-marquee-track flex w-max min-w-full items-center py-1.5">
+          {Array.from({ length: 12 }).map((_, index) => (
+            <span
+              key={`promo-${index}`}
+              className="mx-5 text-[10px] font-semibold uppercase tracking-[0.18em] sm:mx-7 sm:text-[11px]"
+            >
+              {PROMO_MARQUEE_MESSAGE}
+            </span>
+          ))}
+        </div>
+      </div>
+      <nav className="flex w-full items-center justify-between px-4 py-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
         <Link href="/#home" className="flex items-center gap-2.5 font-serif text-2xl font-bold tracking-wider text-foreground">
           <Image
             src="/images/logo-mark.png"
@@ -94,17 +272,105 @@ export function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <ul className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+        <ul ref={desktopNavRef} className="hidden items-center gap-8 md:flex">
+          {navLinks.map((link) => {
+            const megaMenu = PRODUCT_MEGA_MENUS[link.label]
+            const isMenuOpen = openDesktopMenu === link.label
+
+            if (!megaMenu) {
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              )
+            }
+
+            return (
+              <li
+                key={link.href}
+                className="relative"
+                onMouseEnter={() => handleDesktopMenuEnter(link.label)}
+                onMouseLeave={handleDesktopMenuLeave}
               >
-                {link.label}
-              </Link>
-            </li>
-          ))}
+                <Link
+                  href={link.href}
+                  onClick={() => setOpenDesktopMenu(null)}
+                  className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                  aria-expanded={isMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  {link.label}
+                </Link>
+
+                {isMenuOpen && (
+                  <div className="absolute left-1/2 top-full z-50 mt-4 w-[min(1180px,96vw)] -translate-x-1/2 rounded-2xl border border-border bg-background p-6 shadow-2xl">
+                    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+                      <div className="p-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewLightbox({
+                              src: megaMenu.previewImage,
+                              alt: megaMenu.previewAlt,
+                              heading: megaMenu.heading,
+                            })
+                          }
+                          className="preview-shake-trigger group flex min-h-[300px] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl bg-[#f7f4ef] p-0"
+                          aria-label={`Open ${megaMenu.heading} preview image`}
+                        >
+                          <Image
+                            src={megaMenu.previewImage}
+                            alt={megaMenu.previewAlt}
+                            sizes="380px"
+                            width={700}
+                            height={700}
+                            unoptimized
+                            className={`h-full w-full ${
+                              link.label === "Weft Hair"
+                                ? "object-cover scale-[1.12] transition-transform duration-300 group-hover:scale-[1.16]"
+                                : "object-contain transition-transform duration-300 group-hover:scale-[1.04]"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="mb-3 flex items-center justify-between gap-4">
+                          <h3 className="text-base font-bold uppercase tracking-wide text-foreground">{megaMenu.heading}</h3>
+                          <Link
+                            href={megaMenu.viewAllHref}
+                            onClick={() => setOpenDesktopMenu(null)}
+                            className="text-xs font-semibold uppercase tracking-widest text-accent transition-colors hover:text-foreground"
+                          >
+                            {megaMenu.viewAllLabel}
+                          </Link>
+                        </div>
+
+                        <ul className="space-y-1.5">
+                          {megaMenu.items.map((item) => (
+                            <li key={item.href}>
+                              <Link
+                                href={item.href}
+                                onClick={() => setOpenDesktopMenu(null)}
+                                className="text-[15px] text-foreground/90 transition-colors hover:text-accent"
+                              >
+                                {item.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
 
         <div className="hidden items-center gap-4 md:flex">
@@ -171,19 +437,69 @@ export function Navbar() {
 
       {/* Mobile Nav */}
       {isOpen && (
-        <div className="border-t border-border bg-background px-6 pb-6 md:hidden">
+        <div className="border-t border-border bg-background px-4 pb-6 sm:px-6 md:hidden">
           <ul className="flex flex-col gap-4 pt-4">
-            {navLinks.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  onClick={() => setIsOpen(false)}
-                  className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
+            {navLinks.map((link) => {
+              const megaMenu = PRODUCT_MEGA_MENUS[link.label]
+              const isMenuOpen = openMobileMenu === link.label
+
+              if (!megaMenu) {
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                )
+              }
+
+              return (
+                <li key={link.href}>
+                  <div className="flex items-center justify-between">
+                    <Link
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setOpenMobileMenu((prev) => (prev === link.label ? null : link.label))}
+                      className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label={`Toggle ${link.label} menu`}
+                    >
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform duration-200 ${isMenuOpen ? "rotate-180" : "rotate-0"}`}
+                      />
+                    </button>
+                  </div>
+
+                  {isMenuOpen && (
+                    <div className="mt-2 space-y-1 pl-3">
+                      {megaMenu.items.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => {
+                            setIsOpen(false)
+                            setOpenMobileMenu(null)
+                          }}
+                          className="block py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
             <li>
               <Link
                 href="/cart"
@@ -211,7 +527,88 @@ export function Navbar() {
           </a>
         </div>
       )}
-    </header>
+      </header>
+
+      {previewLightbox && (
+        <div
+          className="fixed inset-0 z-[140] bg-black px-4 py-4 sm:px-8 sm:py-6"
+          onClick={() => setPreviewLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              setPreviewLightbox(null)
+            }}
+            className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white transition-colors hover:bg-white/30"
+            aria-label="Close preview image"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-6 w-6" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-white/25 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">
+            {previewLightbox.heading}
+          </div>
+
+          <div className="relative mx-auto h-full w-full max-w-[1500px]">
+            <Image
+              src={previewLightbox.src}
+              alt={previewLightbox.alt}
+              fill
+              unoptimized
+              sizes="100vw"
+              className="object-contain"
+              priority
+            />
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes promoMarqueeSlide {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        .promo-marquee {
+          overflow: hidden;
+          white-space: nowrap;
+        }
+
+        .promo-marquee-track {
+          will-change: transform;
+          animation: promoMarqueeSlide 44s linear infinite;
+        }
+
+        @keyframes megaPreviewWiggle {
+          0% {
+            transform: translateX(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(-2px) rotate(-0.7deg);
+          }
+          50% {
+            transform: translateX(2px) rotate(0.7deg);
+          }
+          75% {
+            transform: translateX(-1px) rotate(-0.35deg);
+          }
+          100% {
+            transform: translateX(0) rotate(0deg);
+          }
+        }
+
+        .preview-shake-trigger:hover {
+          animation: megaPreviewWiggle 0.55s ease-in-out infinite;
+        }
+      `}</style>
+    </>
   )
 }
 

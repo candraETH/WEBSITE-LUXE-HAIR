@@ -3,7 +3,7 @@ import { Footer } from "@/components/footer"
 
 export default function ReturnPolicyPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[72px] lg:pt-[78px]">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       <Navbar />
 
       <section className="mx-auto max-w-3xl px-6 py-12 lg:py-16">

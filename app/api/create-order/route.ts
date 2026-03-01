@@ -13,6 +13,7 @@ import { enforceRateLimit } from "@/lib/rate-limit"
 import { getAllowedAppOrigin, isAllowedRequestOrigin } from "@/lib/security"
 import { checkoutCustomerSchema, normalizeCheckoutCustomer } from "@/lib/checkout-customer"
 import { consumeCheckoutVerificationToken } from "@/lib/checkout-verification"
+import { getCouponByCode, isCouponEligibleForSubtotal, normalizeCouponCode } from "@/lib/coupon"
 
 export const runtime = "nodejs"
 
@@ -41,11 +42,17 @@ type CartJsonPayload = {
   }
   summary: {
     item_count: number
+    line_items_subtotal: number
+    discount: number
     subtotal: number
     tax: number
     shipping: number
     total: number
   }
+  coupon: {
+    code: string
+    discount_rate: number
+  } | null
   items: Array<{
     name: string
     slug: string
@@ -72,6 +79,7 @@ const createOrderSchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(MAX_CHECKOUT_ITEMS),
   customer: checkoutCustomerSchema,
   verificationToken: z.string().trim().min(20).max(200).optional(),
+  couponCode: z.string().trim().max(40).optional(),
 })
 
 const CHECKOUT_OTP_REQUIRED_TOTAL_CENTS = 2500 * 100
@@ -150,7 +158,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
     }
 
-    const calculated = calculateOrderFromItems(parsed.data.items)
+    const normalizedCouponCode = normalizeCouponCode(parsed.data.couponCode)
+    const requestedCoupon = normalizedCouponCode ? getCouponByCode(normalizedCouponCode) : null
+    if (normalizedCouponCode && !requestedCoupon) {
+      return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 })
+    }
+
+    const calculated = calculateOrderFromItems(
+      parsed.data.items,
+      normalizedCouponCode || undefined
+    )
+    if (
+      requestedCoupon &&
+      !isCouponEligibleForSubtotal(requestedCoupon, calculated.lineItemsSubtotalCents / 100)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Coupon requires minimum subtotal ${requestedCoupon.minimumSubtotal.toFixed(0)} USD.`,
+        },
+        { status: 400 }
+      )
+    }
     const customer = normalizeCheckoutCustomer(parsed.data.customer)
     const requiresCheckoutOtp = calculated.totalCents >= CHECKOUT_OTP_REQUIRED_TOTAL_CENTS
     if (requiresCheckoutOtp) {
@@ -173,6 +201,24 @@ export async function POST(request: Request) {
     const internalOrderId = crypto.randomUUID()
     const origin = getAllowedAppOrigin(request)
 
+    const amountBreakdown: {
+      item_total: { currency_code: "USD"; value: string }
+      tax_total: { currency_code: "USD"; value: string }
+      shipping: { currency_code: "USD"; value: string }
+      discount?: { currency_code: "USD"; value: string }
+    } = {
+      item_total: { currency_code: "USD", value: centsToDollars(calculated.lineItemsSubtotalCents) },
+      tax_total: { currency_code: "USD", value: centsToDollars(calculated.taxCents) },
+      shipping: { currency_code: "USD", value: centsToDollars(calculated.shippingCents) },
+    }
+
+    if (calculated.couponDiscountCents > 0) {
+      amountBreakdown.discount = {
+        currency_code: "USD",
+        value: centsToDollars(calculated.couponDiscountCents),
+      }
+    }
+
     const payload = {
       intent: "CAPTURE",
       purchase_units: [
@@ -182,11 +228,7 @@ export async function POST(request: Request) {
           amount: {
             currency_code: "USD",
             value: centsToDollars(calculated.totalCents),
-            breakdown: {
-              item_total: { currency_code: "USD", value: centsToDollars(calculated.subtotalCents) },
-              tax_total: { currency_code: "USD", value: centsToDollars(calculated.taxCents) },
-              shipping: { currency_code: "USD", value: centsToDollars(calculated.shippingCents) },
-            },
+            breakdown: amountBreakdown,
           },
           items: calculated.lineItems.map((item) => ({
             name: item.displayName.slice(0, 127),
@@ -228,6 +270,8 @@ export async function POST(request: Request) {
       currencyCode: "USD",
     })
 
+    const lineItemsSubtotalAmount = Number(centsToDollars(calculated.lineItemsSubtotalCents))
+    const discountAmount = Number(centsToDollars(calculated.couponDiscountCents))
     const subtotalAmount = Number(centsToDollars(calculated.subtotalCents))
     const taxAmount = Number(centsToDollars(calculated.taxCents))
     const shippingAmount = Number(centsToDollars(calculated.shippingCents))
@@ -251,11 +295,19 @@ export async function POST(request: Request) {
       },
       summary: {
         item_count: calculated.lineItems.reduce((sum, item) => sum + item.quantity, 0),
+        line_items_subtotal: lineItemsSubtotalAmount,
+        discount: discountAmount,
         subtotal: subtotalAmount,
         tax: taxAmount,
         shipping: shippingAmount,
         total: totalAmount,
       },
+      coupon: calculated.appliedCoupon
+        ? {
+            code: calculated.appliedCoupon.code,
+            discount_rate: calculated.appliedCoupon.discountRate,
+          }
+        : null,
       items: calculated.lineItems.map((item) => ({
         name: item.name,
         slug: item.slug,
@@ -281,6 +333,12 @@ export async function POST(request: Request) {
       "Items:",
       ...cartTextItems,
       "",
+      `Line Items Subtotal: $${centsToDollars(calculated.lineItemsSubtotalCents)}`,
+      ...(calculated.couponDiscountCents > 0
+        ? [
+            `Coupon (${calculated.appliedCoupon?.code ?? normalizedCouponCode}): -$${centsToDollars(calculated.couponDiscountCents)}`,
+          ]
+        : []),
       `Subtotal: $${centsToDollars(calculated.subtotalCents)}`,
       `Tax: $${centsToDollars(calculated.taxCents)}`,
       `Shipping: $${centsToDollars(calculated.shippingCents)}`,

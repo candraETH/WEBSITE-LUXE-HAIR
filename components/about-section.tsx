@@ -7,7 +7,7 @@ const WHATSAPP_ABOUT_MESSAGE = "Hi, I'd like to learn more about your products"
 export function AboutSection() {
   return (
     <section id="about" className="bg-secondary py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
           {/* Image */}
           <div className="relative aspect-[4/5] overflow-hidden">

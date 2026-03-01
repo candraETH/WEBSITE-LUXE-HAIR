@@ -15,7 +15,7 @@ export function Testimonials() {
 
   return (
     <section id="testimonials" className="bg-card py-24 lg:py-32">
-      <div className="mx-auto max-w-4xl px-6 text-center">
+      <div className="mx-auto w-full max-w-[1120px] px-4 text-center sm:px-6 lg:px-10">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-accent">
           Testimonials
         </p>

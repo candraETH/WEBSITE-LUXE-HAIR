@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { calculateCheckoutUnitPrice } from "@/lib/paypal/catalog"
 
 export interface CartItem {
   slug: string
@@ -29,6 +30,24 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 const CART_STORAGE_KEY = "candrashair-cart-v1"
 export const MAX_ITEM_QUANTITY = 1000
+
+function resolveCurrentUnitPrice(item: Pick<CartItem, "slug" | "length" | "variant" | "price">): number {
+  try {
+    const recalculated = calculateCheckoutUnitPrice({
+      slug: item.slug,
+      length: item.length,
+      variant: item.variant,
+    })
+
+    if (!Number.isFinite(recalculated) || recalculated <= 0) {
+      return item.price
+    }
+
+    return Number(recalculated.toFixed(2))
+  } catch {
+    return item.price
+  }
+}
 
 function isValidCartItem(item: unknown): item is CartItem {
   if (!item || typeof item !== "object") {
@@ -70,6 +89,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ...item,
         variant: item.variant?.trim() ? item.variant : undefined,
         quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(item.quantity))),
+        price: resolveCurrentUnitPrice(item),
       }))
 
       setItems(normalizedItems)
@@ -90,28 +110,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = (newItem: CartItem) => {
     setItems((prevItems) => {
+      const normalizedNewItem: CartItem = {
+        ...newItem,
+        price: resolveCurrentUnitPrice(newItem),
+      }
       const newVariant = newItem.variant ?? "default"
       // Check if item with same slug, length, and variant already exists
       const existingIndex = prevItems.findIndex(
         (item) =>
-          item.slug === newItem.slug &&
-          item.length === newItem.length &&
+          item.slug === normalizedNewItem.slug &&
+          item.length === normalizedNewItem.length &&
           (item.variant ?? "default") === newVariant
       )
 
       if (existingIndex > -1) {
         // Update quantity if item exists
         const updatedItems = [...prevItems]
-        const mergedQuantity = updatedItems[existingIndex].quantity + Math.max(1, Math.floor(newItem.quantity))
+        const mergedQuantity =
+          updatedItems[existingIndex].quantity + Math.max(1, Math.floor(normalizedNewItem.quantity))
         updatedItems[existingIndex].quantity = Math.min(MAX_ITEM_QUANTITY, mergedQuantity)
+        updatedItems[existingIndex].price = resolveCurrentUnitPrice(updatedItems[existingIndex])
         return updatedItems
       } else {
         // Add new item
         return [
           ...prevItems,
           {
-            ...newItem,
-            quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(newItem.quantity))),
+            ...normalizedNewItem,
+            quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(normalizedNewItem.quantity))),
           },
         ]
       }

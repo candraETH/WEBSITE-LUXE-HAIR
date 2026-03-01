@@ -4,7 +4,8 @@ interface Product {
   name: string
   slug: string
   price: string
-  image: string
+  image?: string
+  images?: string[]
   category: string
   description: string
   tag?: string
@@ -29,7 +30,7 @@ export function ProductSection({
 }: ProductSectionProps) {
   return (
     <section id={id} className="py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
         {/* Section Header */}
         <div className={`mb-16 flex flex-col items-start gap-4 lg:flex-row lg:items-end lg:justify-between ${reverse ? "lg:flex-row-reverse lg:text-right" : ""}`}>
           <div className={`max-w-xl ${reverse ? "lg:ml-auto" : ""}`}>
@@ -46,7 +47,7 @@ export function ProductSection({
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => (
             <ProductCard key={product.name} {...product} />
           ))}
