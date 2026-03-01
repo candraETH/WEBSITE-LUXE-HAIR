@@ -260,6 +260,16 @@ export function Navbar() {
         </div>
       </div>
       <nav className="flex w-full items-center justify-between px-4 py-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
+        {/* Mobile Toggle (Left) */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="text-foreground md:hidden"
+          aria-label="Toggle navigation"
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
         <Link href="/#home" className="flex items-center gap-2.5 font-serif text-2xl font-bold tracking-wider text-foreground">
           <Image
             src="/images/logo-mark.png"
@@ -422,15 +432,6 @@ export function Navbar() {
             title="Search"
           >
             <Search size={22} strokeWidth={1.8} />
-          </button>
-
-          {/* Mobile Toggle */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="text-foreground"
-            aria-label="Toggle navigation"
-          >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </nav>
