@@ -1,7 +1,7 @@
 export function CategoryBanner() {
   const categories = [
     { label: "Bulk Hair", count: "Premium Quality", href: "#bulk" },
-    { label: "Weft Hair", count: "25+ Options", href: "#weft" },
+    { label: "Bundles", count: "25+ Options", href: "#weft" },
     { label: "Extensions", count: "50+ Styles", href: "#extensions" },
     { label: "Wigs", count: "30+ Styles", href: "#wigs" },
   ]

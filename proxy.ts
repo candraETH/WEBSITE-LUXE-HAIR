@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server"
 // Set to `false` to return the website to normal operation.
 const MAINTENANCE_MODE = false
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!MAINTENANCE_MODE) {
     return NextResponse.next()
   }
@@ -30,4 +30,3 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
 }
-

@@ -11,10 +11,50 @@ import { BULK_PRODUCTS } from "@/lib/bulk-products"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
+import type { Metadata } from "next"
+import { buildPageMetadata, getSiteUrl } from "@/lib/seo"
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Premium Hair Extensions, Wigs & More",
+  description:
+    "Shop premium human hair extensions, bulk hair, weft hair, and wigs with trusted quality, fast delivery, and professional support.",
+  path: "/",
+  keywords: [
+    "human hair extensions",
+    "premium wigs",
+    "weft hair",
+    "bulk hair",
+    "luxury hair store",
+  ],
+  images: ["/images/hero.jpg"],
+})
 
 export default function Page() {
+  const siteUrl = getSiteUrl()
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "CANDRA'S HAIR",
+    url: siteUrl,
+  }
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "CANDRA'S HAIR",
+    url: siteUrl,
+    logo: `${siteUrl}/images/logo-mark.png`,
+  }
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
       <Navbar />
       <Hero />
       <CategoryBanner />
@@ -33,7 +73,7 @@ export default function Page() {
 
       <ProductSection
         id="weft"
-        title="Weft Hair"
+        title="Bundles"
         subtitle="Professional Grade"
         description="Machine-made and hand-tied weft options for professional installations. Designed for stylists who demand the best."
         products={WEFT_PRODUCTS}

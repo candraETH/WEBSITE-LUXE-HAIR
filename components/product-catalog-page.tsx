@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProductCatalogCard } from "@/components/product-catalog-card"
@@ -10,6 +11,7 @@ import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import type { CatalogFaqItem } from "@/lib/catalog-faqs"
+import { CATALOG_SEO_CONTENT, type CatalogGroupKey } from "@/lib/catalog-seo"
 
 const sortOptions = [
   { value: "featured", label: "Featured" },
@@ -24,7 +26,7 @@ type ProductCatalogPageProps = {
   products: CatalogProduct[]
   filterTitle?: string
   sortId: string
-  activeCatalogGroup?: "bulk" | "weft" | "extensions" | "wigs"
+  activeCatalogGroup?: CatalogGroupKey
   faqHeading?: string
   faqItems?: CatalogFaqItem[]
 }
@@ -46,15 +48,21 @@ export function ProductCatalogPage({
   const [selectedProductSlugs, setSelectedProductSlugs] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<SortValue>("featured")
   const [openFaqIndex, setOpenFaqIndex] = useState<number>(0)
+  const seoContent = CATALOG_SEO_CONTENT[activeCatalogGroup]
 
   const catalogGroups = useMemo(
     () => [
       { key: "bulk", title: "Bulk Collection", href: "/bulk-hair", items: BULK_PRODUCTS },
-      { key: "weft", title: "Weft Hair", href: "/weft-hair", items: WEFT_PRODUCTS },
+      { key: "weft", title: "Bundles", href: "/weft-hair", items: WEFT_PRODUCTS },
       { key: "extensions", title: "Extensions", href: "/extensions", items: EXTENSIONS_PRODUCTS },
       { key: "wigs", title: "Wigs", href: "/wigs", items: WIGS_PRODUCTS },
     ],
     []
+  )
+
+  const currentGroup = useMemo(
+    () => catalogGroups.find((group) => group.key === activeCatalogGroup) ?? catalogGroups[0],
+    [activeCatalogGroup, catalogGroups]
   )
 
   const allCatalogProducts = useMemo(() => {
@@ -88,6 +96,15 @@ export function ProductCatalogPage({
     return sorted
   }, [sortBy, products, selectedProducts, selectedProductSlugs.length])
 
+  const popularProductLinks = useMemo(
+    () =>
+      products.slice(0, 4).map((product) => ({
+        href: `/order/${product.slug}`,
+        label: product.name,
+      })),
+    [products]
+  )
+
   const toggleProductSelection = (slug: string) => {
     setSelectedProductSlugs((prev) =>
       prev.includes(slug) ? prev.filter((value) => value !== slug) : [...prev, slug]
@@ -105,6 +122,20 @@ export function ProductCatalogPage({
       <Navbar />
 
       <section className="w-full px-4 py-7 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
+        <nav aria-label="Breadcrumb" className="mb-4">
+          <ol className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-[#6b6b70]">
+            <li>
+              <Link href="/" className="transition-colors hover:text-[#1f1f1f]">
+                Home
+              </Link>
+            </li>
+            <li aria-hidden="true" className="text-[#9a9aa0]">
+              /
+            </li>
+            <li className="text-[#1f1f1f]">{seoContent.breadcrumbLabel}</li>
+          </ol>
+        </nav>
+
         <div className="mb-5 flex items-center justify-between gap-3 border-b border-[#dfd7cf] pb-4">
           <p className="text-[24px] font-semibold leading-none text-[#171717] sm:text-[26px]">{filteredProducts.length} items</p>
           <div className="flex items-center gap-2">
@@ -148,6 +179,23 @@ export function ProductCatalogPage({
             </button>
           </div>
         )}
+
+        <div className="mb-5 rounded-xl border border-[#dfd7cf] bg-white/60 p-3 sm:p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7a80]">
+            Popular in {currentGroup.title}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {popularProductLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center rounded-full border border-[#cfc5ba] bg-white px-3 py-1.5 text-xs font-medium text-[#1f1f1f] transition-colors hover:bg-[#f5efe6]"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         <div className="grid gap-5 lg:grid-cols-[245px_1fr]">
           <aside className="h-fit border-r border-[#dfd7cf] pr-4">
@@ -264,6 +312,34 @@ export function ProductCatalogPage({
                 </div>
               </section>
             )}
+
+            <section className="mt-10 rounded-2xl border border-[#ddd2c8] bg-white/70 p-5 sm:mt-12 sm:p-6">
+              <h2 className="text-xl font-semibold leading-tight text-[#161616] sm:text-2xl">
+                {seoContent.guideTitle}
+              </h2>
+              <div className="mt-3 space-y-3 text-sm leading-relaxed text-[#2d2d2f] sm:text-base">
+                {seoContent.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+
+              <div className="mt-5 border-t border-[#e6ddd4] pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7a80]">
+                  Explore Related Collections
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {seoContent.relatedCollections.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="inline-flex items-center rounded-full border border-[#cfc5ba] bg-white px-3 py-1.5 text-xs font-medium text-[#1f1f1f] transition-colors hover:bg-[#f5efe6]"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>

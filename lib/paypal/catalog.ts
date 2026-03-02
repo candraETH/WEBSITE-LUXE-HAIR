@@ -144,20 +144,20 @@ const PRODUCT_PRICING: Record<
   },
   "virgin-straight-bulk": {
     name: "Virgin Straight Bulk",
-    basePrice: 70,
-    pricePerInch: 3.6,
+    basePrice: 116,
+    pricePerInch: 10,
     category: "Bulk Hair",
   },
   "natural-braiding-hair": {
     name: "Natural Braiding Hair",
-    basePrice: 60,
-    pricePerInch: 3.2,
+    basePrice: 100,
+    pricePerInch: 10,
     category: "Bulk Hair",
   },
   "wavy-bulk-premium": {
     name: "Wavy Bulk Premium",
-    basePrice: 85,
-    pricePerInch: 4.2,
+    basePrice: 120,
+    pricePerInch: 10,
     category: "Bulk Hair",
   },
 }

@@ -17,6 +17,7 @@ type HeroSlide = {
   description: string
   ctaLabel: string
   ctaHref: string
+  imageClassName?: string
 }
 
 const HERO_SLIDES: HeroSlide[] = [
@@ -33,7 +34,7 @@ const HERO_SLIDES: HeroSlide[] = [
   },
   {
     id: "promo",
-    image: "/images/about.jpg",
+    image: "/images/hero%202.jpg",
     alt: "Premium hair promotion banner",
     eyebrow: "Limited Time Offer",
     title: "Get 25% Off\nAll Collections",
@@ -41,6 +42,19 @@ const HERO_SLIDES: HeroSlide[] = [
       "Upgrade your look with salon-quality bulk hair, weft hair, extensions, and wigs. Promo is available for all categories.",
     ctaLabel: "Shop 25% Off",
     ctaHref: "/bulk-hair",
+    imageClassName: "object-contain object-center",
+  },
+  {
+    id: "promo-2",
+    image: "/images/hero%203.png",
+    alt: "Premium bundles and bulk hair showcase",
+    eyebrow: "New Arrival",
+    title: "Luxury Texture\nNow Available",
+    description:
+      "Discover our newest premium bundles and bulk hair selections with salon-grade quality and timeless finish.",
+    ctaLabel: "Shop New Arrival",
+    ctaHref: "/weft-hair",
+    imageClassName: "object-contain object-center",
   },
 ]
 
@@ -57,21 +71,21 @@ export function Hero() {
   }, [])
 
   return (
-    <section id="home" className="relative min-h-[84vh] overflow-hidden pt-28 lg:pt-32">
+    <section id="home" className="relative min-h-[42vh] overflow-hidden pt-24 lg:pt-28">
       <div className="absolute inset-0">
         {HERO_SLIDES.map((slide, index) => (
           <div
             key={slide.id}
             className={`absolute inset-0 transition-opacity duration-700 ${
               index === activeSlideIndex ? "opacity-100" : "opacity-0"
-            }`}
+            } bg-[#120f0d]`}
           >
             <Image
               src={slide.image}
               alt={slide.alt}
               fill
               sizes="100vw"
-              className="object-cover object-center"
+              className={slide.imageClassName ?? "object-cover object-center"}
               priority={index === 0}
             />
             <div className="absolute inset-0 bg-foreground/45" />
@@ -79,7 +93,7 @@ export function Hero() {
         ))}
       </div>
 
-      <div className="relative z-10 flex min-h-[84vh] flex-col items-center justify-center px-6 py-14 text-center md:py-20">
+      <div className="relative z-10 flex min-h-[42vh] flex-col items-center justify-center px-6 py-10 text-center md:py-12">
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.3em] text-background/80">
           {activeSlide.eyebrow}
         </p>

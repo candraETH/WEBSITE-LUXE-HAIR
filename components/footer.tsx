@@ -36,7 +36,7 @@ export function Footer() {
               {[
                 { label: "Hair Extensions", href: "#extensions" },
                 { label: "Wigs", href: "#wigs" },
-                { label: "Weft Hair", href: "#weft" },
+                { label: "Bundles", href: "#weft" },
                 { label: "Bulk Hair", href: "#bulk" },
               ].map((link) => (
                 <li key={link.href}>

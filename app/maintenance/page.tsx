@@ -1,3 +1,13 @@
+import type { Metadata } from "next"
+import { buildPageMetadata } from "@/lib/seo"
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Maintenance",
+  description: "CANDRA'S HAIR is temporarily under maintenance. Please check back soon.",
+  path: "/maintenance",
+  noIndex: true,
+})
+
 export default function MaintenancePage() {
   return (
     <main className="min-h-screen bg-[#f6f3ef] px-6 py-10">
@@ -13,4 +23,3 @@ export default function MaintenancePage() {
     </main>
   )
 }
-

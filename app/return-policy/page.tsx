@@ -1,5 +1,15 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import type { Metadata } from "next"
+import { buildPageMetadata } from "@/lib/seo"
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Return Policy",
+  description:
+    "Read CANDRA'S HAIR return policy, including return window, eligibility, non-returnable custom orders, and support contact details.",
+  path: "/return-policy",
+  keywords: ["return policy", "hair extensions return", "wig return policy"],
+})
 
 export default function ReturnPolicyPage() {
   return (

@@ -11,10 +11,10 @@ import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 const navLinks = [
   { label: "Home", href: "/#home" },
   { label: "Bulk Hair", href: "/bulk-hair" },
-  { label: "Weft Hair", href: "/weft-hair" },
+  { label: "Bundles", href: "/weft-hair" },
   { label: "Extensions", href: "/extensions" },
   { label: "Wigs", href: "/wigs" },
-  { label: "About", href: "/#about" },
+  { label: "Blog", href: "/blog" },
 ]
 
 const WHATSAPP_CONTACT_MESSAGE = "Hi, I'm interested in your hair products"
@@ -46,7 +46,7 @@ const bulkMenuItems: MegaMenuItem[] = [
   { label: "Wavy Bulk Premium", href: "/order/wavy-bulk-premium" },
 ]
 
-const weftMenuItems: MegaMenuItem[] = [
+const bundleMenuItems: MegaMenuItem[] = [
   { label: "Natural Wave", href: "/order/natural-wave-weft" },
   { label: "Body Wave", href: "/order/body-wave-weft" },
   { label: "Curly", href: "/order/curly-weft" },
@@ -82,13 +82,13 @@ const PRODUCT_MEGA_MENUS: Record<string, MegaMenuConfig> = {
     previewAlt: "Bulk hair collection",
     items: bulkMenuItems,
   },
-  "Weft Hair": {
-    heading: "Texture Hair",
+  Bundles: {
+    heading: "Bundles",
     viewAllHref: "/weft-hair",
-    viewAllLabel: "View All Weft Hair",
+    viewAllLabel: "View All Bundles",
     previewImage: "/images/texture/all%20texture.png",
-    previewAlt: "All texture options",
-    items: weftMenuItems,
+    previewAlt: "Bundles options",
+    items: bundleMenuItems,
   },
   Extensions: {
     heading: "Extensions",
@@ -109,7 +109,7 @@ const PRODUCT_MEGA_MENUS: Record<string, MegaMenuConfig> = {
 }
 
 const searchableProducts = [
-  ...[...bulkMenuItems, ...weftMenuItems, ...extensionsMenuItems, ...wigsMenuItems].map((item) => ({
+  ...[...bulkMenuItems, ...bundleMenuItems, ...extensionsMenuItems, ...wigsMenuItems].map((item) => ({
     name: item.label,
     slug: item.href.replace("/order/", ""),
   })),
@@ -132,7 +132,7 @@ function resolveSearchTarget(query: string): string {
   if (normalizedQuery.includes("bulk")) {
     return "/bulk-hair"
   }
-  if (normalizedQuery.includes("weft")) {
+  if (normalizedQuery.includes("weft") || normalizedQuery.includes("bundle")) {
     return "/weft-hair"
   }
   if (normalizedQuery.includes("extension") || normalizedQuery.includes("clip") || normalizedQuery.includes("tape")) {
@@ -148,10 +148,14 @@ function resolveSearchTarget(query: string): string {
 export function Navbar() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+  const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false)
+  const [desktopSearchQuery, setDesktopSearchQuery] = useState("")
   const [openDesktopMenu, setOpenDesktopMenu] = useState<string | null>(null)
   const [openMobileMenu, setOpenMobileMenu] = useState<string | null>(null)
   const [previewLightbox, setPreviewLightbox] = useState<PreviewLightboxState | null>(null)
   const desktopNavRef = useRef<HTMLUListElement>(null)
+  const desktopSearchRef = useRef<HTMLDivElement>(null)
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null)
   const desktopOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const desktopCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { getTotalItems } = useCart()
@@ -165,11 +169,16 @@ export function Navbar() {
       if (!desktopNavRef.current.contains(event.target as Node)) {
         setOpenDesktopMenu(null)
       }
+
+      if (desktopSearchRef.current && !desktopSearchRef.current.contains(event.target as Node)) {
+        setIsDesktopSearchOpen(false)
+      }
     }
 
     function handleEsc(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpenDesktopMenu(null)
+        setIsDesktopSearchOpen(false)
       }
     }
 
@@ -186,6 +195,19 @@ export function Navbar() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!isDesktopSearchOpen) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      desktopSearchInputRef.current?.focus()
+      desktopSearchInputRef.current?.select()
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [isDesktopSearchOpen])
 
   useEffect(() => {
     if (!previewLightbox) {
@@ -235,13 +257,51 @@ export function Navbar() {
     }, 150)
   }
 
-  const handleSearchClick = () => {
+  const handleSearchSubmit = (query: string) => {
+    router.push(resolveSearchTarget(query))
+    setIsOpen(false)
+  }
+
+  const handleDesktopSearchIconClick = () => {
+    if (!isDesktopSearchOpen) {
+      setIsDesktopSearchOpen(true)
+      return
+    }
+
+    const normalizedQuery = desktopSearchQuery.trim()
+    if (!normalizedQuery) {
+      setIsDesktopSearchOpen(false)
+      return
+    }
+
+    handleSearchSubmit(normalizedQuery)
+    setDesktopSearchQuery("")
+    setIsDesktopSearchOpen(false)
+  }
+
+  const handleDesktopSearchEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return
+    }
+
+    event.preventDefault()
+    const normalizedQuery = desktopSearchQuery.trim()
+    if (!normalizedQuery) {
+      setIsDesktopSearchOpen(false)
+      return
+    }
+
+    handleSearchSubmit(normalizedQuery)
+    setDesktopSearchQuery("")
+    setIsDesktopSearchOpen(false)
+  }
+
+  const handleMobileSearchClick = () => {
     const query = window.prompt("Search product:")
     if (query === null) {
       return
     }
-    router.push(resolveSearchTarget(query))
-    setIsOpen(false)
+    handleSearchSubmit(query)
   }
 
   return (
@@ -341,7 +401,7 @@ export function Navbar() {
                             height={700}
                             unoptimized
                             className={`h-full w-full ${
-                              link.label === "Weft Hair"
+                              link.label === "Bundles"
                                 ? "object-cover scale-[1.12] transition-transform duration-300 group-hover:scale-[1.16]"
                                 : "object-contain transition-transform duration-300 group-hover:scale-[1.04]"
                             }`}
@@ -384,15 +444,36 @@ export function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-4 md:flex">
-          <button
-            type="button"
-            onClick={handleSearchClick}
-            className="inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
-            aria-label="Search products"
-            title="Search"
-          >
-            <Search size={22} strokeWidth={1.8} />
-          </button>
+          <div ref={desktopSearchRef} className="relative h-10 w-10">
+            <div
+              className={`absolute right-0 top-1/2 z-30 flex h-10 -translate-y-1/2 items-center overflow-hidden rounded-lg border transition-all duration-300 ${
+                isDesktopSearchOpen
+                  ? "w-[280px] border-[#d6c8b4] bg-white shadow-[0_10px_24px_-16px_rgba(0,0,0,0.45)]"
+                  : "w-10 border-transparent bg-transparent"
+              }`}
+            >
+              <input
+                ref={desktopSearchInputRef}
+                value={desktopSearchQuery}
+                onChange={(event) => setDesktopSearchQuery(event.target.value)}
+                onKeyDown={handleDesktopSearchEnter}
+                placeholder="Search products..."
+                aria-label="Search products"
+                className={`h-full w-full bg-transparent pl-3 pr-10 text-sm text-foreground outline-none transition-opacity duration-200 placeholder:text-muted-foreground ${
+                  isDesktopSearchOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={handleDesktopSearchIconClick}
+                className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-accent/10"
+                aria-label="Search products"
+                title="Search"
+              >
+                <Search size={22} strokeWidth={1.8} />
+              </button>
+            </div>
+          </div>
 
           <Link
             href="/cart"
@@ -426,7 +507,7 @@ export function Navbar() {
         <div className="flex items-center gap-1 md:hidden">
           <button
             type="button"
-            onClick={handleSearchClick}
+            onClick={handleMobileSearchClick}
             className="inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
             aria-label="Search products"
             title="Search"

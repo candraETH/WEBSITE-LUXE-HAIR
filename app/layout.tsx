@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google'
 
 import './globals.css'
 import { Providers } from './providers'
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from '@/lib/seo'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -15,9 +16,29 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: "CANDRA'S HAIR | Premium Hair Extensions, Wigs & More",
-  description:
-    'Discover premium quality hair extensions, wigs, weft hair, and bulk hair. Luxury hair solutions for every style.',
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    type: "website",
+    siteName: SITE_NAME,
+    url: "/",
+    images: ["/images/hero.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/images/hero.jpg"],
+  },
   icons: {
     icon: '/images/logo-favicon.png',
     shortcut: '/images/logo-favicon.png',

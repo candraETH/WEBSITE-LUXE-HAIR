@@ -11,6 +11,7 @@ import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 import { applyProductDiscount, formatUsdPrice, getDiscountedPriceLabel } from "@/lib/pricing"
+import { parsePriceValues } from "@/lib/seo"
 
 type ProductColor = {
   code: string
@@ -313,13 +314,13 @@ const allProducts: ProductItem[] = [
   {
     slug: "virgin-straight-bulk",
     name: "Virgin Straight Bulk",
-    price: "$70 - $160",
+    price: "$116 - $216",
     image: "/images/images1.png",
     category: "Bulk Hair",
     description: "100% virgin hair without weft. Perfect for braiding and custom wig making.",
     longDescription: "Premium 100% virgin bulk hair without weft. Unprocessed and perfect for braiding, custom wig construction, and creative styling projects.",
-    basePrice: 70,
-    pricePerInch: 3.6,
+    basePrice: 116,
+    pricePerInch: 10,
     colorImageMap: {
       "#ash": "/images/images2.png",
     },
@@ -341,7 +342,7 @@ const allProducts: ProductItem[] = [
   {
     slug: "natural-braiding-hair",
     name: "Natural Braiding Hair",
-    price: "$60 - $140",
+    price: "$100 - $200",
     image: "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%201.png",
     gallery: [
       "/images/Natural%20Braiding%20Hair/Natural%20Braiding%20Hair%204.png",
@@ -355,21 +356,21 @@ const allProducts: ProductItem[] = [
     description: "Soft, tangle-free bulk hair ideal for box braids and twists.",
     longDescription: "Soft, premium quality bulk braiding hair that's tangle-free and perfect for creating beautiful box braids, twists, and other protective styles.",
     tag: "Popular",
-    basePrice: 60,
-    pricePerInch: 3.2,
+    basePrice: 100,
+    pricePerInch: 10,
   },
   {
     slug: "wavy-bulk-premium",
     name: "Wavy Bulk Premium",
-    price: "$85 - $180",
+    price: "$120 - $220",
     image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
     colorImageFolder: "/images/Wavy%20Bulk%20Premium",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",
     longDescription: "Premium grade wavy bulk hair that's unprocessed and can be colored to any shade. Perfect for custom wig making and creative styling.",
     tag: "New",
-    basePrice: 85,
-    pricePerInch: 4.2,
+    basePrice: 120,
+    pricePerInch: 10,
   },
 ]
 
@@ -765,6 +766,60 @@ export default function OrderPage({ params }: PageProps) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isImageLightboxOpen, galleryImages.length])
 
+  const productSchema = useMemo(() => {
+    if (!product) {
+      return null
+    }
+
+    const priceValues = parsePriceValues(product.price)
+    const rawStartingPrice = priceValues.length > 0 ? Math.min(...priceValues) : product.basePrice
+    const startingPrice = applyProductDiscount(rawStartingPrice)
+    const images = Array.from(new Set([product.image, ...(product.gallery ?? [])])).filter(Boolean)
+
+    return {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.name,
+      description: product.longDescription || product.description,
+      category: product.category,
+      sku: product.slug,
+      image: images,
+      brand: {
+        "@type": "Brand",
+        name: "CANDRA'S HAIR",
+      },
+      offers: {
+        "@type": "Offer",
+        url: `/order/${product.slug}`,
+        priceCurrency: "USD",
+        price: startingPrice.toFixed(2),
+        availability: "https://schema.org/InStock",
+        itemCondition: "https://schema.org/NewCondition",
+      },
+    }
+  }, [product])
+
+  const categoryHref = useMemo(() => {
+    if (!product) {
+      return "/"
+    }
+
+    if (product.category === "Bulk Hair") {
+      return "/bulk-hair"
+    }
+    if (product.category === "Weft Hair") {
+      return "/weft-hair"
+    }
+    if (product.category === "Hair Extensions") {
+      return "/extensions"
+    }
+    if (product.category === "Wigs") {
+      return "/wigs"
+    }
+
+    return "/"
+  }, [product])
+
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
@@ -786,9 +841,38 @@ export default function OrderPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#eeeeef] pt-[102px] lg:pt-[108px]">
+      {productSchema && (
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+        />
+      )}
       <Navbar />
 
       <div className="mx-auto w-full max-w-[1520px] px-4 pb-12 sm:px-6 lg:px-8 xl:px-10">
+        <nav aria-label="Breadcrumb" className="pt-3">
+          <ol className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-[#6b6b70]">
+            <li>
+              <Link href="/" className="transition-colors hover:text-[#1f1f1f]">
+                Home
+              </Link>
+            </li>
+            <li aria-hidden="true" className="text-[#9a9aa0]">
+              /
+            </li>
+            <li>
+              <Link href={categoryHref} className="transition-colors hover:text-[#1f1f1f]">
+                {product.category}
+              </Link>
+            </li>
+            <li aria-hidden="true" className="text-[#9a9aa0]">
+              /
+            </li>
+            <li className="text-[#1f1f1f]">{product.name}</li>
+          </ol>
+        </nav>
+
         <div className="py-3 lg:py-4">
           <Link href={backToShopHref} onClick={handleBackToShopClick}>
             <Button
@@ -1001,7 +1085,7 @@ export default function OrderPage({ params }: PageProps) {
         {suggestedProducts.length > 0 && (
           <section className="mt-5 border-t border-[#d8d8db] px-0 py-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7b7b80]">You might also like</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7b7b80]">Our Product</p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1106,11 +1190,13 @@ function SelectLengthComponent({
   const [selectedLength, setSelectedLength] = useState<string>("18")
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
+  const [selectedHairType, setSelectedHairType] = useState<"Bulk Hair" | "Weft Hair">("Bulk Hair")
   const [isBenefitsOpen, setIsBenefitsOpen] = useState(true)
   const [isSpecsOpen, setIsSpecsOpen] = useState(true)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const { addToCart } = useCart()
   const hasTextureOptions = textureOptions.length > 0
+  const supportsHairTypeSelection = category === "Bulk Hair"
   const supportsColorSelection = ["Hair Extensions", "Bulk Hair"].includes(category) && !hasTextureOptions
   const availableColors =
     colors && colors.length > 0 ? colors : supportsColorSelection ? DEFAULT_HAIR_COLORS : []
@@ -1285,6 +1371,36 @@ function SelectLengthComponent({
           <p className={originalPriceClass}>{formatUsdPrice(originalSinglePrice)}</p>
         </div>
       </div>
+
+      {supportsHairTypeSelection && (
+        <div>
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Type: {selectedHairType}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedHairType("Bulk Hair")}
+              className={`inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-all sm:h-11 sm:text-base ${
+                selectedHairType === "Bulk Hair"
+                  ? "border-black bg-black text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,0.6)]"
+                  : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
+              }`}
+            >
+              Bulk Hair
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedHairType("Weft Hair")}
+              className={`inline-flex h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-all sm:h-11 sm:text-base ${
+                selectedHairType === "Weft Hair"
+                  ? "border-black bg-black text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,0.6)]"
+                  : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
+              }`}
+            >
+              Weft Hair
+            </button>
+          </div>
+        </div>
+      )}
 
       {hasTextureOptions && (
         <div>
