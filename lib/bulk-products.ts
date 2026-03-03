@@ -13,7 +13,7 @@ export const BULK_PRODUCTS: CatalogProduct[] = [
   {
     name: "Virgin Straight Bulk",
     slug: "virgin-straight-bulk",
-    price: "$116 - $216",
+    price: "$100 - $200",
     image: "/images/images1.png",
     category: "Bulk Hair",
     description: "100% virgin hair without weft. Perfect for braiding and custom wig making.",
@@ -30,7 +30,7 @@ export const BULK_PRODUCTS: CatalogProduct[] = [
   {
     name: "Wavy Bulk Premium",
     slug: "wavy-bulk-premium",
-    price: "$120 - $220",
+    price: "$100 - $200",
     image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",

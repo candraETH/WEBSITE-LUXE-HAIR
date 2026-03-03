@@ -138,12 +138,9 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
+        <div className="mt-16 border-t border-border pt-8 text-center">
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} CANDRA&apos;S HAIR. All rights reserved.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Prices are for display purposes. Contact us via WhatsApp to order.
           </p>
         </div>
       </div>

@@ -144,7 +144,7 @@ const PRODUCT_PRICING: Record<
   },
   "virgin-straight-bulk": {
     name: "Virgin Straight Bulk",
-    basePrice: 116,
+    basePrice: 100,
     pricePerInch: 10,
     category: "Bulk Hair",
   },
@@ -156,7 +156,7 @@ const PRODUCT_PRICING: Record<
   },
   "wavy-bulk-premium": {
     name: "Wavy Bulk Premium",
-    basePrice: 120,
+    basePrice: 100,
     pricePerInch: 10,
     category: "Bulk Hair",
   },
@@ -176,6 +176,9 @@ const COLOR_LABELS: Record<string, string> = {
   "#4": "Deep Brown",
   "#2": "Natural Hair",
 }
+
+const BULK_COLOR_PLUS_30_CODES = new Set(["#4", "#8", "#10"])
+const BULK_COLOR_PLUS_40_CODES = new Set(["#12", "#14", "#16", "#18", "#24", "#60", "#613", "#ash"])
 
 export const checkoutItemSchema = z.object({
   slug: z.string().trim().min(1).max(128),
@@ -218,26 +221,37 @@ function normalizeColorCodeVariant(normalizedVariant: string | null): string | n
   return null
 }
 
-function hasNoColorSurcharge(normalizedVariant: string | null): boolean {
+function getBulkColorSurchargeDollars(normalizedColorCode: string): number {
+  if (!normalizedColorCode || normalizedColorCode === "#2") {
+    return 0
+  }
+  if (BULK_COLOR_PLUS_30_CODES.has(normalizedColorCode)) {
+    return 30
+  }
+  if (BULK_COLOR_PLUS_40_CODES.has(normalizedColorCode)) {
+    return 40
+  }
+  return 0
+}
+
+function getColorSurchargeCents(slug: string, variant?: string): number {
+  const normalizedVariant = normalizeVariant(variant)
   const colorCode = normalizeColorCodeVariant(normalizedVariant)
   if (!colorCode) {
     // Variants like "Body Wave" or "Curly 1" are texture/type, not color.
-    return true
+    return 0
   }
 
-  if (colorCode.startsWith("#2")) {
-    return true
+  if (colorCode === "#2" || normalizedVariant?.includes("natural hair")) {
+    return 0
   }
 
-  if (normalizedVariant?.includes("natural hair")) {
-    return true
+  const product = PRODUCT_PRICING[slug]
+  if (product?.category === "Bulk Hair") {
+    return dollarsToCents(getBulkColorSurchargeDollars(colorCode))
   }
 
-  return false
-}
-
-function getColorSurchargeCents(variant?: string): number {
-  return hasNoColorSurcharge(normalizeVariant(variant)) ? 0 : dollarsToCents(COLOR_SURCHARGE_DOLLARS)
+  return dollarsToCents(COLOR_SURCHARGE_DOLLARS)
 }
 
 function getColorDisplay(variant?: string): string | null {
@@ -289,7 +303,7 @@ type CheckoutUnitPriceInput = Pick<CheckoutItemInput, "slug" | "length" | "varia
 export function calculateCheckoutUnitPrice(input: CheckoutUnitPriceInput): number {
   assertValidLength(input.length)
   const product = resolveProduct(input.slug)
-  const surchargeCents = getColorSurchargeCents(input.variant)
+  const surchargeCents = getColorSurchargeCents(input.slug, input.variant)
   const baseUnitPrice = product.basePrice + (input.length - 16) * product.pricePerInch
   const originalUnitPriceDollars = Number((baseUnitPrice + surchargeCents / 100).toFixed(2))
   return applyProductDiscount(originalUnitPriceDollars)
@@ -309,7 +323,7 @@ export function calculateOrderFromItems(items: CheckoutItemInput[], couponCode?:
     assertValidQuantity(item.quantity)
 
     const product = resolveProduct(item.slug)
-    const surchargeCents = getColorSurchargeCents(item.variant)
+    const surchargeCents = getColorSurchargeCents(item.slug, item.variant)
     const unitPriceDollars = calculateCheckoutUnitPrice(item)
     const unitPriceCents = dollarsToCents(unitPriceDollars)
     const lineTotalCents = unitPriceCents * item.quantity

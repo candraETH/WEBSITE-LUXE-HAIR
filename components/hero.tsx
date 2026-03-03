@@ -18,6 +18,7 @@ type HeroSlide = {
   ctaLabel: string
   ctaHref: string
   imageClassName?: string
+  containerClassName?: string
 }
 
 const HERO_SLIDES: HeroSlide[] = [
@@ -42,7 +43,8 @@ const HERO_SLIDES: HeroSlide[] = [
       "Upgrade your look with salon-quality bulk hair, weft hair, extensions, and wigs. Promo is available for all categories.",
     ctaLabel: "Shop 25% Off",
     ctaHref: "/bulk-hair",
-    imageClassName: "object-contain object-center",
+    imageClassName: "object-cover object-top scale-[1.18] md:scale-100 md:object-contain md:object-center",
+    containerClassName: "bg-[#8d7263] md:bg-[#120f0d]",
   },
   {
     id: "promo-2",
@@ -54,7 +56,8 @@ const HERO_SLIDES: HeroSlide[] = [
       "Discover our newest premium bundles and bulk hair selections with salon-grade quality and timeless finish.",
     ctaLabel: "Shop New Arrival",
     ctaHref: "/weft-hair",
-    imageClassName: "object-contain object-center",
+    imageClassName: "object-cover object-top scale-[1.2] md:scale-100 md:object-contain md:object-center",
+    containerClassName: "bg-[#8a766a] md:bg-[#120f0d]",
   },
 ]
 
@@ -78,7 +81,7 @@ export function Hero() {
             key={slide.id}
             className={`absolute inset-0 transition-opacity duration-700 ${
               index === activeSlideIndex ? "opacity-100" : "opacity-0"
-            } bg-[#120f0d]`}
+            } ${slide.containerClassName ?? "bg-[#120f0d]"}`}
           >
             <Image
               src={slide.image}

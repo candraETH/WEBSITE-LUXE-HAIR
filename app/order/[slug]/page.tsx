@@ -314,12 +314,12 @@ const allProducts: ProductItem[] = [
   {
     slug: "virgin-straight-bulk",
     name: "Virgin Straight Bulk",
-    price: "$116 - $216",
+    price: "$100 - $200",
     image: "/images/images1.png",
     category: "Bulk Hair",
     description: "100% virgin hair without weft. Perfect for braiding and custom wig making.",
     longDescription: "Premium 100% virgin bulk hair without weft. Unprocessed and perfect for braiding, custom wig construction, and creative styling projects.",
-    basePrice: 116,
+    basePrice: 100,
     pricePerInch: 10,
     colorImageMap: {
       "#ash": "/images/images2.png",
@@ -362,14 +362,14 @@ const allProducts: ProductItem[] = [
   {
     slug: "wavy-bulk-premium",
     name: "Wavy Bulk Premium",
-    price: "$120 - $220",
+    price: "$100 - $200",
     image: "/images/Wavy%20Bulk%20Premium/Wavy%20Bulk%20Premium.png",
     colorImageFolder: "/images/Wavy%20Bulk%20Premium",
     category: "Bulk Hair",
     description: "Premium grade wavy bulk hair. Unprocessed, can be colored to any shade.",
     longDescription: "Premium grade wavy bulk hair that's unprocessed and can be colored to any shade. Perfect for custom wig making and creative styling.",
     tag: "New",
-    basePrice: 120,
+    basePrice: 100,
     pricePerInch: 10,
   },
 ]
@@ -388,6 +388,40 @@ const DEFAULT_HAIR_COLORS = [
   { code: "#4", label: "Deep Brown", hex: "#3d3129" },
   { code: "#2", label: "Natural Hair", hex: "#1a1a1a" },
 ]
+
+const BULK_COLOR_PLUS_30_CODES = new Set(["#4", "#8", "#10"])
+const BULK_COLOR_PLUS_40_CODES = new Set(["#12", "#14", "#16", "#18", "#24", "#60", "#613", "#ash"])
+
+function getBulkColorSurchargeDollars(colorCode: string): number {
+  const normalized = colorCode.trim().toLowerCase()
+  if (!normalized || normalized === "#2") {
+    return 0
+  }
+  if (BULK_COLOR_PLUS_30_CODES.has(normalized)) {
+    return 30
+  }
+  if (BULK_COLOR_PLUS_40_CODES.has(normalized)) {
+    return 40
+  }
+  return 0
+}
+
+function getColorSurchargeDollars(category: string, colorCode: string, supportsColorSelection: boolean): number {
+  if (!supportsColorSelection) {
+    return 0
+  }
+
+  const normalized = colorCode.trim().toLowerCase()
+  if (!normalized || normalized === "#2") {
+    return 0
+  }
+
+  if (category === "Bulk Hair") {
+    return getBulkColorSurchargeDollars(normalized)
+  }
+
+  return 15
+}
 
 function formatTextureLabel(imageSrc: string, fallbackName: string): string {
   const fileNameWithExt = imageSrc.split("/").pop() ?? ""
@@ -1221,7 +1255,7 @@ function SelectLengthComponent({
     .replace(/\s*wig\s*/gi, " ")
     .replace(/\s{2,}/g, " ")
     .trim()
-  const colorSurcharge = supportsColorSelection && normalizedColorCode && normalizedColorCode !== "#2" ? 15 : 0
+  const colorSurcharge = getColorSurchargeDollars(category, normalizedColorCode, supportsColorSelection)
   const baseSinglePrice = parseFloat((basePrice + (currentLength - 16) * pricePerInch).toFixed(2))
   const originalSinglePrice = parseFloat((baseSinglePrice + colorSurcharge).toFixed(2))
   const discountedSinglePrice = applyProductDiscount(originalSinglePrice)
@@ -1583,6 +1617,10 @@ function SelectLengthComponent({
             <ul className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-[#222]">
               <li className="flex gap-2.5">
                 <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                <span><strong>Double Drawn Quality</strong> - Our hair is double drawn, so it stays fuller from top to bottom with balanced thickness and even length.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
                 <span><strong>Styling Freedom</strong> - Wear it sleek, wavy, or curled while keeping a natural finish.</span>
               </li>
               <li className="flex gap-2.5">
@@ -1621,11 +1659,20 @@ function SelectLengthComponent({
               <dt className="font-medium text-[#111]">Hair Type</dt>
               <dd>100% Human Hair</dd>
 
+              <dt className="font-medium text-[#111]">Quality</dt>
+              <dd>Double Drawn</dd>
+
               <dt className="font-medium text-[#111]">Category</dt>
               <dd>{category}</dd>
 
               <dt className="font-medium text-[#111]">Selected Size</dt>
               <dd>{currentLength}&quot;</dd>
+
+              <dt className="font-medium text-[#111]">Pack</dt>
+              <dd>1 bundles</dd>
+
+              <dt className="font-medium text-[#111]">Weight</dt>
+              <dd>100 grams</dd>
 
               <dt className="font-medium text-[#111]">Single Price</dt>
               <dd>
