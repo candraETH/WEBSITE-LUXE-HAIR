@@ -29,7 +29,7 @@ type OrderRow = {
   cart_json?: unknown
 }
 
-const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,phone_number,cart_json"
+const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,cart_json"
 const OTP_TTL_SECONDS = 10 * 60
 
 function mapOtpErrorToMessage(error: unknown): string {
@@ -114,7 +114,11 @@ export async function POST(request: Request) {
     const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(orderId, phoneNumber, ORDER_SELECT)
     if (error) {
       console.error("Order-tracking request-otp query failed:", error, `order=${orderId}`)
-      return NextResponse.json({ error: "Unable to read order data." }, { status: 500 })
+      const isProd = process.env.NODE_ENV === "production"
+      return NextResponse.json(
+        { error: isProd ? "Unable to read order data." : `Unable to read order data. (${error})` },
+        { status: 500 }
+      )
     }
 
     if (!data) {

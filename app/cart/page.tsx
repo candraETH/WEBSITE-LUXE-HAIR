@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
@@ -17,6 +17,8 @@ import {
 } from "@/lib/payment-draft"
 import { containsDisallowedAddressMarker, hasAddressLettersAndNumbers } from "@/lib/checkout-customer"
 import { formatUsdPrice, recoverOriginalPriceFromDiscounted } from "@/lib/pricing"
+import { readAddresses } from "@/lib/address-book"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import {
   calculateCouponDiscount,
   clearActiveCouponCode,
@@ -26,6 +28,7 @@ import {
   loadActiveCouponCode,
   normalizeCouponCode,
   saveActiveCouponCode,
+  type CouponDefinition,
 } from "@/lib/coupon"
 
 type RequestVerificationResponse = {
@@ -42,6 +45,7 @@ type VerifyVerificationResponse = {
 
 export default function CartPage() {
   const { items, isCartReady, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
+  const supabase = useMemo(() => getSupabaseBrowserClient(), [])
   const [continueShoppingHref, setContinueShoppingHref] = useState("/")
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
   const [checkoutDetails, setCheckoutDetails] = useState<CheckoutDetails>(EMPTY_CHECKOUT_DETAILS)
@@ -58,9 +62,10 @@ export default function CartPage() {
   const [verificationError, setVerificationError] = useState("")
   const [verificationDevCode, setVerificationDevCode] = useState("")
   const [couponInput, setCouponInput] = useState("")
-  const [appliedCouponCode, setAppliedCouponCode] = useState("")
+  const [resolvedCouponDefinition, setResolvedCouponDefinition] = useState<CouponDefinition | null>(null)
   const [couponInfo, setCouponInfo] = useState("")
   const [couponError, setCouponError] = useState("")
+  const [didAutofillAddress, setDidAutofillAddress] = useState(false)
 
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
@@ -88,6 +93,82 @@ export default function CartPage() {
     setCheckoutDetails(loadCheckoutDetails())
     setIsCheckoutDetailsReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!showCheckoutForm || !isCheckoutDetailsReady || didAutofillAddress || !supabase) {
+      return
+    }
+
+    const client = supabase
+    let cancelled = false
+
+    async function tryAutofill() {
+      const { data } = await client.auth.getUser()
+      if (cancelled) return
+      const user = data.user
+      if (!user) {
+        return
+      }
+
+      const addresses = readAddresses(user.id)
+      if (addresses.length === 0) {
+        setDidAutofillAddress(true)
+        return
+      }
+
+      const selected = addresses.find((address) => address.isDefault) ?? addresses[0]
+      if (!selected) {
+        setDidAutofillAddress(true)
+        return
+      }
+
+      let changed = false
+      setCheckoutDetails((previous) => {
+        const next: CheckoutDetails = { ...previous }
+
+        if (!next.fullName.trim() && selected.fullName.trim()) {
+          next.fullName = selected.fullName
+          changed = true
+        }
+        if (!next.whatsapp.trim() && selected.phone.trim()) {
+          next.whatsapp = selected.phone
+          changed = true
+        }
+        if (!next.addressLine.trim() && selected.address.trim()) {
+          next.addressLine = selected.address
+          changed = true
+        }
+        if (!next.city.trim() && selected.city.trim()) {
+          next.city = selected.city
+          changed = true
+        }
+        if (!next.province.trim() && selected.province.trim()) {
+          next.province = selected.province
+          changed = true
+        }
+        if (!next.postalCode.trim() && selected.postalCode.trim()) {
+          next.postalCode = selected.postalCode
+          changed = true
+        }
+        if (!next.country.trim() && selected.country.trim()) {
+          next.country = selected.country
+          changed = true
+        }
+
+        return changed ? next : previous
+      })
+
+      setDidAutofillAddress(true)
+      if (changed) setCheckoutError("")
+    }
+
+    void tryAutofill()
+    const { data: subscription } = client.auth.onAuthStateChange(() => void tryAutofill())
+    return () => {
+      cancelled = true
+      subscription.subscription.unsubscribe()
+    }
+  }, [didAutofillAddress, isCheckoutDetailsReady, showCheckoutForm, supabase])
 
   useEffect(() => {
     if (!isCheckoutDetailsReady) {
@@ -128,24 +209,93 @@ export default function CartPage() {
   }, [])
 
   useEffect(() => {
-    const syncCouponFromStorage = () => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("checkout") !== "1") {
+      return
+    }
+
+    if (!supabase) {
+      return
+    }
+
+    let cancelled = false
+    const client = supabase
+
+    async function tryOpenCheckout() {
+      const { data } = await client.auth.getUser()
+      if (cancelled) return
+      const user = data.user
+      if (!user) return
+
+      const addresses = readAddresses(user.id)
+      if (addresses.length === 0) return
+
+      setShowCheckoutForm(true)
+
+      try {
+        const nextUrl = new URL(window.location.href)
+        nextUrl.searchParams.delete("checkout")
+        window.history.replaceState({}, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`)
+      } catch {
+        // ignore invalid URL
+      }
+    }
+
+    void tryOpenCheckout()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const lookupCoupon = async (code: string): Promise<CouponDefinition | null> => {
+      const builtIn = getCouponByCode(code)
+      if (builtIn) return builtIn
+
+      const response = await fetch("/api/coupons/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const payload = (await response.json().catch(() => ({}))) as { coupon?: CouponDefinition }
+      return payload.coupon ?? null
+    }
+
+    const syncCouponFromStorage = async () => {
       const activeCode = loadActiveCouponCode()
-      const resolvedCoupon = getCouponByCode(activeCode)
-      if (!resolvedCoupon) {
-        setAppliedCouponCode("")
+      if (!activeCode) {
         setCouponInput("")
+        setResolvedCouponDefinition(null)
         return
       }
 
-      setAppliedCouponCode(resolvedCoupon.code)
+      const resolvedCoupon = await lookupCoupon(activeCode)
+      if (cancelled) return
+
+      if (!resolvedCoupon) {
+        setCouponInput("")
+        setResolvedCouponDefinition(null)
+        return
+      }
+
       setCouponInput(resolvedCoupon.code)
+      setResolvedCouponDefinition(resolvedCoupon)
     }
 
-    syncCouponFromStorage()
-    window.addEventListener(COUPON_UPDATED_EVENT, syncCouponFromStorage)
+    void syncCouponFromStorage()
+    const handler = () => void syncCouponFromStorage()
+    window.addEventListener(COUPON_UPDATED_EVENT, handler)
 
     return () => {
-      window.removeEventListener(COUPON_UPDATED_EVENT, syncCouponFromStorage)
+      cancelled = true
+      window.removeEventListener(COUPON_UPDATED_EVENT, handler)
     }
   }, [])
 
@@ -194,7 +344,7 @@ export default function CartPage() {
   const totalPrice = getTotalPrice()
   const FREE_SHIPPING_THRESHOLD = 750
   const TAX_RATE = 0.035
-  const activeCouponDefinition = getCouponByCode(appliedCouponCode)
+  const activeCouponDefinition = resolvedCouponDefinition
   const isActiveCouponEligible = activeCouponDefinition
     ? isCouponEligibleForSubtotal(activeCouponDefinition, totalPrice)
     : false
@@ -241,7 +391,7 @@ export default function CartPage() {
     }
   }
 
-  const applyCouponCode = () => {
+  const applyCouponCode = async () => {
     const normalizedCode = normalizeCouponCode(couponInput)
     if (!normalizedCode) {
       setCouponError("Enter a coupon code first.")
@@ -249,7 +399,24 @@ export default function CartPage() {
       return
     }
 
-    const coupon = getCouponByCode(normalizedCode)
+    const builtIn = getCouponByCode(normalizedCode)
+    const coupon = builtIn
+      ? builtIn
+      : await (async () => {
+          const response = await fetch("/api/coupons/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: normalizedCode }),
+          })
+
+          if (!response.ok) {
+            return null
+          }
+
+          const payload = (await response.json().catch(() => ({}))) as { coupon?: CouponDefinition }
+          return payload.coupon ?? null
+        })()
+
     if (!coupon) {
       setCouponError("Coupon code is not valid.")
       setCouponInfo("")
@@ -262,16 +429,16 @@ export default function CartPage() {
       return
     }
 
-    setAppliedCouponCode(coupon.code)
     setCouponInput(coupon.code)
+    setResolvedCouponDefinition(coupon)
     saveActiveCouponCode(coupon.code)
     setCouponInfo(`${coupon.code} applied successfully.`)
     setCouponError("")
   }
 
   const removeCouponCode = () => {
-    setAppliedCouponCode("")
     setCouponInput("")
+    setResolvedCouponDefinition(null)
     clearActiveCouponCode()
     setCouponInfo("Coupon removed.")
     setCouponError("")
@@ -439,6 +606,28 @@ export default function CartPage() {
       return
     }
 
+    if (!supabase) {
+      setPaypalError("Auth is not configured. Please try again later.")
+      return
+    }
+
+    const returnTo = "/cart?checkout=1"
+    const registerUrl = `/register?next=${encodeURIComponent("/account/address/new")}&returnTo=${encodeURIComponent(returnTo)}`
+    const addressUrl = `/account/address/new?returnTo=${encodeURIComponent(returnTo)}`
+
+    const { data: checkoutUserData } = await supabase.auth.getUser()
+    const checkoutUser = checkoutUserData.user
+    if (!checkoutUser) {
+      window.location.href = registerUrl
+      return
+    }
+
+    const savedAddresses = readAddresses(checkoutUser.id)
+    if (savedAddresses.length === 0) {
+      window.location.href = addressUrl
+      return
+    }
+
     if (!showCheckoutForm) {
       setShowCheckoutForm(true)
       setCheckoutError("")
@@ -475,9 +664,21 @@ export default function CartPage() {
         variant: item.variant,
       }))
 
+      const { data: checkoutSessionData } = await supabase.auth.getSession()
+      const accessToken = checkoutSessionData.session?.access_token ?? ""
+      if (!accessToken) {
+        window.location.href = `/login?next=${encodeURIComponent("/account/address/new")}&returnTo=${encodeURIComponent(
+          "/cart?checkout=1"
+        )}`
+        return
+      }
+
       const response = await fetch("/api/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify(
           requiresCheckoutOtp
             ? {

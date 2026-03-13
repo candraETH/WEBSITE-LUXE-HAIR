@@ -166,3 +166,7 @@ export function markCouponPopupSeen() {
 export function getWelcomeCoupon(): CouponDefinition {
   return COUPON_MAP[WELCOME_COUPON_CODE]
 }
+
+export function listCoupons(): CouponDefinition[] {
+  return Object.values(COUPON_MAP)
+}

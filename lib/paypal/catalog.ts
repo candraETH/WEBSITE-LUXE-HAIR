@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { applyProductDiscount } from "@/lib/pricing"
-import { calculateCouponDiscountCents, getCouponByCode } from "@/lib/coupon"
+import { calculateCouponDiscountCents, getCouponByCode, type CouponDefinition } from "@/lib/coupon"
 
 export const MAX_CHECKOUT_ITEMS = 100
 export const MAX_ITEM_QUANTITY = 1000
@@ -309,7 +309,11 @@ export function calculateCheckoutUnitPrice(input: CheckoutUnitPriceInput): numbe
   return applyProductDiscount(originalUnitPriceDollars)
 }
 
-export function calculateOrderFromItems(items: CheckoutItemInput[], couponCode?: string) {
+export function calculateOrderFromItems(
+  items: CheckoutItemInput[],
+  couponCode?: string,
+  couponOverride?: CouponDefinition | null
+) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error("Cart items are required")
   }
@@ -343,7 +347,7 @@ export function calculateOrderFromItems(items: CheckoutItemInput[], couponCode?:
   })
 
   const lineItemsSubtotalCents = lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0)
-  const resolvedCoupon = getCouponByCode(couponCode)
+  const resolvedCoupon = couponOverride ?? getCouponByCode(couponCode)
   const couponMeetsMinimum =
     resolvedCoupon ? lineItemsSubtotalCents >= dollarsToCents(resolvedCoupon.minimumSubtotal) : false
   const eligibleCoupon = couponMeetsMinimum ? resolvedCoupon : null

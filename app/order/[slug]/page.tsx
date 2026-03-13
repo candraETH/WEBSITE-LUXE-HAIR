@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { Navbar } from "@/components/navbar"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { addToWishlist } from "@/lib/wishlist"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 import { applyProductDiscount, formatUsdPrice, getDiscountedPriceLabel } from "@/lib/pricing"
@@ -1221,6 +1223,7 @@ function SelectLengthComponent({
   activeTextureLabel?: string
   onTextureSelect?: (textureKey: string) => void
 }) {
+  const router = useRouter()
   const [selectedLength, setSelectedLength] = useState<string>("18")
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
@@ -1395,6 +1398,37 @@ function SelectLengthComponent({
       variant: hasTextureOptions ? selectedTextureLabel || "default" : selectedColorCode || "default",
     })
     setIsAddingToCart(false)
+  }
+
+  const [wishlistMessage, setWishlistMessage] = useState<string | null>(null)
+
+  const handleAddToWishlist = async () => {
+    setWishlistMessage(null)
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      setWishlistMessage("Wishlist is not configured.")
+      return
+    }
+
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) {
+      router.push("/login")
+      return
+    }
+
+    addToWishlist(data.user.id, {
+      slug,
+      name: selectedOptionSuffix ? `${name} - ${selectedOptionSuffix}` : name,
+      category,
+      image: selectedImage,
+      length: currentLength,
+      variant: hasTextureOptions ? selectedTextureLabel || "default" : selectedColorCode || "default",
+      basePrice,
+      pricePerInch,
+      addedAt: new Date().toISOString(),
+    })
+
+    setWishlistMessage("Saved to wishlist.")
   }
 
   return (
@@ -1601,6 +1635,17 @@ function SelectLengthComponent({
         >
           {isAddingToCart ? "ADDING..." : "ADD TO CART"}
         </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => void handleAddToWishlist()}
+          className="h-12 rounded-full border border-black bg-white px-5 text-xs font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f5f5f6] sm:h-14 sm:text-sm"
+        >
+          ADD TO WISHLIST
+        </button>
+        {wishlistMessage && <p className="text-xs font-medium text-[#111]">{wishlistMessage}</p>}
       </div>
 
       <div className="border-t border-[#d8d8db] pt-4">

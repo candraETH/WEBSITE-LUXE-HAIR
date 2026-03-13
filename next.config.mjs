@@ -6,6 +6,7 @@ function buildContentSecurityPolicy() {
     "'self'",
     "'unsafe-inline'",
     ...(isDevelopment ? ["'unsafe-eval'"] : []),
+    "https://va.vercel-scripts.com",
     "https://www.paypal.com",
     "https://www.sandbox.paypal.com",
   ]

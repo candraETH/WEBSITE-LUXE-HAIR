@@ -4,9 +4,18 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronDown, Menu, X, ShoppingBag, Search } from "lucide-react"
+import { ChevronDown, Menu, X, ShoppingBag, Search, UserRound } from "lucide-react"
 import { useCart } from "@/context/CartContext"
-import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { TierBadge, getTierNameGradientClass } from "@/components/loyalty/tier-badge"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { getAppRoleFromMetadata } from "@/lib/roles"
+import { getTierForSpend, type LoyaltyTierKey } from "@/lib/loyalty-tier"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
@@ -17,7 +26,6 @@ const navLinks = [
   { label: "Blog", href: "/blog" },
 ]
 
-const WHATSAPP_CONTACT_MESSAGE = "Hi, I'm interested in your hair products"
 const PROMO_MARQUEE_MESSAGE = "Limited Offer: 25% OFF all hair collections - Shop now"
 
 type MegaMenuItem = {
@@ -153,6 +161,15 @@ export function Navbar() {
   const [openDesktopMenu, setOpenDesktopMenu] = useState<string | null>(null)
   const [openMobileMenu, setOpenMobileMenu] = useState<string | null>(null)
   const [previewLightbox, setPreviewLightbox] = useState<PreviewLightboxState | null>(null)
+  const [authState, setAuthState] = useState<{
+    status: "loading" | "signed_out" | "signed_in"
+    role: "admin" | "user"
+  }>({ status: "loading", role: "user" })
+  const [accountLabel, setAccountLabel] = useState<{
+    firstName: string
+    tierKey: LoyaltyTierKey | null
+    tierName: string | null
+  } | null>(null)
   const desktopNavRef = useRef<HTMLUListElement>(null)
   const desktopSearchRef = useRef<HTMLDivElement>(null)
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
@@ -160,6 +177,77 @@ export function Navbar() {
   const desktopCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { getTotalItems } = useCart()
   const totalItems = getTotalItems()
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      setAuthState({ status: "signed_out", role: "user" })
+      return
+    }
+    const client = supabase
+
+    let isCancelled = false
+
+    async function load() {
+      const { data } = await client.auth.getUser()
+      if (isCancelled) return
+
+      if (!data.user) {
+        setAuthState({ status: "signed_out", role: "user" })
+        setAccountLabel(null)
+        return
+      }
+
+      const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>
+      const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : ""
+      const fallbackName = (data.user.email ?? "").split("@")[0] ?? ""
+      const firstNameRaw = (fullName || fallbackName).trim().split(/\s+/)[0] ?? ""
+      const firstName = firstNameRaw || "Account"
+
+      let tierKey: LoyaltyTierKey | null = null
+      let tierName: string | null = null
+      const { data: sessionData } = await client.auth.getSession()
+      const token = sessionData.session?.access_token ?? ""
+      if (token) {
+        const response = await fetch("/api/account/loyalty", { headers: { authorization: `Bearer ${token}` } })
+        const payload = (await response.json().catch(() => ({}))) as { totalPoints?: number; totalSpent?: number }
+        if (!isCancelled && response.ok) {
+          const spent = typeof payload.totalSpent === "number" ? payload.totalSpent : Number(payload.totalSpent ?? 0)
+          const points = typeof payload.totalPoints === "number" ? payload.totalPoints : Math.max(0, Math.floor(spent))
+          const tier = getTierForSpend(points)
+          tierKey = tier.key
+          tierName = tier.name
+        }
+      }
+
+      setAuthState({
+        status: "signed_in",
+        role: getAppRoleFromMetadata(metadata),
+      })
+      setAccountLabel({ firstName, tierKey, tierName })
+    }
+
+    void load()
+
+    const { data: subscription } = client.auth.onAuthStateChange(() => {
+      void load()
+    })
+
+    return () => {
+      isCancelled = true
+      subscription.subscription.unsubscribe()
+    }
+  }, [])
+
+  async function handleSignOut() {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return
+    }
+
+    await supabase.auth.signOut()
+    router.refresh()
+  }
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -489,19 +577,56 @@ export function Navbar() {
             )}
           </Link>
 
-          <a
-            href={getWhatsAppHref(WHATSAPP_CONTACT_MESSAGE)}
-            target={WHATSAPP_ENABLED ? "_blank" : undefined}
-            rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
-            aria-disabled={!WHATSAPP_ENABLED}
-            title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
-            className={`flex items-center gap-2 rounded-none border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${
-              !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-55" : ""
-            }`}
-          >
-            <WhatsAppIcon />
-            Contact Us
-          </a>
+          {authState.status === "signed_in" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
+                  aria-label="Open account menu"
+                  title="Account"
+                >
+                  <UserRound size={18} strokeWidth={1.8} />
+                  <span className="flex items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
+                    <span
+                      className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} max-w-[96px] truncate`}
+                    >
+                      {accountLabel?.firstName || "Account"}
+                    </span>
+                    {accountLabel?.tierKey && accountLabel.tierName ? (
+                      <TierBadge
+                        tier={accountLabel.tierKey}
+                        label={accountLabel.tierName}
+                        className="px-2 py-0.5 text-[10px] shadow-none"
+                      />
+                    ) : null}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem onSelect={() => router.push("/account/profile")}>My account</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void handleSignOut()}>Sign out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
+                  aria-label="Open account menu"
+                  title="Register / Login"
+                >
+                  <UserRound size={18} strokeWidth={1.8} />
+                  Register
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem onSelect={() => router.push("/register")}>Create account</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push("/login")}>Sign in</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
@@ -594,19 +719,61 @@ export function Navbar() {
               </Link>
             </li>
           </ul>
-          <a
-            href={getWhatsAppHref(WHATSAPP_CONTACT_MESSAGE)}
-            target={WHATSAPP_ENABLED ? "_blank" : undefined}
-            rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
-            aria-disabled={!WHATSAPP_ENABLED}
-            title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
-            className={`mt-4 flex w-full items-center justify-center gap-2 border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground ${
-              !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-55" : ""
-            }`}
-          >
-            <WhatsAppIcon />
-            Contact Us
-          </a>
+          {authState.status === "signed_in" ? (
+            <div className="mt-4 grid gap-2">
+              <Link
+                href="/account"
+                onClick={() => setIsOpen(false)}
+                className="flex w-full items-center justify-center gap-2 border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
+              >
+                <UserRound size={18} strokeWidth={1.8} />
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} max-w-[140px] truncate`}
+                  >
+                    {accountLabel?.firstName || "Account"}
+                  </span>
+                  {accountLabel?.tierKey && accountLabel.tierName ? (
+                    <TierBadge
+                      tier={accountLabel.tierKey}
+                      label={accountLabel.tierName}
+                      className="px-2 py-0.5 text-[10px] shadow-none"
+                    />
+                  ) : null}
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false)
+                  void handleSignOut()
+                }}
+                className="flex w-full items-center justify-center gap-2 border border-border bg-background px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <UserRound size={18} strokeWidth={1.8} />
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-2">
+              <Link
+                href="/register"
+                onClick={() => setIsOpen(false)}
+                className="flex w-full items-center justify-center gap-2 border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <UserRound size={18} strokeWidth={1.8} />
+                Create account
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setIsOpen(false)}
+                className="flex w-full items-center justify-center gap-2 border border-border bg-background px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <UserRound size={18} strokeWidth={1.8} />
+                Sign in
+              </Link>
+            </div>
+          )}
         </div>
       )}
       </header>
@@ -694,10 +861,3 @@ export function Navbar() {
   )
 }
 
-function WhatsAppIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-    </svg>
-  )
-}

@@ -13,7 +13,8 @@ import { enforceRateLimit } from "@/lib/rate-limit"
 import { getAllowedAppOrigin, isAllowedRequestOrigin } from "@/lib/security"
 import { checkoutCustomerSchema, normalizeCheckoutCustomer } from "@/lib/checkout-customer"
 import { consumeCheckoutVerificationToken } from "@/lib/checkout-verification"
-import { getCouponByCode, isCouponEligibleForSubtotal, normalizeCouponCode } from "@/lib/coupon"
+import { isCouponEligibleForSubtotal, normalizeCouponCode } from "@/lib/coupon"
+import { resolveCouponDefinition } from "@/lib/coupon-resolver"
 
 export const runtime = "nodejs"
 
@@ -75,6 +76,15 @@ type OrderInsertPayload = {
   status: "PENDING"
 }
 
+function getBearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? ""
+  if (!header.toLowerCase().startsWith("bearer ")) {
+    return null
+  }
+  const token = header.slice(7).trim()
+  return token || null
+}
+
 const createOrderSchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(MAX_CHECKOUT_ITEMS),
   customer: checkoutCustomerSchema,
@@ -86,12 +96,17 @@ const CHECKOUT_OTP_REQUIRED_TOTAL_CENTS = 2500 * 100
 
 function isMissingColumnError(message: string) {
   const normalized = message.trim().toLowerCase()
-  return normalized.includes("column") && normalized.includes("does not exist")
+  return (
+    (normalized.includes("column") && normalized.includes("does not exist")) ||
+    (normalized.includes("could not find") && normalized.includes("column") && normalized.includes("schema cache")) ||
+    (normalized.includes("schema cache") && normalized.includes("column"))
+  )
 }
 
 async function insertOrderWithPhoneFallback(
   basePayload: OrderInsertPayload,
-  phoneNumber: string
+  phoneNumber: string,
+  userId?: string | null
 ) {
   const phoneColumnCandidates = [
     "phone_number",
@@ -100,28 +115,35 @@ async function insertOrderWithPhoneFallback(
     "whatsapp",
   ] as const
 
-  for (const columnName of phoneColumnCandidates) {
-    const attemptPayload = {
-      ...basePayload,
-      [columnName]: phoneNumber,
-    }
+  const base = { ...basePayload } as Record<string, unknown>
+  const phoneVariants: Array<Record<string, unknown>> = phoneColumnCandidates.map((columnName) => ({
+    ...base,
+    [columnName]: phoneNumber,
+  }))
+  phoneVariants.push(base)
 
+  const attempts: Array<Record<string, unknown>> = []
+  if (userId) {
+    for (const variant of phoneVariants) {
+      attempts.push({ ...variant, user_id: userId })
+    }
+  }
+  attempts.push(...phoneVariants)
+
+  let lastError: { message: string } | null = null
+  for (const attemptPayload of attempts) {
     const { error } = await supabase.from("orders").insert([attemptPayload])
     if (!error) {
       return { error: null as null | { message: string } }
     }
 
+    lastError = { message: error.message }
     if (!isMissingColumnError(error.message)) {
-      return { error: { message: error.message } }
+      return { error: lastError }
     }
   }
 
-  const { error } = await supabase.from("orders").insert([basePayload])
-  if (error) {
-    return { error: { message: error.message } }
-  }
-
-  return { error: null as null | { message: string } }
+  return { error: lastError ?? { message: "Unable to save order." } }
 }
 
 export async function POST(request: Request) {
@@ -159,14 +181,15 @@ export async function POST(request: Request) {
     }
 
     const normalizedCouponCode = normalizeCouponCode(parsed.data.couponCode)
-    const requestedCoupon = normalizedCouponCode ? getCouponByCode(normalizedCouponCode) : null
+    const requestedCoupon = normalizedCouponCode ? await resolveCouponDefinition(normalizedCouponCode) : null
     if (normalizedCouponCode && !requestedCoupon) {
       return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 })
     }
 
     const calculated = calculateOrderFromItems(
       parsed.data.items,
-      normalizedCouponCode || undefined
+      normalizedCouponCode || undefined,
+      requestedCoupon
     )
     if (
       requestedCoupon &&
@@ -179,7 +202,27 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    const customer = normalizeCheckoutCustomer(parsed.data.customer)
+
+    const token = getBearerToken(request)
+    if (!token) {
+      return NextResponse.json({ error: "You must be signed in to checkout." }, { status: 401 })
+    }
+
+    const { data: authedUser, error: authedUserError } = await supabase.auth.getUser(token)
+    if (authedUserError || !authedUser?.user) {
+      return NextResponse.json({ error: "Your session expired. Please sign in again." }, { status: 401 })
+    }
+
+    const authedUserId = authedUser.user.id
+    const authedEmail = authedUser.user.email?.trim().toLowerCase() ?? ""
+    if (!authedEmail) {
+      return NextResponse.json({ error: "Unable to read your account email. Please sign in again." }, { status: 401 })
+    }
+
+    const customer = normalizeCheckoutCustomer({
+      ...parsed.data.customer,
+      email: authedEmail,
+    })
     const requiresCheckoutOtp = calculated.totalCents >= CHECKOUT_OTP_REQUIRED_TOTAL_CENTS
     if (requiresCheckoutOtp) {
       if (!parsed.data.verificationToken) {
@@ -357,11 +400,17 @@ export async function POST(request: Request) {
       status: "PENDING",
     }
 
-    const { error: insertError } = await insertOrderWithPhoneFallback(orderInsertPayload, customer.whatsapp)
+    const { error: insertError } = await insertOrderWithPhoneFallback(orderInsertPayload, customer.whatsapp, authedUserId)
 
     if (insertError) {
       console.error("Supabase insert order failed:", insertError.message)
-      return NextResponse.json({ error: "Unable to save order." }, { status: 500 })
+      const isProd = process.env.NODE_ENV === "production"
+      return NextResponse.json(
+        {
+          error: isProd ? "Unable to save order." : `Unable to save order. (${insertError.message})`,
+        },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({

@@ -3,7 +3,11 @@ import { supabase } from "@/lib/supabase-server"
 
 export function isMissingColumnError(message: string) {
   const normalized = message.trim().toLowerCase()
-  return normalized.includes("column") && normalized.includes("does not exist")
+  return (
+    (normalized.includes("column") && normalized.includes("does not exist")) ||
+    (normalized.includes("could not find") && normalized.includes("column") && normalized.includes("schema cache")) ||
+    (normalized.includes("schema cache") && normalized.includes("column"))
+  )
 }
 
 export function buildPhoneCandidates(rawValue: string): string[] {
@@ -88,6 +92,89 @@ export async function queryOrderByOrderAndPhone<T extends Record<string, unknown
   const phoneColumns = ["phone_number", "customer_phone", "customer_whatsapp", "whatsapp"] as const
   const candidates = buildPhoneCandidates(phoneNumber)
 
+  const normalizePhoneComparable = (value: string) => {
+    const digits = value.replace(/\D/g, "")
+    return digits ? `+${digits}` : ""
+  }
+
+  const phoneMatches = (storedPhone: string, inputPhone: string) => {
+    const input = normalizePhoneComparable(inputPhone)
+    const stored = normalizePhoneComparable(storedPhone)
+    if (!input || !stored) return false
+    return input === stored
+  }
+
+  const extractPhoneFromRow = (row: Record<string, unknown>) => {
+    const directCandidates = phoneColumns
+      .map((key) => row[key])
+      .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+
+    if (directCandidates.length > 0) {
+      return directCandidates[0].trim()
+    }
+
+    return extractPhoneFromCartJson(row.cart_json) ?? ""
+  }
+
+  const extractMissingColumnName = (message: string): string | null => {
+    const matchSchemaCache = message.match(/'([^']+)'\s+column/i)
+    if (matchSchemaCache?.[1]) return matchSchemaCache[1]
+
+    const matchPg = message.match(/column\s+\"([^\"]+)\"\s+does not exist/i)
+    if (matchPg?.[1]) return matchPg[1]
+
+    return null
+  }
+
+  const parseSelectColumns = (value: string) =>
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+  const queryOrderByIdWithSelectFallback = async (): Promise<{ data: T | null; error: string | null }> => {
+    const baseColumns = new Set(parseSelectColumns(select))
+    baseColumns.add("paypal_order_id")
+    baseColumns.add("cart_json")
+
+    let columns = Array.from(baseColumns)
+    let attemptsLeft = 12
+    let lastError: string | null = null
+
+    while (attemptsLeft > 0) {
+      attemptsLeft -= 1
+
+      const selectClause = columns.join(",")
+      const { data, error } = await supabase
+        .from("orders")
+        .select(selectClause)
+        .eq("paypal_order_id", orderId)
+        .maybeSingle()
+
+      if (!error) {
+        return { data: (data as unknown as T) ?? null, error: null }
+      }
+
+      lastError = error.message
+
+      if (!isMissingColumnError(error.message)) {
+        return { data: null, error: error.message }
+      }
+
+      const missing = extractMissingColumnName(error.message)
+      if (!missing) {
+        return { data: null, error: error.message }
+      }
+
+      columns = columns.filter((col) => col !== missing)
+      if (columns.length === 0) {
+        return { data: null, error: error.message }
+      }
+    }
+
+    return { data: null, error: lastError ?? "Unable to read order data." }
+  }
+
   for (const candidate of candidates) {
     for (const column of phoneColumns) {
       const { data, error } = await supabase
@@ -110,5 +197,17 @@ export async function queryOrderByOrderAndPhone<T extends Record<string, unknown
     }
   }
 
-  return { data: null, error: null }
+  // Fallback: if the orders table doesn't have a phone column, look up by order id and compare against cart_json.
+  const fallback = await queryOrderByIdWithSelectFallback()
+  if (fallback.error || !fallback.data) {
+    return fallback
+  }
+
+  const storedPhone = extractPhoneFromRow(fallback.data)
+  const match = candidates.some((candidate) => phoneMatches(storedPhone, candidate))
+  if (!match) {
+    return { data: null, error: null }
+  }
+
+  return { data: fallback.data, error: null }
 }

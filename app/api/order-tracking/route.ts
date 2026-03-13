@@ -137,7 +137,11 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Order-tracking read query failed:", error, `order=${queryOrderId}`)
-      return NextResponse.json({ error: "Unable to read order data." }, { status: 500 })
+      const isProd = process.env.NODE_ENV === "production"
+      return NextResponse.json(
+        { error: isProd ? "Unable to read order data." : `Unable to read order data. (${error})` },
+        { status: 500 }
+      )
     }
 
     if (!data) {

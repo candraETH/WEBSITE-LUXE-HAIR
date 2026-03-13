@@ -1,6 +1,7 @@
 "use client"
 
-import { FormEvent, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 
@@ -229,7 +230,9 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
   )
 }
 
-export default function TrackOrderPage() {
+function TrackOrderContent() {
+  const searchParams = useSearchParams()
+  const hasPrefilledOrderId = useRef(false)
   const [orderId, setOrderId] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
@@ -243,6 +246,18 @@ export default function TrackOrderPage() {
   const primaryOrder = orders[0] ?? null
 
   const canTrackOrder = useMemo(() => Boolean(orderId.trim() && phoneNumber.trim()), [orderId, phoneNumber])
+
+  useEffect(() => {
+    if (hasPrefilledOrderId.current) return
+
+    const incoming =
+      searchParams.get("orderId") || searchParams.get("order_id") || searchParams.get("paypal_order_id") || ""
+    const normalized = incoming.trim().toUpperCase()
+    if (!normalized) return
+
+    setOrderId((current) => (current.trim() ? current : normalized))
+    hasPrefilledOrderId.current = true
+  }, [searchParams])
 
   const normalizePhone = () => {
     const normalizedPhoneDigits = phoneNumber.replace(/\D/g, "")
@@ -567,5 +582,13 @@ export default function TrackOrderPage() {
 
       <Footer />
     </main>
+  )
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={null}>
+      <TrackOrderContent />
+    </Suspense>
   )
 }
