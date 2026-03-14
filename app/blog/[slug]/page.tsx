@@ -199,7 +199,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           <aside className="h-fit rounded-2xl border border-[#ddd2c8] bg-white p-4 lg:sticky lg:top-[132px]">
             <h2 className="text-lg font-semibold uppercase tracking-[0.14em] text-[#171717]">Blog Preview</h2>
-            <p className="mt-1 text-sm text-[#66666d]">Artikel lain yang mungkin ingin kamu baca.</p>
+            <p className="mt-1 text-sm text-[#66666d]">More articles you might enjoy.</p>
 
             <div className="mt-4 space-y-4">
               {previewPosts.map((preview) => (

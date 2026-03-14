@@ -374,13 +374,13 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
   const copyToClipboard = async (text: string) => {
     const value = text.trim()
     if (!value) {
-      setCopyStatus("Alamat belum tersedia untuk disalin.")
+      setCopyStatus("Shipping address is not available to copy.")
       return
     }
 
     try {
       await navigator.clipboard.writeText(value)
-      setCopyStatus("Tersalin.")
+      setCopyStatus("Copied.")
       window.setTimeout(() => setCopyStatus(null), 1800)
       return
     } catch {
@@ -397,10 +397,10 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
       el.select()
       const ok = document.execCommand("copy")
       document.body.removeChild(el)
-      setCopyStatus(ok ? "Tersalin." : "Gagal menyalin.")
+      setCopyStatus(ok ? "Copied." : "Failed to copy.")
       window.setTimeout(() => setCopyStatus(null), 1800)
     } catch {
-      setCopyStatus("Gagal menyalin.")
+      setCopyStatus("Failed to copy.")
       window.setTimeout(() => setCopyStatus(null), 1800)
     }
   }
@@ -408,7 +408,7 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
   const printLabel = (labelText: string) => {
     const value = labelText.trim()
     if (!value) {
-      setCopyStatus("Alamat belum tersedia untuk dicetak.")
+      setCopyStatus("Shipping address is not available to print.")
       window.setTimeout(() => setCopyStatus(null), 1800)
       return
     }
@@ -423,7 +423,7 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
 
     const win = window.open("", "_blank", "noopener,noreferrer,width=480,height=640")
     if (!win) {
-      setCopyStatus("Popup diblokir.")
+      setCopyStatus("Popup blocked.")
       window.setTimeout(() => setCopyStatus(null), 1800)
       return
     }
@@ -722,7 +722,7 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Shipping address</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Copy/print label untuk ditempel di paket.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Copy/print a label to attach to the package.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -753,7 +753,7 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
                     <pre className="m-0 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{shippingLabelText}</pre>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Alamat belum tersedia untuk order ini.</p>
+                  <p className="text-sm text-muted-foreground">Shipping address is not available for this order.</p>
                 )}
               </div>
 
