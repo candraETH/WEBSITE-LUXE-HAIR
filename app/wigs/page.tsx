@@ -1,4 +1,5 @@
 import { ProductCatalogPage } from "@/components/product-catalog-page"
+import { JsonLd } from "@/components/json-ld"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import { WIGS_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
@@ -47,8 +48,8 @@ export default function WigsPage() {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <JsonLd data={faqSchema} />
+      <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={WIGS_PRODUCTS}
         filterTitle="Wig Styles"

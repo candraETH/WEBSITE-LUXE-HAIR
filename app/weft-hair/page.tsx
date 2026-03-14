@@ -1,4 +1,5 @@
 import { ProductCatalogPage } from "@/components/product-catalog-page"
+import { JsonLd } from "@/components/json-ld"
 import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { WEFT_HAIR_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
@@ -47,8 +48,8 @@ export default function WeftHairPage() {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <JsonLd data={faqSchema} />
+      <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={WEFT_PRODUCTS}
         filterTitle="Hair Texture"

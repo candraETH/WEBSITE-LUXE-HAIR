@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { TierBadge, getTierNameGradientClass } from "@/components/loyalty/tier-badge"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { getAppRoleFromMetadata } from "@/lib/roles"
 import { getTierForSpend, type LoyaltyTierKey } from "@/lib/loyalty-tier"
 
 const navLinks = [
@@ -161,10 +160,7 @@ export function Navbar() {
   const [openDesktopMenu, setOpenDesktopMenu] = useState<string | null>(null)
   const [openMobileMenu, setOpenMobileMenu] = useState<string | null>(null)
   const [previewLightbox, setPreviewLightbox] = useState<PreviewLightboxState | null>(null)
-  const [authState, setAuthState] = useState<{
-    status: "loading" | "signed_out" | "signed_in"
-    role: "admin" | "user"
-  }>({ status: "loading", role: "user" })
+  const [authState, setAuthState] = useState<{ status: "loading" | "signed_out" | "signed_in" }>({ status: "loading" })
   const [accountLabel, setAccountLabel] = useState<{
     firstName: string
     tierKey: LoyaltyTierKey | null
@@ -181,7 +177,7 @@ export function Navbar() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
-      setAuthState({ status: "signed_out", role: "user" })
+      setAuthState({ status: "signed_out" })
       return
     }
     const client = supabase
@@ -193,7 +189,7 @@ export function Navbar() {
       if (isCancelled) return
 
       if (!data.user) {
-        setAuthState({ status: "signed_out", role: "user" })
+        setAuthState({ status: "signed_out" })
         setAccountLabel(null)
         return
       }
@@ -220,10 +216,7 @@ export function Navbar() {
         }
       }
 
-      setAuthState({
-        status: "signed_in",
-        role: getAppRoleFromMetadata(metadata),
-      })
+      setAuthState({ status: "signed_in" })
       setAccountLabel({ firstName, tierKey, tierName })
     }
 

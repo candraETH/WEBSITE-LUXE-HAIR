@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 import { supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
     if (isMissingRelationError(error.message)) {
       return NextResponse.json({ configured: false, rows: [] })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Admin inventory load failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to load inventory.") }, { status: 500 })
   }
 
   const rows = (data ?? []).map((row) => ({
@@ -65,7 +67,8 @@ export async function PATCH(request: Request) {
         { status: 500 }
       )
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Admin inventory update failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to update inventory.") }, { status: 500 })
   }
 
   return NextResponse.json({
@@ -76,4 +79,3 @@ export async function PATCH(request: Request) {
     },
   })
 }
-

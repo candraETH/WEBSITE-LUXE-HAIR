@@ -39,7 +39,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { getAppRoleFromMetadata } from "@/lib/roles"
 
 type AdminStats = {
   orders: {
@@ -137,7 +136,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const metadataRole = getAppRoleFromMetadata(user.user_metadata)
       const { data: profile } = await client
         .from("profiles")
         .select("role,full_name")
@@ -145,9 +143,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         .maybeSingle()
 
       const profileRoleRaw = typeof profile?.role === "string" ? profile.role : ""
-      const profileRole = profileRoleRaw.trim().toLowerCase() === "admin" ? "admin" : profileRoleRaw ? "user" : null
-      const role = profileRole ?? metadataRole
-      if (role !== "admin") {
+      const profileRole = profileRoleRaw.trim().toLowerCase() === "admin" ? "admin" : "user"
+      if (profileRole !== "admin") {
         setState({ status: "denied" })
         return
       }

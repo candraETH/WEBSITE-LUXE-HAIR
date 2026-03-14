@@ -11,7 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { TierBadge, getTierNameGradientClass } from "@/components/loyalty/tier-badge"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { getAppRoleFromMetadata } from "@/lib/roles"
 import { getTierForSpend, type LoyaltyTier } from "@/lib/loyalty-tier"
 import { cn } from "@/lib/utils"
 
@@ -23,7 +22,6 @@ type ProfileState =
       email: string
       fullName: string
       phone: string
-      role: "admin" | "user"
       avatar: string
     }
 
@@ -113,14 +111,12 @@ export function ProfileClient() {
       const fullName = typeof metadata.full_name === "string" ? metadata.full_name : ""
       const phone = typeof metadata.phone === "string" ? metadata.phone : ""
       const avatar = typeof metadata.avatar === "string" ? metadata.avatar : ""
-      const role = getAppRoleFromMetadata(metadata)
 
       setState({
         status: "signed_in",
         email: user.email ?? "",
         fullName,
         phone,
-        role,
         avatar,
       })
 
@@ -169,7 +165,6 @@ export function ProfileClient() {
       full_name: values.fullName.trim(),
       phone: values.phone?.trim() || "",
       avatar: nextAvatar,
-      role: state.role,
     }
 
     const { error } = await supabase.auth.updateUser({ data: payload })

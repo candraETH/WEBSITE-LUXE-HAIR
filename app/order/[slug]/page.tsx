@@ -13,7 +13,6 @@ import { addToWishlist } from "@/lib/wishlist"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 import { applyProductDiscount, formatUsdPrice, getDiscountedPriceLabel } from "@/lib/pricing"
-import { parsePriceValues } from "@/lib/seo"
 
 type ProductColor = {
   code: string
@@ -802,39 +801,6 @@ export default function OrderPage({ params }: PageProps) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isImageLightboxOpen, galleryImages.length])
 
-  const productSchema = useMemo(() => {
-    if (!product) {
-      return null
-    }
-
-    const priceValues = parsePriceValues(product.price)
-    const rawStartingPrice = priceValues.length > 0 ? Math.min(...priceValues) : product.basePrice
-    const startingPrice = applyProductDiscount(rawStartingPrice)
-    const images = Array.from(new Set([product.image, ...(product.gallery ?? [])])).filter(Boolean)
-
-    return {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: product.name,
-      description: product.longDescription || product.description,
-      category: product.category,
-      sku: product.slug,
-      image: images,
-      brand: {
-        "@type": "Brand",
-        name: "CANDRA'S HAIR",
-      },
-      offers: {
-        "@type": "Offer",
-        url: `/order/${product.slug}`,
-        priceCurrency: "USD",
-        price: startingPrice.toFixed(2),
-        availability: "https://schema.org/InStock",
-        itemCondition: "https://schema.org/NewCondition",
-      },
-    }
-  }, [product])
-
   const categoryHref = useMemo(() => {
     if (!product) {
       return "/"
@@ -877,13 +843,6 @@ export default function OrderPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#eeeeef] pt-[102px] lg:pt-[108px]">
-      {productSchema && (
-        <script
-          type="application/ld+json"
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
-        />
-      )}
       <Navbar />
 
       <div className="mx-auto w-full max-w-[1520px] px-4 pb-12 sm:px-6 lg:px-8 xl:px-10">

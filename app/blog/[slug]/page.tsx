@@ -5,6 +5,7 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { RecommendedProductsCarousel } from "@/components/recommended-products-carousel"
+import { JsonLd } from "@/components/json-ld"
 import { BLOG_POSTS, getBlogPostBySlug } from "@/lib/blog-posts"
 import { ALL_CATALOG_PRODUCTS } from "@/lib/catalog-index"
 import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
@@ -99,8 +100,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f6f3ef] pt-[102px] lg:pt-[108px]">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
-      {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
+      <JsonLd data={articleSchema} />
+      {faqSchema ? <JsonLd data={faqSchema} /> : null}
       <Navbar />
 
       <section className="mx-auto w-full max-w-[1480px] px-4 py-10 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">

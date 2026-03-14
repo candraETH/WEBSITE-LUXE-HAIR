@@ -41,10 +41,19 @@ export function isAllowedRequestOrigin(request: Request): boolean {
     }
   }
 
+  // In production, block non-browser calls that omit both `Origin` and `Referer` headers
+  // for state-changing requests. This reduces brute-force / direct-call surface area.
+  if (process.env.NODE_ENV === "production") {
+    const method = request.method.toUpperCase()
+    const isSafeMethod = method === "GET" || method === "HEAD" || method === "OPTIONS"
+    if (!isSafeMethod && !requestOrigin && !referer) {
+      return false
+    }
+  }
+
   return true
 }
 
 export function isValidPayPalOrderId(value: string): boolean {
   return PAYPAL_ORDER_ID_REGEX.test(value.trim().toUpperCase())
 }
-

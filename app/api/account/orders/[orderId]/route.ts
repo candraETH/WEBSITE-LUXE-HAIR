@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-server"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 
 const PENDING_EXPIRES_AFTER_MS = 6 * 60 * 60 * 1000
 
@@ -63,7 +64,8 @@ export async function GET(request: Request, context: { params: Promise<{ orderId
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Account order load failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to load order.") }, { status: 500 })
   }
 
   if (!data) {
@@ -81,7 +83,7 @@ export async function GET(request: Request, context: { params: Promise<{ orderId
       .in("status", ["PENDING", "pending", "Pending"])
 
     if (cancelError) {
-      console.error("Supabase pending order auto-cancel failed:", cancelError.message, `order=${orderId}`)
+      logServerError(`Supabase pending order auto-cancel failed (order=${orderId}):`, cancelError)
     } else {
       ;(data as Record<string, unknown>).status = "CANCELLED"
     }

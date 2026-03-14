@@ -3,6 +3,7 @@ import Link from "next/link"
 import type { Metadata } from "next"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { JsonLd } from "@/components/json-ld"
 import { BLOG_POSTS } from "@/lib/blog-posts"
 import type { CatalogProduct } from "@/lib/bulk-products"
 import { ALL_CATALOG_PRODUCTS } from "@/lib/catalog-index"
@@ -60,7 +61,7 @@ export default function BlogPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f6f3ef] pt-[102px] lg:pt-[108px]">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }} />
+      <JsonLd data={blogSchema} />
       <Navbar />
 
       <section className="w-full px-4 py-10 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">

@@ -4,6 +4,7 @@ import { PayPalHttpError, verifyWebhookSignature } from "@/lib/paypal/client"
 import { getPayPalOrder, updatePayPalOrderStatus } from "@/lib/paypal/order-store"
 import { hasSupabaseEnv, supabase } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
+import { logError, logEvent, redactOrderId } from "@/lib/observability"
 
 export const runtime = "nodejs"
 
@@ -175,6 +176,7 @@ export async function POST(request: Request) {
       windowMs: 10 * 60 * 1000,
     })
     if (!rateLimit.allowed) {
+      logEvent("warn", "paypal_webhook_rate_limited", { retryAfterSeconds: rateLimit.retryAfterSeconds })
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
@@ -185,13 +187,16 @@ export async function POST(request: Request) {
     const isVerified = await verifyWebhookSignature(payload, request.headers)
 
     if (!isVerified) {
+      logEvent("warn", "paypal_webhook_invalid_signature")
       return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 })
     }
 
     const eventType = payload.event_type ?? ""
     const orderId = extractOrderIdFromEvent(payload)
+    const orderIdHint = orderId ? redactOrderId(orderId) : ""
 
     if (!orderId) {
+      logEvent("info", "paypal_webhook_verified_no_order_id", { eventType })
       return NextResponse.json({ ok: true, message: "Webhook verified, no order id found." })
     }
 
@@ -201,6 +206,7 @@ export async function POST(request: Request) {
       if (stored) {
         updatePayPalOrderStatus(orderId, "CAPTURE_REQUESTED")
       }
+      logEvent("info", "paypal_webhook_order_approved", { orderId: orderIdHint })
       return NextResponse.json({ ok: true })
     }
 
@@ -213,34 +219,37 @@ export async function POST(request: Request) {
       if (stored) {
         if (!Number.isFinite(receivedAmountCents) || currencyCode !== stored.currencyCode) {
           updatePayPalOrderStatus(orderId, "FAILED")
+          logEvent("warn", "paypal_webhook_invalid_payment_payload", { orderId: orderIdHint })
           return NextResponse.json({ ok: true, message: "Webhook verified but payment payload invalid." })
         }
 
         if (receivedAmountCents !== stored.totalCents) {
-          console.error(
-            "PayPal amount mismatch:",
-            `order=${orderId} expected=${centsToDollars(stored.totalCents)} got=${centsToDollars(receivedAmountCents)}`
-          )
+          logEvent("warn", "paypal_webhook_amount_mismatch", {
+            orderId: orderIdHint,
+            expected: centsToDollars(stored.totalCents),
+            got: centsToDollars(receivedAmountCents),
+          })
           updatePayPalOrderStatus(orderId, "FAILED")
           return NextResponse.json({ ok: true, message: "Webhook verified but amount mismatch." })
         }
       }
 
       if (!hasSupabaseEnv) {
+        logEvent("error", "paypal_webhook_missing_supabase_env", { orderId: orderIdHint })
         return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
       }
 
       const { error: updateError } = await syncOrderStatusInSupabase(orderId, "PAID")
 
       if (updateError) {
-        console.error("Supabase update order failed:", updateError, `order=${orderId}`)
+        logEvent("error", "paypal_webhook_supabase_update_failed", { orderId: orderIdHint })
         return NextResponse.json({ error: "Failed to update order status." }, { status: 500 })
       }
 
       if (stored) {
         updatePayPalOrderStatus(orderId, "PAID")
       }
-      console.log("Order marked as PAID:", orderId)
+      logEvent("info", "paypal_webhook_order_paid", { orderId: orderIdHint })
       return NextResponse.json({ ok: true })
     }
 
@@ -248,7 +257,7 @@ export async function POST(request: Request) {
       if (hasSupabaseEnv) {
         const { error: updateError } = await syncOrderStatusInSupabase(orderId, "FAILED", "DENIED")
         if (updateError) {
-          console.error("Supabase update order failed:", updateError, `order=${orderId}`)
+          logEvent("error", "paypal_webhook_supabase_update_failed", { orderId: orderIdHint, reason: "DENIED" })
           return NextResponse.json({ error: "Failed to update order status." }, { status: 500 })
         }
       }
@@ -256,6 +265,7 @@ export async function POST(request: Request) {
       if (stored) {
         updatePayPalOrderStatus(orderId, "FAILED")
       }
+      logEvent("info", "paypal_webhook_order_failed", { orderId: orderIdHint, reason: "DENIED" })
       return NextResponse.json({ ok: true })
     }
 
@@ -263,7 +273,7 @@ export async function POST(request: Request) {
       if (hasSupabaseEnv) {
         const { error: updateError } = await syncOrderStatusInSupabase(orderId, "FAILED", "REVERSED")
         if (updateError) {
-          console.error("Supabase update order failed:", updateError, `order=${orderId}`)
+          logEvent("error", "paypal_webhook_supabase_update_failed", { orderId: orderIdHint, reason: "REVERSED" })
           return NextResponse.json({ error: "Failed to update order status." }, { status: 500 })
         }
       }
@@ -271,6 +281,7 @@ export async function POST(request: Request) {
       if (stored) {
         updatePayPalOrderStatus(orderId, "FAILED")
       }
+      logEvent("info", "paypal_webhook_order_failed", { orderId: orderIdHint, reason: "REVERSED" })
       return NextResponse.json({ ok: true })
     }
 
@@ -278,7 +289,7 @@ export async function POST(request: Request) {
       if (hasSupabaseEnv) {
         const { error: updateError } = await syncOrderStatusInSupabase(orderId, "FAILED", "REFUNDED")
         if (updateError) {
-          console.error("Supabase update order failed:", updateError, `order=${orderId}`)
+          logEvent("error", "paypal_webhook_supabase_update_failed", { orderId: orderIdHint, reason: "REFUNDED" })
           return NextResponse.json({ error: "Failed to update order status." }, { status: 500 })
         }
       }
@@ -286,17 +297,19 @@ export async function POST(request: Request) {
       if (stored) {
         updatePayPalOrderStatus(orderId, "FAILED")
       }
+      logEvent("info", "paypal_webhook_order_failed", { orderId: orderIdHint, reason: "REFUNDED" })
       return NextResponse.json({ ok: true })
     }
 
+    logEvent("info", "paypal_webhook_ignored", { orderId: orderIdHint, eventType })
     return NextResponse.json({ ok: true, message: "Webhook verified and ignored." })
   } catch (error) {
     if (error instanceof PayPalHttpError) {
-      console.error("PayPal webhook verification failed:", error.status, error.message)
+      logError("paypal_webhook_paypal_error", error, { status: error.status })
       return NextResponse.json({ error: "Failed to verify webhook." }, { status: 502 })
     }
 
-    console.error("PayPal webhook error:", error instanceof Error ? error.message : "Unknown error")
+    logError("paypal_webhook_unhandled_error", error)
     return NextResponse.json({ error: "Webhook handling failed." }, { status: 500 })
   }
 }

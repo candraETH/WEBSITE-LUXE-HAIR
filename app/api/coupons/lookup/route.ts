@@ -3,6 +3,7 @@ import { z } from "zod"
 import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin } from "@/lib/security"
 import { resolveCouponDefinition } from "@/lib/coupon-resolver"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 
 export const runtime = "nodejs"
 
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ coupon })
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to look up coupon." }, { status: 500 })
+    logServerError("Coupon lookup failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to look up coupon.") }, { status: 500 })
   }
 }
-

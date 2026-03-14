@@ -1,6 +1,7 @@
 import "server-only"
 
 import { supabase } from "@/lib/supabase-server"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 
 export type AdminAuthOk = {
   ok: true
@@ -52,19 +53,18 @@ export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
       .maybeSingle()
 
     if (profileError) {
-      return { ok: false, status: 500, message: profileError.message }
+      logServerError("requireAdmin: failed to load profile role", profileError)
+      return { ok: false, status: 500, message: publicErrorMessage(profileError, "Unable to authorize") }
     }
 
     const hasProfilesAdmin = isAdminRole((profile as { role?: unknown } | null)?.role)
-    const hasMetadataAdmin = isAdminRole((user.user_metadata as Record<string, unknown> | null)?.role)
-
-    if (!hasProfilesAdmin && !hasMetadataAdmin) {
+    if (!hasProfilesAdmin) {
       return { ok: false, status: 403, message: "Forbidden" }
     }
 
     return { ok: true, userId, email }
   } catch (error) {
-    return { ok: false, status: 500, message: error instanceof Error ? error.message : "Unable to authorize" }
+    logServerError("requireAdmin: unexpected error", error)
+    return { ok: false, status: 500, message: publicErrorMessage(error, "Unable to authorize") }
   }
 }
-

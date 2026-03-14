@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-server"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 
 type OrderSummary = {
   orderId: string
@@ -91,7 +92,8 @@ export async function GET(request: Request) {
   const result = ordered.error ? await query : ordered
 
   if (result.error) {
-    return NextResponse.json({ error: result.error.message }, { status: 500 })
+    logServerError("Account orders load failed:", result.error)
+    return NextResponse.json({ error: publicErrorMessage(result.error, "Unable to load orders.") }, { status: 500 })
   }
 
   const rows = (result.data ?? []) as Array<Record<string, unknown>>
@@ -127,7 +129,7 @@ export async function GET(request: Request) {
       .in("status", ["PENDING", "pending", "Pending"])
 
     if (cancelError) {
-      console.error("Supabase pending order auto-cancel failed:", cancelError.message)
+      logServerError("Supabase pending order auto-cancel failed:", cancelError)
     }
   }
 

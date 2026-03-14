@@ -9,6 +9,7 @@ import { Navbar } from "@/components/navbar"
 import { useCart } from "@/context/CartContext"
 import { WHATSAPP_ENABLED } from "@/lib/whatsapp-config"
 import { markPaymentNotificationSent, removePaymentDraft, wasPaymentNotificationSent } from "@/lib/payment-draft"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 type PaymentUiState = "processing" | "paid" | "pending" | "error"
 
@@ -56,6 +57,7 @@ function isCaptureAlreadyProcessedError(message: string) {
 }
 
 function PaymentSuccessContent() {
+  const supabase = useMemo(() => getSupabaseBrowserClient(), [])
   const searchParams = useSearchParams()
   const orderId = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams])
   const { clearCart, isCartReady } = useCart()
@@ -81,10 +83,20 @@ function PaymentSuccessContent() {
     setMessage("Finalizing your payment...")
     setLastStatus("")
 
+    const sessionResult = supabase ? await supabase.auth.getSession() : null
+    const token = sessionResult?.data.session?.access_token ?? ""
+    if (!token) {
+      setUiState("error")
+      setMessage("Your session expired. Please sign in again to verify payment.")
+      return
+    }
+
+    const authHeaders = { authorization: `Bearer ${token}` }
+
     const getCurrentStatus = async () => {
       const statusResponse = await fetch("/api/payment-status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ orderId }),
       })
 
@@ -119,7 +131,7 @@ function PaymentSuccessContent() {
 
     const captureResponse = await fetch("/api/capture-order", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ orderId }),
     })
 
@@ -159,7 +171,7 @@ function PaymentSuccessContent() {
 
     setUiState("pending")
     setMessage("Payment is still being confirmed. Please check again in a moment.")
-  }, [orderId])
+  }, [orderId, supabase])
 
   useEffect(() => {
     let cancelled = false
@@ -221,9 +233,15 @@ function PaymentSuccessContent() {
       return
     }
 
+    const sessionResult = supabase ? await supabase.auth.getSession() : null
+    const token = sessionResult?.data.session?.access_token ?? ""
+    if (!token) {
+      throw new Error("Please sign in again to send WhatsApp confirmation.")
+    }
+
     const response = await fetch("/api/whatsapp-confirmation", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ orderId }),
     })
     const payload = (await response.json().catch(() => ({}))) as WhatsAppConfirmationResponse
@@ -252,7 +270,7 @@ function PaymentSuccessContent() {
         ? "WhatsApp confirmations opened for seller and buyer."
         : "WhatsApp confirmation opened for seller."
     )
-  }, [openNotificationTabs, orderId])
+  }, [openNotificationTabs, orderId, supabase])
 
   const handleManualNotification = () => {
     if (!manualNotificationUrls || !orderId) {

@@ -5,6 +5,7 @@ import { getPayPalOrder, updatePayPalOrderStatus } from "@/lib/paypal/order-stor
 import { hasSupabaseEnv, supabase } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
+import { extractEmailFromCartJson } from "@/lib/order-lookup"
 
 export const runtime = "nodejs"
 
@@ -25,6 +26,19 @@ const captureSchema = z.object({
 
 function normalizeStatus(value: string | null | undefined) {
   return (value ?? "").trim().toUpperCase()
+}
+
+function getBearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? ""
+  if (!header.toLowerCase().startsWith("bearer ")) {
+    return null
+  }
+  const token = header.slice(7).trim()
+  return token || null
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
 }
 
 function isLikelyAlreadyCapturedError(error: PayPalHttpError) {
@@ -59,6 +73,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden origin." }, { status: 403 })
     }
 
+    if (!hasSupabaseEnv) {
+      return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
+    }
+
+    const token = getBearerToken(request)
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    if (userError || !userData.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await request.json()
     const parsed = captureSchema.safeParse(body)
     if (!parsed.success) {
@@ -68,25 +96,40 @@ export async function POST(request: Request) {
     orderId = parsed.data.orderId
     const stored = getPayPalOrder(orderId)
 
-    if (hasSupabaseEnv) {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("status")
-        .eq("paypal_order_id", orderId)
-        .maybeSingle()
+    const authedEmail = normalizeEmail(userData.user.email)
+    if (!authedEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-      if (error) {
-        console.error("Supabase capture-order status query failed:", error.message, `order=${orderId}`)
-      } else if (normalizeStatus(data?.status) === "PAID") {
-        if (stored) {
-          updatePayPalOrderStatus(orderId, "PAID")
-        }
-        return NextResponse.json({
-          orderId,
-          status: "PAID",
-          message: "Order already confirmed.",
-        })
+    const { data, error } = await supabase
+      .from("orders")
+      .select("status,customer_email,cart_json")
+      .eq("paypal_order_id", orderId)
+      .maybeSingle()
+
+    if (error) {
+      console.error("Supabase capture-order status query failed:", error.message, `order=${orderId}`)
+      return NextResponse.json({ error: "Unable to capture order." }, { status: 500 })
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 })
+    }
+
+    const orderEmail = normalizeEmail((data.customer_email ?? extractEmailFromCartJson(data.cart_json) ?? "") as string)
+    if (!orderEmail || orderEmail !== authedEmail) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    if (normalizeStatus(data.status) === "PAID") {
+      if (stored) {
+        updatePayPalOrderStatus(orderId, "PAID")
       }
+      return NextResponse.json({
+        orderId,
+        status: "PAID",
+        message: "Order already confirmed.",
+      })
     }
 
     if (stored?.status === "PAID") {

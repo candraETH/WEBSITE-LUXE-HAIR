@@ -60,6 +60,19 @@ function normalizeStatus(value: string | null | undefined): string {
   return (value ?? "").trim().toUpperCase()
 }
 
+function getBearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? ""
+  if (!header.toLowerCase().startsWith("bearer ")) {
+    return null
+  }
+  const token = header.slice(7).trim()
+  return token || null
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
 function isMissingColumnError(message: string) {
   const normalized = message.trim().toLowerCase()
   return normalized.includes("column") && normalized.includes("does not exist")
@@ -233,6 +246,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 })
     }
 
+    const token = getBearerToken(request)
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    if (userError || !userData.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const authedEmail = normalizeEmail(userData.user.email)
+    if (!authedEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await request.json()
     const parsed = confirmationSchema.safeParse(body)
     if (!parsed.success) {
@@ -249,15 +277,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 })
     }
 
+    // Prevent leaking PII for someone who only knows an order id.
+    const cartRoot = getCartJsonRoot(data.cart_json)
+    const customer = cartRoot.customer ?? {}
+    const customerEmailFromCart = asString(customer.email)
+    const customerEmailFromRow = asString(data.customer_email)
+    const orderEmail = normalizeEmail(customerEmailFromRow || customerEmailFromCart)
+    if (!orderEmail || orderEmail !== authedEmail) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     if (normalizeStatus(data.status) !== "PAID") {
       return NextResponse.json({ error: "Order payment is not confirmed yet." }, { status: 409 })
     }
 
-    const cartRoot = getCartJsonRoot(data.cart_json)
     const currency = asString(data.currency) || "USD"
-    const customer = cartRoot.customer ?? {}
     const customerName = asString(customer.name) || asString(data.customer_name) || "-"
-    const customerEmail = asString(customer.email) || asString(data.customer_email) || "-"
+    const customerEmail = customerEmailFromCart || customerEmailFromRow || "-"
     const customerPhone = extractBuyerPhone(data, cartRoot)
     const address = buildAddress(cartRoot)
 

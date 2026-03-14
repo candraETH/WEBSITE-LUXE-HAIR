@@ -50,6 +50,32 @@ function normalizeStatus(value: string | null | undefined): string {
   return (value ?? "").trim().toUpperCase() || "UNKNOWN"
 }
 
+function sanitizeCartJsonForTracking(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  const root = value as Record<string, unknown>
+  const safe: Record<string, unknown> = {}
+
+  const order = root.order
+  if (order && typeof order === "object" && !Array.isArray(order)) {
+    const createdAt = (order as Record<string, unknown>).created_at
+    safe.order = createdAt ? { created_at: createdAt } : {}
+  }
+
+  const summary = root.summary
+  if (summary && typeof summary === "object" && !Array.isArray(summary)) {
+    safe.summary = summary
+  }
+
+  if (Array.isArray(root.items)) {
+    safe.items = root.items
+  }
+
+  return safe
+}
+
 function maskEmail(value: string): string {
   const email = value.trim()
   if (!email.includes("@")) {
@@ -82,7 +108,7 @@ function normalizeOrderRow(row: OrderRow) {
     phoneNumber: row.phone_number ?? extractPhoneFromCartJson(row.cart_json) ?? "",
     trackingNumber: row.tracking_number ?? "",
     shippingCarrier: row.shipping_carrier ?? "",
-    cartJson: row.cart_json ?? null,
+    cartJson: sanitizeCartJsonForTracking(row.cart_json),
   }
 }
 

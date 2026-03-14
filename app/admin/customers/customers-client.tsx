@@ -4,8 +4,6 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { format, parseISO } from "date-fns"
 import { Badge } from "@/components/ui/badge"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
@@ -49,14 +47,6 @@ function shortId(value: string) {
 export function AdminCustomersClient({ initialQuery }: { initialQuery: string }) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
   const [state, setState] = useState<UiState>({ status: "loading" })
-  const [savingId, setSavingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [confirmChange, setConfirmChange] = useState<{
-    userId: string
-    currentRole: "admin" | "user"
-    nextRole: "admin" | "user"
-    label: string
-  } | null>(null)
 
   const load = async () => {
     if (!supabase) {
@@ -94,56 +84,6 @@ export function AdminCustomersClient({ initialQuery }: { initialQuery: string })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery, supabase])
 
-  const updateRole = async (userId: string, role: "admin" | "user") => {
-    if (!supabase) return
-
-    const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token ?? ""
-    if (!token) {
-      setError("Your session expired. Please sign in again.")
-      return
-    }
-
-    setSavingId(userId)
-    setError(null)
-    try {
-      const response = await fetch("/api/admin/customers", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userId, role }),
-      })
-      const payload = (await response.json().catch(() => ({}))) as { error?: string }
-      if (!response.ok) {
-        throw new Error(payload.error || "Failed to update role.")
-      }
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update role.")
-    } finally {
-      setSavingId(null)
-    }
-  }
-
-  const confirmRoleChange = (customer: CustomerRow, nextRole: "admin" | "user") => {
-    const currentRole = customer.role.trim().toLowerCase() === "admin" ? "admin" : "user"
-    if (currentRole === nextRole) {
-      return
-    }
-    setConfirmChange({
-      userId: customer.id,
-      currentRole,
-      nextRole,
-      label: nextRole === "admin" ? "Change role to admin?" : "Change role to user?",
-    })
-  }
-
-  const commitRoleChange = async () => {
-    if (!confirmChange) return
-    const { userId, nextRole } = confirmChange
-    await updateRole(userId, nextRole)
-    setConfirmChange(null)
-  }
-
   if (state.status === "signed_out") {
     return (
       <div className="rounded-2xl border border-border/30 bg-card/60 p-6 text-sm text-muted-foreground shadow-sm">
@@ -169,8 +109,6 @@ export function AdminCustomersClient({ initialQuery }: { initialQuery: string })
           <p className="mt-1 text-xs text-muted-foreground">Use the top search bar to filter customers.</p>
         </div>
       </div>
-
-      {error && <p className="mt-3 text-sm font-medium text-destructive">{error}</p>}
 
       <div className="mt-4 overflow-hidden rounded-xl border border-border/30">
         {state.status === "loading" ? (
@@ -198,44 +136,13 @@ export function AdminCustomersClient({ initialQuery }: { initialQuery: string })
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">ID: {shortId(customer.id)}</p>
                   </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="w-full sm:w-[160px]">
-                      <Select
-                        value={currentRole}
-                        onValueChange={(value) => confirmRoleChange(customer, value as "admin" | "user")}
-                        disabled={Boolean(savingId) && savingId === customer.id}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">user</SelectItem>
-                          <SelectItem value="admin">admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </div>
-
-      <AlertDialog open={Boolean(confirmChange)} onOpenChange={(open) => (!open ? setConfirmChange(null) : null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmChange?.label ?? "Confirm change"}</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmChange(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void commitRoleChange()} disabled={Boolean(savingId)}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
+

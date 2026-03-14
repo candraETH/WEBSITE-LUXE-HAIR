@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { getAppRoleFromMetadata } from "@/lib/roles"
 
 type AdminState = { status: "loading" } | { status: "denied" } | { status: "allowed" }
 
@@ -30,11 +29,9 @@ export function AdminClient() {
         return
       }
 
-      const metadataRole = getAppRoleFromMetadata(user.user_metadata)
       const { data: profile } = await client.from("profiles").select("role").eq("id", user.id).maybeSingle()
       const profileRoleRaw = typeof profile?.role === "string" ? profile.role : ""
-      const profileRole = profileRoleRaw.trim().toLowerCase() === "admin" ? "admin" : profileRoleRaw ? "user" : null
-      const role = profileRole ?? metadataRole
+      const role = profileRoleRaw.trim().toLowerCase() === "admin" ? "admin" : "user"
       setState({ status: role === "admin" ? "allowed" : "denied" })
     }
 

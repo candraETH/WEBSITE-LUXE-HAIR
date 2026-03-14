@@ -1,3 +1,5 @@
+import type { LoyaltyTierKey } from "@/lib/loyalty-tier"
+
 const WELCOME_COUPON_CODE = "WELCOME25"
 const WELCOME_COUPON_DISCOUNT_RATE = 0.25
 
@@ -14,6 +16,9 @@ export type CouponDefinition = {
   description: string
   discountRate: number
   minimumSubtotal: number
+  maxUsesTotal?: number | null
+  maxUsesPerCustomer?: number | null
+  minTierKey?: LoyaltyTierKey | null
 }
 
 const COUPON_MAP: Record<string, CouponDefinition> = {

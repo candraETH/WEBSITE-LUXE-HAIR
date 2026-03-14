@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
 import { supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
@@ -17,6 +18,12 @@ const updateRoleSchema = z.object({
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value : ""
+}
+
+function sanitizeOrFilterValue(value: string) {
+  // Supabase `.or()` uses a comma-separated filter string; strip separators and grouping chars
+  // to prevent filter injection via user-provided query text.
+  return value.replace(/[(),]/g, " ").replace(/[%_]/g, " ").trim()
 }
 
 function isMissingColumnError(message: string) {
@@ -43,7 +50,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid query." }, { status: 400 })
   }
 
-  const q = safeString(parsed.data.q).trim()
+  const q = sanitizeOrFilterValue(safeString(parsed.data.q).trim())
   const limit = parsed.data.limit ?? 50
 
   const selectWithEmail = "id,full_name,email,phone,role,created_at,updated_at"
@@ -78,7 +85,8 @@ export async function GET(request: Request) {
   const result = emailColumnAvailable ? attemptWithEmail : attemptWithoutEmail ?? attemptWithEmail
   const { data, error } = result
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Admin customers load failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to load customers.") }, { status: 500 })
   }
 
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>
@@ -129,7 +137,8 @@ export async function PATCH(request: Request) {
   const { userId, role } = parsed.data
   const { error } = await supabase.from("profiles").update({ role }).eq("id", userId)
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Admin customer role update failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to update customer role.") }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

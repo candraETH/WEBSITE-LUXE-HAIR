@@ -1,4 +1,5 @@
 import { ProductCatalogPage } from "@/components/product-catalog-page"
+import { JsonLd } from "@/components/json-ld"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { EXTENSIONS_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
@@ -47,8 +48,8 @@ export default function ExtensionsPage() {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <JsonLd data={faqSchema} />
+      <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={EXTENSIONS_PRODUCTS}
         filterTitle="Extension Types"

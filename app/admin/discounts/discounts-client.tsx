@@ -8,11 +8,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { getCouponByCode, listCoupons, normalizeCouponCode, type CouponDefinition } from "@/lib/coupon"
+import { LOYALTY_TIERS, type LoyaltyTierKey } from "@/lib/loyalty-tier"
 
 type DbCoupon = {
   code: string
@@ -20,6 +22,9 @@ type DbCoupon = {
   description: string
   discountRate: number
   minimumSubtotal: number
+  maxUsesTotal: number | null
+  maxUsesPerCustomer: number | null
+  minTierKey: LoyaltyTierKey | null
   active: boolean
   startsAt: string | null
   endsAt: string | null
@@ -83,6 +88,9 @@ export function AdminDiscountsClient() {
   const [description, setDescription] = useState("")
   const [discountPercent, setDiscountPercent] = useState("25")
   const [minimumSubtotal, setMinimumSubtotal] = useState("0")
+  const [maxUsesTotal, setMaxUsesTotal] = useState("")
+  const [maxUsesPerCustomer, setMaxUsesPerCustomer] = useState("")
+  const [minTierKey, setMinTierKey] = useState<LoyaltyTierKey | "all">("all")
   const [active, setActive] = useState(true)
   const [startsAt, setStartsAt] = useState("")
   const [endsAt, setEndsAt] = useState("")
@@ -122,6 +130,9 @@ export function AdminDiscountsClient() {
     setDescription("")
     setDiscountPercent("25")
     setMinimumSubtotal("0")
+    setMaxUsesTotal("")
+    setMaxUsesPerCustomer("")
+    setMinTierKey("all")
     setActive(true)
     setStartsAt("")
     setEndsAt("")
@@ -136,6 +147,9 @@ export function AdminDiscountsClient() {
     setDescription(coupon.description)
     setDiscountPercent(String(Math.round(coupon.discountRate * 100)))
     setMinimumSubtotal(String(coupon.minimumSubtotal))
+    setMaxUsesTotal(coupon.maxUsesTotal == null ? "" : String(coupon.maxUsesTotal))
+    setMaxUsesPerCustomer(coupon.maxUsesPerCustomer == null ? "" : String(coupon.maxUsesPerCustomer))
+    setMinTierKey(coupon.minTierKey ?? "all")
     setActive(coupon.active)
     setStartsAt(toDateTimeLocal(coupon.startsAt))
     setEndsAt(toDateTimeLocal(coupon.endsAt))
@@ -170,6 +184,32 @@ export function AdminDiscountsClient() {
       return
     }
 
+    const maxTotal = maxUsesTotal.trim() ? Number(maxUsesTotal) : null
+    if (maxTotal != null) {
+      if (!Number.isFinite(maxTotal) || maxTotal < 1) {
+        setFormError("Max total uses must be 1 or higher.")
+        return
+      }
+      if (!Number.isInteger(maxTotal)) {
+        setFormError("Max total uses must be a whole number.")
+        return
+      }
+    }
+
+    const maxPerCustomer = maxUsesPerCustomer.trim() ? Number(maxUsesPerCustomer) : null
+    if (maxPerCustomer != null) {
+      if (!Number.isFinite(maxPerCustomer) || maxPerCustomer < 1) {
+        setFormError("Max uses per customer must be 1 or higher.")
+        return
+      }
+      if (!Number.isInteger(maxPerCustomer)) {
+        setFormError("Max uses per customer must be a whole number.")
+        return
+      }
+    }
+
+    const normalizedMinTierKey = minTierKey === "all" ? null : (minTierKey as LoyaltyTierKey)
+
     const startsIso = fromDateTimeLocal(startsAt)
     const endsIso = fromDateTimeLocal(endsAt)
 
@@ -191,6 +231,9 @@ export function AdminDiscountsClient() {
           description: description.trim(),
           discountRate: rate,
           minimumSubtotal: min,
+          maxUsesTotal: maxTotal,
+          maxUsesPerCustomer: maxPerCustomer,
+          minTierKey: normalizedMinTierKey,
           active,
           startsAt: startsIso,
           endsAt: endsIso,
@@ -272,7 +315,10 @@ export function AdminDiscountsClient() {
         {!configured ? (
           <div className="mt-4 rounded-xl border border-border/30 bg-background/40 p-4 text-sm text-muted-foreground">
             Coupons database is not configured yet. Run the SQL file{" "}
-            <span className="font-medium text-foreground">supabase/sql/20260313_add_inventory_and_coupons.sql</span> in Supabase SQL Editor.
+            <span className="font-medium text-foreground">supabase/sql/20260313_add_inventory_and_coupons.sql</span>{" "}
+            (and then{" "}
+            <span className="font-medium text-foreground">supabase/sql/20260314_harden_coupons_limits_and_visibility.sql</span>
+            ) in Supabase SQL Editor.
           </div>
         ) : null}
 
@@ -303,6 +349,24 @@ export function AdminDiscountsClient() {
                       <span className="rounded-full border border-border bg-background px-3 py-1">
                         Min subtotal: <span className="font-semibold text-foreground">${coupon.minimumSubtotal.toFixed(0)}</span>
                       </span>
+                      {coupon.minTierKey ? (
+                        <span className="rounded-full border border-border bg-background px-3 py-1">
+                          Min tier:{" "}
+                          <span className="font-semibold text-foreground">
+                            {LOYALTY_TIERS.find((tier) => tier.key === coupon.minTierKey)?.name ?? coupon.minTierKey}
+                          </span>
+                        </span>
+                      ) : null}
+                      {coupon.maxUsesTotal != null ? (
+                        <span className="rounded-full border border-border bg-background px-3 py-1">
+                          Max uses: <span className="font-semibold text-foreground">{coupon.maxUsesTotal}</span>
+                        </span>
+                      ) : null}
+                      {coupon.maxUsesPerCustomer != null ? (
+                        <span className="rounded-full border border-border bg-background px-3 py-1">
+                          Max/customer: <span className="font-semibold text-foreground">{coupon.maxUsesPerCustomer}</span>
+                        </span>
+                      ) : null}
                       {coupon.startsAt ? (
                         <span className="rounded-full border border-border bg-background px-3 py-1">
                           Starts: <span className="font-semibold text-foreground">{formatDateTime(coupon.startsAt)}</span>
@@ -401,6 +465,43 @@ export function AdminDiscountsClient() {
               </div>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Max uses (optional)</p>
+                <Input
+                  inputMode="numeric"
+                  value={maxUsesTotal}
+                  onChange={(e) => setMaxUsesTotal(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="Unlimited"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Max/customer (optional)</p>
+                <Input
+                  inputMode="numeric"
+                  value={maxUsesPerCustomer}
+                  onChange={(e) => setMaxUsesPerCustomer(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="Unlimited"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Minimum tier (optional)</p>
+                <Select value={minTierKey} onValueChange={(value) => setMinTierKey(value as LoyaltyTierKey | "all")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All tiers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All tiers</SelectItem>
+                    {LOYALTY_TIERS.map((tier) => (
+                      <SelectItem key={tier.key} value={tier.key}>
+                        {tier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Starts at (optional)</p>
@@ -480,4 +581,3 @@ function BuiltInCouponRow({ coupon }: { coupon: CouponDefinition }) {
     </div>
   )
 }
-

@@ -7,32 +7,77 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-const COUNTRY_CALLING_CODES: Array<{ label: string; value: string }> = [
-  { label: "Indonesia (+62)", value: "+62" },
-  { label: "United States (+1)", value: "+1" },
-  { label: "United Kingdom (+44)", value: "+44" },
-  { label: "Australia (+61)", value: "+61" },
-  { label: "Singapore (+65)", value: "+65" },
-  { label: "Malaysia (+60)", value: "+60" },
-  { label: "Philippines (+63)", value: "+63" },
-  { label: "Thailand (+66)", value: "+66" },
-  { label: "Vietnam (+84)", value: "+84" },
-  { label: "India (+91)", value: "+91" },
-  { label: "China (+86)", value: "+86" },
-  { label: "Japan (+81)", value: "+81" },
-  { label: "South Korea (+82)", value: "+82" },
-  { label: "United Arab Emirates (+971)", value: "+971" },
-  { label: "Saudi Arabia (+966)", value: "+966" },
-  { label: "Germany (+49)", value: "+49" },
-  { label: "France (+33)", value: "+33" },
-  { label: "Netherlands (+31)", value: "+31" },
-  { label: "Brazil (+55)", value: "+55" },
+const COUNTRY_CALLING_CODES: Array<{ country: string; dial: string }> = [
+  { country: "Afghanistan", dial: "+93" },
+  { country: "Albania", dial: "+355" },
+  { country: "Algeria", dial: "+213" },
+  { country: "Argentina", dial: "+54" },
+  { country: "Australia", dial: "+61" },
+  { country: "Austria", dial: "+43" },
+  { country: "Bangladesh", dial: "+880" },
+  { country: "Belgium", dial: "+32" },
+  { country: "Brazil", dial: "+55" },
+  { country: "Cambodia", dial: "+855" },
+  { country: "Canada", dial: "+1" },
+  { country: "Chile", dial: "+56" },
+  { country: "China", dial: "+86" },
+  { country: "Colombia", dial: "+57" },
+  { country: "Czech Republic", dial: "+420" },
+  { country: "Denmark", dial: "+45" },
+  { country: "Egypt", dial: "+20" },
+  { country: "Finland", dial: "+358" },
+  { country: "France", dial: "+33" },
+  { country: "Germany", dial: "+49" },
+  { country: "Ghana", dial: "+233" },
+  { country: "Greece", dial: "+30" },
+  { country: "Hong Kong", dial: "+852" },
+  { country: "Hungary", dial: "+36" },
+  { country: "India", dial: "+91" },
+  { country: "Indonesia", dial: "+62" },
+  { country: "Ireland", dial: "+353" },
+  { country: "Israel", dial: "+972" },
+  { country: "Italy", dial: "+39" },
+  { country: "Japan", dial: "+81" },
+  { country: "Kenya", dial: "+254" },
+  { country: "Laos", dial: "+856" },
+  { country: "Malaysia", dial: "+60" },
+  { country: "Mexico", dial: "+52" },
+  { country: "Morocco", dial: "+212" },
+  { country: "Myanmar", dial: "+95" },
+  { country: "Nepal", dial: "+977" },
+  { country: "Netherlands", dial: "+31" },
+  { country: "New Zealand", dial: "+64" },
+  { country: "Nigeria", dial: "+234" },
+  { country: "Norway", dial: "+47" },
+  { country: "Pakistan", dial: "+92" },
+  { country: "Peru", dial: "+51" },
+  { country: "Philippines", dial: "+63" },
+  { country: "Poland", dial: "+48" },
+  { country: "Portugal", dial: "+351" },
+  { country: "Romania", dial: "+40" },
+  { country: "Russia", dial: "+7" },
+  { country: "Saudi Arabia", dial: "+966" },
+  { country: "Singapore", dial: "+65" },
+  { country: "South Africa", dial: "+27" },
+  { country: "South Korea", dial: "+82" },
+  { country: "Spain", dial: "+34" },
+  { country: "Sri Lanka", dial: "+94" },
+  { country: "Sweden", dial: "+46" },
+  { country: "Switzerland", dial: "+41" },
+  { country: "Taiwan", dial: "+886" },
+  { country: "Thailand", dial: "+66" },
+  { country: "Tunisia", dial: "+216" },
+  { country: "Turkey", dial: "+90" },
+  { country: "Ukraine", dial: "+380" },
+  { country: "United Arab Emirates", dial: "+971" },
+  { country: "United Kingdom", dial: "+44" },
+  { country: "United States", dial: "+1" },
+  { country: "Vietnam", dial: "+84" },
 ]
 
 function getPasswordStrength(password: string): { score: number; label: string; barClassName: string } {
@@ -145,7 +190,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
           data: {
             full_name: values.fullName,
             phone,
-            role: "user",
           },
         },
       })
@@ -217,23 +261,30 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                 <FormItem className="sm:col-span-2">
                   <FormLabel>Phone number</FormLabel>
                   <div className="flex overflow-hidden rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-                    <div className="w-[92px] shrink-0 border-r border-input">
+                    <div className="w-[104px] shrink-0 border-r border-input">
                       <FormControl>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="w-full rounded-none border-0 bg-transparent px-3 py-2 focus:ring-0 focus:ring-offset-0">
-                            <span className={field.value ? "text-foreground" : "text-muted-foreground"}>
-                              {field.value || "Code"}
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COUNTRY_CALLING_CODES.map((code) => (
-                              <SelectItem key={`${code.label}-${code.value}`} value={code.value}>
-                                {code.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel-country-code"
+                          placeholder="Code"
+                          list="country-calling-codes"
+                          className="w-full rounded-none border-0 bg-transparent px-3 py-2 text-center text-sm tabular-nums focus-visible:ring-0 focus-visible:ring-offset-0"
+                          {...field}
+                          onChange={(event) => {
+                            const raw = event.target.value
+                            const digitsOnly = raw.replace(/\D/g, "").slice(0, 4)
+                            field.onChange(digitsOnly ? `+${digitsOnly}` : "")
+                          }}
+                        />
                       </FormControl>
+                      <datalist id="country-calling-codes">
+                        {COUNTRY_CALLING_CODES.map((entry) => (
+                          <option key={`${entry.country}-${entry.dial}`} value={entry.dial}>
+                            {entry.country}
+                          </option>
+                        ))}
+                      </datalist>
                     </div>
 
                     <div className="flex-1">
@@ -259,7 +310,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                     </div>
                   </div>
 
-                  <FormDescription className="text-xs">Digits only. Select your country code first.</FormDescription>
+                  <FormDescription className="text-xs">Digits only. Enter your country code first.</FormDescription>
 
                   {(form.formState.errors.phoneCountryCode?.message || form.formState.errors.phoneNumber?.message) && (
                     <div className="space-y-1">

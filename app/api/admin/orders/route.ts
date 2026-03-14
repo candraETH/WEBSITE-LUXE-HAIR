@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logServerError, publicErrorMessage } from "@/lib/api-errors"
+import { getTierForSpend } from "@/lib/loyalty-tier"
 import { supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
@@ -22,6 +24,12 @@ function safeString(value: unknown) {
   return typeof value === "string" ? value : ""
 }
 
+function sanitizeOrFilterValue(value: string) {
+  // Supabase `.or()` uses a comma-separated filter string; strip separators and grouping chars
+  // to prevent filter injection via user-provided query text.
+  return value.replace(/[(),]/g, " ").replace(/[%_]/g, " ").trim()
+}
+
 function normalizeStatus(value: string | undefined) {
   const raw = (value ?? "").trim()
   if (!raw) return ""
@@ -41,6 +49,29 @@ function buildOrdersQuery(selectClause: string, limit: number) {
   return supabase.from("orders").select(selectClause).limit(limit)
 }
 
+const PAID_STATUSES = ["PAID", "PROCESSING", "SHIPPED", "DELIVERED", "COMPLETED"] as const
+const PAID_STATUSES_SET = new Set(PAID_STATUSES)
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function asNumber(value: unknown) {
+  const num = typeof value === "number" ? value : Number(value ?? NaN)
+  return Number.isFinite(num) ? num : 0
+}
+
+function normalizeRowStatus(value: unknown) {
+  return typeof value === "string" ? value.trim().toUpperCase() : ""
+}
+
+function shouldCountUsd(currency: unknown) {
+  if (typeof currency !== "string") return true
+  const trimmed = currency.trim()
+  if (!trimmed) return true
+  return trimmed.toUpperCase() === "USD"
+}
+
 export async function GET(request: Request) {
   const auth = await requireAdmin(request)
   if (!auth.ok) {
@@ -57,7 +88,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid query." }, { status: 400 })
   }
 
-  const q = safeString(parsed.data.q).trim()
+  const q = sanitizeOrFilterValue(safeString(parsed.data.q).trim())
   const status = normalizeStatus(parsed.data.status)
   const limit = parsed.data.limit ?? 50
 
@@ -82,11 +113,12 @@ export async function GET(request: Request) {
     ordered.error && isMissingColumnError(ordered.error.message) ? await filteredQuery : ordered
 
   if (result.error) {
-    return NextResponse.json({ error: result.error.message }, { status: 500 })
+    logServerError("Admin orders list failed:", result.error)
+    return NextResponse.json({ error: publicErrorMessage(result.error, "Unable to load orders.") }, { status: 500 })
   }
 
   const rows = (result.data ?? []) as unknown as Array<Record<string, unknown>>
-  const orders = rows.map((row) => ({
+  const baseOrders = rows.map((row) => ({
     orderId: safeString(row["paypal_order_id"]).trim(),
     status: safeString(row["status"]).trim() || "UNKNOWN",
     amount: typeof row["amount"] === "number" ? row["amount"] : Number(row["amount"] ?? 0),
@@ -98,6 +130,49 @@ export async function GET(request: Request) {
     createdAt: safeString(row["created_at"]).trim() || null,
     updatedAt: safeString(row["updated_at"]).trim() || null,
   }))
+
+  const emailsForQuery = Array.from(
+    new Set(
+      baseOrders
+        .map((order) => normalizeEmail(safeString(order.customerEmail)))
+        .filter((email) => Boolean(email))
+    )
+  )
+
+  const totalsByEmail = new Map<string, number>()
+
+  if (emailsForQuery.length) {
+    const { data: loyaltyRows, error: loyaltyError } = await supabase
+      .from("orders")
+      .select("customer_email,amount,status,currency")
+      .in("customer_email", emailsForQuery)
+      .limit(10000)
+
+    if (loyaltyError) {
+      logServerError("Admin orders tier calculation failed:", loyaltyError)
+    } else {
+      for (const row of (loyaltyRows ?? []) as unknown as Array<Record<string, unknown>>) {
+        const status = normalizeRowStatus(row["status"])
+        if (!PAID_STATUSES_SET.has(status as (typeof PAID_STATUSES)[number])) continue
+
+        const email = normalizeEmail(safeString(row["customer_email"]))
+        if (!email) continue
+        if (!shouldCountUsd(row["currency"])) continue
+        totalsByEmail.set(email, (totalsByEmail.get(email) ?? 0) + asNumber(row["amount"]))
+      }
+    }
+  }
+
+  const orders = baseOrders.map((order) => {
+    const total = totalsByEmail.get(normalizeEmail(order.customerEmail)) ?? 0
+    const tier = getTierForSpend(total)
+
+    return {
+      ...order,
+      customerTierKey: tier.key,
+      customerTierName: tier.name,
+    }
+  })
 
   return NextResponse.json({ orders })
 }
@@ -132,7 +207,8 @@ export async function PATCH(request: Request) {
 
   const { error } = await supabase.from("orders").update(updatePayload).eq("paypal_order_id", orderId)
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    logServerError("Admin order update failed:", error)
+    return NextResponse.json({ error: publicErrorMessage(error, "Unable to update order.") }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

@@ -13,6 +13,7 @@ import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import type { Metadata } from "next"
 import { buildPageMetadata, getSiteUrl } from "@/lib/seo"
+import { JsonLd } from "@/components/json-ld"
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Premium Hair Extensions, Wigs & More",
@@ -47,14 +48,8 @@ export default function Page() {
 
   return (
     <main>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-      />
+      <JsonLd data={websiteSchema} />
+      <JsonLd data={organizationSchema} />
       <Navbar />
       <Hero />
       <CategoryBanner />
