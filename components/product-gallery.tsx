@@ -77,7 +77,6 @@ export default function ProductGallery({
                     src={src}
                     alt={alt ?? `Image ${i + 1}`}
                     fill
-                    unoptimized
                     sizes="(max-width: 768px) 100vw, 50vw"
                     className={cn(
                       "transition-transform duration-700 ease-out hover:scale-110",
@@ -141,7 +140,6 @@ export default function ProductGallery({
                   src={src}
                   alt={alt ?? `Thumb ${i + 1}`}
                   fill
-                  unoptimized
                   className={useContainFit ? "object-contain p-1" : "object-cover"}
                 />
               </button>

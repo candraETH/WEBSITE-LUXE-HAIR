@@ -481,7 +481,6 @@ export function Navbar() {
                             sizes="380px"
                             width={700}
                             height={700}
-                            unoptimized
                             className={`h-full w-full ${
                               link.label === "Bundles"
                                 ? "object-cover scale-[1.12] transition-transform duration-300 group-hover:scale-[1.16]"
@@ -815,7 +814,6 @@ export function Navbar() {
               src={previewLightbox.src}
               alt={previewLightbox.alt}
               fill
-              unoptimized
               sizes="100vw"
               className="object-contain"
               priority

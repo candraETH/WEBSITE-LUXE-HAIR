@@ -917,7 +917,6 @@ export default function OrderPage({ params }: PageProps) {
                           src={imageSrc}
                           alt={`${product.name} thumbnail ${index + 1}`}
                           fill
-                          unoptimized
                           sizes="74px"
                           className="object-contain object-center p-0.5"
                         />
@@ -939,7 +938,6 @@ export default function OrderPage({ params }: PageProps) {
                   src={activeImageSrc}
                   alt={product.name}
                   fill
-                  unoptimized
                   sizes="(max-width: 1024px) 100vw, 42vw"
                   style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}
                   className={`object-contain object-center p-1 transition-transform duration-200 ease-out sm:p-2 ${
@@ -1067,7 +1065,6 @@ export default function OrderPage({ params }: PageProps) {
                   src={activeImageSrc}
                   alt={`${product.name} full preview`}
                   fill
-                  unoptimized
                   sizes="100vw"
                   className="object-contain"
                   priority
@@ -1123,7 +1120,6 @@ export default function OrderPage({ params }: PageProps) {
                         src={item.image}
                         alt={item.name}
                         fill
-                        unoptimized
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                       />

@@ -39,7 +39,6 @@ export function ProductCard({ name, slug, price, image, images, category, descri
                 src={image ?? ""}
                 alt={name}
                 fill
-                unoptimized
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 className={`transition-transform duration-700 ${isHovered ? "scale-110" : "scale-100"} ${isVirginStraightBulk ? "object-contain p-2" : "object-cover"}`}
               />

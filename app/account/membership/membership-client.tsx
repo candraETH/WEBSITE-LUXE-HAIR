@@ -6,6 +6,7 @@ import { BookOpen } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import { TierIcon } from "@/components/loyalty/tier-icon"
 import { TierBadge } from "@/components/loyalty/tier-badge"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -138,7 +139,42 @@ export function MembershipClient() {
       </div>
 
       {state.status === "loading" ? (
-        <div className="rounded-xl border border-border/30 bg-background/40 p-4 text-sm text-muted-foreground">Loading...</div>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-52" />
+              </div>
+              <Skeleton className="h-8 w-24" />
+            </div>
+            <Skeleton className="mt-4 h-2.5 w-full" />
+            <div className="mt-3 flex items-center justify-between">
+              <Skeleton className="h-3 w-10" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="mt-2 h-4 w-72" />
+            <Skeleton className="mt-4 h-2.5 w-full" />
+          </div>
+
+          <div className="grid snap-x snap-mandatory grid-flow-col auto-cols-[minmax(170px,170px)] gap-3 overflow-x-auto pb-2 sm:snap-none sm:grid-flow-row sm:auto-cols-auto sm:overflow-visible sm:pb-0 sm:grid-cols-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="relative w-[170px] shrink-0 snap-start rounded-2xl border border-border/25 bg-background/40 px-3 pb-3 pt-6 sm:w-auto sm:shrink sm:snap-none"
+              >
+                <Skeleton className="mx-auto h-10 w-10 rounded-full" />
+                <Skeleton className="mx-auto mt-3 h-4 w-20" />
+              </div>
+            ))}
+          </div>
+
+          <Skeleton className="h-7 w-44" />
+        </div>
       ) : state.status === "signed_out" ? (
         <div className="rounded-xl border border-border/30 bg-background/40 p-4 text-sm text-muted-foreground">
           You are not signed in.{" "}

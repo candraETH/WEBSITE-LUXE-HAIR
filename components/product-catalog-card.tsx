@@ -22,7 +22,6 @@ export function ProductCatalogCard({ product }: ProductCatalogCardProps) {
               src={primaryImage}
               alt={product.name}
               fill
-              unoptimized
               sizes="(max-width: 640px) 100vw, (max-width: 1200px) 33vw, 25vw"
               className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             />

@@ -7,6 +7,7 @@ import { Package } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
 
@@ -187,7 +188,52 @@ export function OrdersClient() {
   }
 
   if (state.status === "loading") {
-    return <div className="rounded-xl border border-border/30 bg-background/40 p-4 text-sm text-muted-foreground">Loading...</div>
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-4 w-56" />
+          </div>
+          <Skeleton className="h-10 w-44" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="rounded-2xl border border-border/30 bg-card/60 p-4 shadow-sm">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="mt-2 h-7 w-16" />
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-4 w-full max-w-[360px]" />
+                  <Skeleton className="h-4 w-full max-w-[280px]" />
+                </div>
+                <div className="rounded-xl border border-border/30 bg-background/30 p-4 sm:text-right">
+                  <Skeleton className="h-3 w-16 sm:ml-auto" />
+                  <Skeleton className="mt-2 h-6 w-24 sm:ml-auto" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:justify-end">
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (state.status === "signed_out") {
