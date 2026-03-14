@@ -173,6 +173,7 @@ export function Navbar() {
   const desktopCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { getTotalItems } = useCart()
   const totalItems = getTotalItems()
+  const accountDesktopWidthClass = "w-[228px]"
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient()
@@ -389,7 +390,7 @@ export function Navbar() {
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="promo-marquee border-b border-[#3a2e20] bg-[#1f1810] text-[#f6ddb3]">
-        <div className="promo-marquee-track flex w-max min-w-full items-center py-1.5">
+        <div className="promo-marquee-track flex h-7 w-max min-w-full items-center">
           {Array.from({ length: 12 }).map((_, index) => (
             <span
               key={`promo-${index}`}
@@ -570,56 +571,71 @@ export function Navbar() {
             )}
           </Link>
 
-          {authState.status === "signed_in" ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
-                  aria-label="Open account menu"
-                  title="Account"
-                >
-                  <UserRound size={18} strokeWidth={1.8} />
-                  <span className="flex items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
-                    <span
-                      className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} max-w-[96px] truncate`}
-                    >
-                      {accountLabel?.firstName || "Account"}
+          <div className={`${accountDesktopWidthClass} shrink-0`}>
+            {authState.status === "loading" ? (
+              <div
+                className="flex w-full items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground opacity-90"
+                aria-hidden="true"
+              >
+                <UserRound size={18} strokeWidth={1.8} />
+                <span className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
+                  <span className="h-3 w-20 rounded bg-muted/70" />
+                  <span className="h-4 w-12 rounded bg-muted/70" />
+                </span>
+              </div>
+            ) : authState.status === "signed_in" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
+                    aria-label="Open account menu"
+                    title="Account"
+                  >
+                    <UserRound size={18} strokeWidth={1.8} />
+                    <span className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
+                      <span
+                        className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} min-w-0 max-w-[96px] truncate`}
+                      >
+                        {accountLabel?.firstName || "Account"}
+                      </span>
+                      {accountLabel?.tierKey && accountLabel.tierName ? (
+                        <TierBadge
+                          tier={accountLabel.tierKey}
+                          label={accountLabel.tierName}
+                          className="shrink-0 px-2 py-0.5 text-[10px] shadow-none"
+                        />
+                      ) : (
+                        <span className="h-[18px] w-[52px] shrink-0 opacity-0" aria-hidden="true" />
+                      )}
                     </span>
-                    {accountLabel?.tierKey && accountLabel.tierName ? (
-                      <TierBadge
-                        tier={accountLabel.tierKey}
-                        label={accountLabel.tierName}
-                        className="px-2 py-0.5 text-[10px] shadow-none"
-                      />
-                    ) : null}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuItem onSelect={() => router.push("/account/profile")}>My account</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void handleSignOut()}>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
-                  aria-label="Open account menu"
-                  title="Register / Login"
-                >
-                  <UserRound size={18} strokeWidth={1.8} />
-                  Register
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuItem onSelect={() => router.push("/register")}>Create account</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push("/login")}>Sign in</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onSelect={() => router.push("/account/profile")}>My account</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleSignOut()}>Sign out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
+                    aria-label="Open account menu"
+                    title="Register / Login"
+                  >
+                    <UserRound size={18} strokeWidth={1.8} />
+                    Register
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onSelect={() => router.push("/register")}>Create account</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push("/login")}>Sign in</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-1 md:hidden">

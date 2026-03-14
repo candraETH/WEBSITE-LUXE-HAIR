@@ -10,11 +10,17 @@ import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from '@/lib/seo'
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: "swap",
+  adjustFontFallback: true,
+  fallback: ["system-ui", "Segoe UI", "Arial", "sans-serif"],
 })
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
+  display: "swap",
+  adjustFontFallback: true,
+  fallback: ["Georgia", "Times New Roman", "serif"],
 })
 
 export const metadata: Metadata = {
