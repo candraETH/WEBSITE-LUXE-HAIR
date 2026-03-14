@@ -7,6 +7,8 @@ import './globals.css'
 import { Providers } from './providers'
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from '@/lib/seo'
 
+export const dynamic = "force-dynamic"
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
