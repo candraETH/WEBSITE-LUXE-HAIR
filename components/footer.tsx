@@ -1,9 +1,16 @@
+"use client"
+
 import Image from "next/image"
 import Link from "next/link"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
+import { withLocaleHref } from "@/lib/i18n"
+import { getMessages } from "@/lib/messages"
+import { useLocale } from "@/context/LocaleContext"
 
 export function Footer() {
-  const whatsappMessage = "Hi, I'm interested in your hair products"
+  const { locale } = useLocale()
+  const messages = getMessages(locale)
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
 
   return (
     <footer className="border-t border-border bg-card">
@@ -11,7 +18,7 @@ export function Footer() {
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <Link href="/#home" className="flex items-center gap-2 font-serif text-2xl font-bold tracking-wider text-foreground">
+            <Link href={localizedHref("/#home")} className="flex items-center gap-2 font-serif text-2xl font-bold tracking-wider text-foreground">
               <Image
                 src="/images/logo-mark.png"
                 alt="Candra's Hair logo"
@@ -22,22 +29,21 @@ export function Footer() {
               <span>CANDRA&apos;S HAIR</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Premium quality hair extensions, wigs, and more. Elevate your
-              natural beauty with our luxurious collection.
+              {messages.footer.brandDescription}
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
-              Collections
+              {messages.footer.collectionsHeading}
             </h4>
             <ul className="flex flex-col gap-3">
               {[
-                { label: "Hair Extensions", href: "#extensions" },
-                { label: "Wigs", href: "#wigs" },
-                { label: "Bundles", href: "#weft" },
-                { label: "Bulk Hair", href: "#bulk" },
+                { label: messages.footer.collections.extensions, href: "#extensions" },
+                { label: messages.footer.collections.wigs, href: "#wigs" },
+                { label: messages.footer.collections.bundles, href: "#weft" },
+                { label: messages.footer.collections.bulk, href: "#bulk" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -54,39 +60,39 @@ export function Footer() {
           {/* Company */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
-              Company
+              {messages.footer.companyHeading}
             </h4>
             <ul className="flex flex-col gap-3">
               <li>
                 <Link
-                  href="/#about"
+                  href={localizedHref("/#about")}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  About Us
+                  {messages.footer.company.about}
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/#testimonials"
+                  href={localizedHref("/#testimonials")}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Testimonials
+                  {messages.footer.company.testimonials}
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/track-order"
+                  href={localizedHref("/track-order")}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Track Order
+                  {messages.footer.company.trackOrder}
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/return-policy"
+                  href={localizedHref("/return-policy")}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Return Policy
+                  {messages.footer.company.returnPolicy}
                 </Link>
               </li>
             </ul>
@@ -95,16 +101,16 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
-              Contact
+              {messages.footer.contactHeading}
             </h4>
             <ul className="flex flex-col gap-3">
               <li>
                 <a
-                  href={getWhatsAppHref(whatsappMessage)}
+                  href={getWhatsAppHref(messages.footer.whatsappMessage)}
                   target={WHATSAPP_ENABLED ? "_blank" : undefined}
                   rel={WHATSAPP_ENABLED ? "noopener noreferrer" : undefined}
                   aria-disabled={!WHATSAPP_ENABLED}
-                  title={!WHATSAPP_ENABLED ? "WhatsApp is temporarily unavailable" : undefined}
+                  title={!WHATSAPP_ENABLED ? messages.footer.whatsappUnavailableTitle : undefined}
                   className={`flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground ${
                     !WHATSAPP_ENABLED ? "pointer-events-none cursor-not-allowed opacity-55" : ""
                   }`}
@@ -140,7 +146,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-16 border-t border-border pt-8 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} CANDRA&apos;S HAIR. All rights reserved.
+            &copy; {new Date().getFullYear()} CANDRA&apos;S HAIR. {messages.footer.rightsReserved}
           </p>
         </div>
       </div>

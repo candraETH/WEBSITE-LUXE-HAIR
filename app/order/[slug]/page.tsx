@@ -2,17 +2,20 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { use, useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
+import { use, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { Navbar } from "@/components/navbar"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
+import { useLocale } from "@/context/LocaleContext"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { addToWishlist } from "@/lib/wishlist"
 import { testimonialsCount } from "@/lib/testimonials-data"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
 import { applyProductDiscount, formatUsdPrice, getDiscountedPriceLabel } from "@/lib/pricing"
+import { getProductDisplayCopy } from "@/lib/product-copy"
+import { withLocaleHref, type SupportedLocale } from "@/lib/i18n"
 
 type ProductColor = {
   code: string
@@ -326,7 +329,7 @@ const allProducts: ProductItem[] = [
       "#ash": "/images/images2.png",
     },
     colors: [
-      { code: "#ash", label: "Ash", hex: "#b8b8b8" },
+      { code: "#ash", label: "grey", hex: "#b8b8b8" },
       { code: "#60", label: "Light Blonde", hex: "#f5e6d3" },
       { code: "#613", label: "Gold Blonde", hex: "#f4d49e" },
       { code: "#24", label: "Medium Ash", hex: "#c9b5a0" },
@@ -376,7 +379,7 @@ const allProducts: ProductItem[] = [
 ]
 
 const DEFAULT_HAIR_COLORS = [
-  { code: "#ash", label: "Ash", hex: "#b8b8b8" },
+  { code: "#ash", label: "grey", hex: "#b8b8b8" },
   { code: "#60", label: "Light Blonde", hex: "#f5e6d3" },
   { code: "#613", label: "Gold Blonde", hex: "#f4d49e" },
   { code: "#24", label: "Medium Ash", hex: "#c9b5a0" },
@@ -458,12 +461,23 @@ interface PageProps {
 
 export default function OrderPage({ params }: PageProps) {
   const router = useRouter()
+  const { locale } = useLocale()
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
   const { slug } = use(params)
   const product = allProducts.find((p) => p.slug === slug)
+  const productCopy = product ? getProductDisplayCopy(product, locale) : null
   const suggestedScrollRef = useRef<HTMLDivElement | null>(null)
   const thumbnailRailRef = useRef<HTMLDivElement | null>(null)
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([])
   const mainImageFrameRef = useRef<HTMLDivElement | null>(null)
+  const gallerySwipeStartRef = useRef<{
+    x: number
+    y: number
+    moved: boolean
+    pointerId: number
+    pointerType: "mouse" | "touch" | "pen" | string
+  } | null>(null)
+  const ignoreNextLightboxClickRef = useRef(false)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [backToShopHref, setBackToShopHref] = useState("/")
@@ -497,6 +511,23 @@ export default function OrderPage({ params }: PageProps) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!product?.slug) return
+    if (typeof window === "undefined") return
+
+    const storageKey = `product-viewed:${product.slug}`
+    if (window.sessionStorage.getItem(storageKey)) {
+      return
+    }
+
+    window.sessionStorage.setItem(storageKey, "1")
+    fetch("/api/analytics/product-view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: product.slug }),
+    }).catch(() => {})
+  }, [product?.slug])
+
   const handleBackToShopClick = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
     if (window.history.length > 1) {
@@ -509,22 +540,26 @@ export default function OrderPage({ params }: PageProps) {
   const isVirginStraightBulk = product?.slug === "virgin-straight-bulk"
   const colorImageFolder = product?.colorImageFolder
   const colorImageMap = product?.colorImageMap
-  const resolvedColorImageMap = useMemo(() => {
+  const [availableColorImageMap, setAvailableColorImageMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
     if (!product) {
-      return {}
+      setAvailableColorImageMap({})
+      return
     }
 
-    const map: Record<string, string> = {}
+    let mounted = true
+    const resolvedMap: Record<string, string> = {}
 
     for (const [code, src] of Object.entries(colorImageMap ?? {})) {
-      map[code.toLowerCase()] = src
+      resolvedMap[code.toLowerCase()] = src
     }
 
     if (isVirginStraightBulk || colorImageFolder) {
       const colorList = product.colors ?? DEFAULT_HAIR_COLORS
       for (const color of colorList) {
         const normalizedCode = (color.code ?? "").toLowerCase()
-        if (!normalizedCode || map[normalizedCode]) {
+        if (!normalizedCode || resolvedMap[normalizedCode]) {
           continue
         }
 
@@ -537,26 +572,15 @@ export default function OrderPage({ params }: PageProps) {
         }
 
         if (colorImageFolder) {
-          map[normalizedCode] = `${colorImageFolder}/${fileKey}.png`
+          resolvedMap[normalizedCode] = `${colorImageFolder}/${fileKey}.png`
           continue
         }
 
-        map[normalizedCode] = `/images/${fileKey}.png`
+        resolvedMap[normalizedCode] = `/images/${fileKey}.png`
       }
     }
 
-    return map
-  }, [colorImageFolder, colorImageMap, isVirginStraightBulk, product])
-  const [availableColorImageMap, setAvailableColorImageMap] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (!product) {
-      setAvailableColorImageMap({})
-      return
-    }
-
-    let mounted = true
-    const entries = Object.entries(resolvedColorImageMap)
+    const entries = Object.entries(resolvedMap)
 
     if (entries.length === 0) {
       setAvailableColorImageMap({})
@@ -596,7 +620,7 @@ export default function OrderPage({ params }: PageProps) {
     return () => {
       mounted = false
     }
-  }, [product, resolvedColorImageMap])
+  }, [colorImageFolder, colorImageMap, isVirginStraightBulk, product])
 
   const galleryImages = useMemo(() => {
     if (!product) {
@@ -616,13 +640,14 @@ export default function OrderPage({ params }: PageProps) {
 
     const hairOnlyImages = galleryImages.filter((src) => !src.toLowerCase().includes("/model"))
     const textureImages = hairOnlyImages.length > 0 ? hairOnlyImages : galleryImages
+    const fallbackName = getProductDisplayCopy(product, locale).name
 
     return textureImages.map((imageSrc) => ({
       key: imageSrc,
       image: imageSrc,
-      label: formatTextureLabel(imageSrc, product.name),
+      label: formatTextureLabel(imageSrc, fallbackName),
     }))
-  }, [galleryImages, product])
+  }, [galleryImages, locale, product])
 
   const activeTextureOption = useMemo(() => {
     if (textureOptions.length === 0) {
@@ -741,6 +766,100 @@ export default function OrderPage({ params }: PageProps) {
     setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
   }
 
+  const handleGalleryPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (galleryImages.length <= 1) {
+      return
+    }
+
+    const target = event.target as HTMLElement | null
+    if (target?.closest("button,a,input,select,textarea,label")) {
+      return
+    }
+
+    const isTouchLike = event.pointerType === "touch" || event.pointerType === "pen"
+    const isMouseLike = event.pointerType === "mouse" && event.button === 0
+    if (!isTouchLike && !isMouseLike) {
+      return
+    }
+
+    ignoreNextLightboxClickRef.current = false
+    gallerySwipeStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+    }
+
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleGalleryPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const start = gallerySwipeStartRef.current
+    if (!start) {
+      return
+    }
+    if (start.pointerId !== event.pointerId) {
+      return
+    }
+
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+    if (!start.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      start.moved = true
+      gallerySwipeStartRef.current = start
+    }
+    if (start.moved && start.pointerType === "mouse") {
+      event.preventDefault()
+    }
+  }
+
+  const handleGalleryPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const start = gallerySwipeStartRef.current
+    gallerySwipeStartRef.current = null
+    if (!start) {
+      return
+    }
+    if (start.pointerId !== event.pointerId) {
+      return
+    }
+
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+
+    const absX = Math.abs(dx)
+    const absY = Math.abs(dy)
+    const isHorizontalSwipe = absX >= 48 && absX > absY * 1.2 && absY <= 90
+
+    if (isHorizontalSwipe) {
+      ignoreNextLightboxClickRef.current = true
+      if (dx > 0) {
+        goToPrevImage()
+      } else {
+        goToNextImage()
+      }
+    }
+  }
+
+  const handleGalleryPointerCancel = (event: PointerEvent<HTMLDivElement>) => {
+    const start = gallerySwipeStartRef.current
+    if (start?.pointerId === event.pointerId) {
+      gallerySwipeStartRef.current = null
+    }
+  }
+
+  const handleMainImageClick = () => {
+    if (ignoreNextLightboxClickRef.current) {
+      ignoreNextLightboxClickRef.current = false
+      return
+    }
+    setIsImageLightboxOpen(true)
+  }
+
   const handleMainImageMouseMove = (event: MouseEvent<HTMLDivElement>) => {
     const frame = mainImageFrameRef.current
     if (!frame) {
@@ -801,7 +920,7 @@ export default function OrderPage({ params }: PageProps) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isImageLightboxOpen, galleryImages.length])
 
-  const categoryHref = useMemo(() => {
+  const categoryHref = (() => {
     if (!product) {
       return "/"
     }
@@ -820,20 +939,26 @@ export default function OrderPage({ params }: PageProps) {
     }
 
     return "/"
-  }, [product])
+  })()
 
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
         <div className="flex flex-col items-center justify-center px-6 py-24">
-          <h1 className="mb-4 text-3xl font-serif font-bold">Product Not Found</h1>
-          <p className="mb-8 text-muted-foreground">The product you&apos;re looking for doesn&apos;t exist.</p>
-          <Link href={backToShopHref} onClick={handleBackToShopClick}>
+          <h1 className="mb-4 text-3xl font-serif font-bold">
+            {locale === "ru" ? "\u0422\u043e\u0432\u0430\u0440 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d" : "Product Not Found"}
+          </h1>
+          <p className="mb-8 text-muted-foreground">
+            {locale === "ru"
+              ? "\u041a \u0441\u043e\u0436\u0430\u043b\u0435\u043d\u0438\u044e, \u044d\u0442\u043e\u0442 \u0442\u043e\u0432\u0430\u0440 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d."
+              : "The product you're looking for doesn't exist."}
+          </p>
+          <Link href={localizedHref(backToShopHref)} onClick={handleBackToShopClick}>
             <Button className="inline-flex items-center gap-2">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Back to Shop
+              {locale === "ru" ? "\u041d\u0430\u0437\u0430\u0434 \u0432 \u043c\u0430\u0433\u0430\u0437\u0438\u043d" : "Back to Shop"}
             </Button>
           </Link>
         </div>
@@ -849,27 +974,27 @@ export default function OrderPage({ params }: PageProps) {
         <nav aria-label="Breadcrumb" className="pt-3">
           <ol className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-[#6b6b70]">
             <li>
-              <Link href="/" className="transition-colors hover:text-[#1f1f1f]">
-                Home
+              <Link href={localizedHref("/")} className="transition-colors hover:text-[#1f1f1f]">
+                {locale === "ru" ? "\u0413\u043b\u0430\u0432\u043d\u0430\u044f" : "Home"}
               </Link>
             </li>
             <li aria-hidden="true" className="text-[#9a9aa0]">
               /
             </li>
             <li>
-              <Link href={categoryHref} className="transition-colors hover:text-[#1f1f1f]">
-                {product.category}
+              <Link href={localizedHref(categoryHref)} className="transition-colors hover:text-[#1f1f1f]">
+                {productCopy?.category ?? product.category}
               </Link>
             </li>
             <li aria-hidden="true" className="text-[#9a9aa0]">
               /
             </li>
-            <li className="text-[#1f1f1f]">{product.name}</li>
+            <li className="text-[#1f1f1f]">{productCopy?.name ?? product.name}</li>
           </ol>
         </nav>
 
         <div className="py-3 lg:py-4">
-          <Link href={backToShopHref} onClick={handleBackToShopClick}>
+          <Link href={localizedHref(backToShopHref)} onClick={handleBackToShopClick}>
             <Button
               variant="ghost"
               className="inline-flex items-center gap-2 px-0 text-sm text-muted-foreground/80 transition-colors hover:text-foreground"
@@ -877,7 +1002,7 @@ export default function OrderPage({ params }: PageProps) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Back to Shop
+              {locale === "ru" ? "\u041d\u0430\u0437\u0430\u0434 \u0432 \u043c\u0430\u0433\u0430\u0437\u0438\u043d" : "Back to Shop"}
             </Button>
           </Link>
         </div>
@@ -911,11 +1036,15 @@ export default function OrderPage({ params }: PageProps) {
                         className={`relative h-[68px] w-[56px] shrink-0 overflow-hidden rounded-md transition-all ${
                           isActive ? "ring-2 ring-[#262626]/45" : "hover:scale-[1.02]"
                         }`}
-                        aria-label={`View image ${index + 1}`}
+                        aria-label={
+                          locale === "ru"
+                            ? `\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 ${index + 1}`
+                            : `View image ${index + 1}`
+                        }
                       >
                         <Image
                           src={imageSrc}
-                          alt={`${product.name} thumbnail ${index + 1}`}
+                          alt={`${productCopy?.name ?? product.name} thumbnail ${index + 1}`}
                           fill
                           sizes="74px"
                           className="object-contain object-center p-0.5"
@@ -928,15 +1057,19 @@ export default function OrderPage({ params }: PageProps) {
 
               <div
                 ref={mainImageFrameRef}
-                className="relative aspect-[4/5] cursor-zoom-in overflow-hidden rounded-2xl bg-transparent lg:h-full lg:aspect-auto"
+                className="relative aspect-[4/5] cursor-zoom-in overflow-hidden rounded-2xl bg-transparent lg:h-full lg:aspect-auto touch-pan-y"
                 onMouseEnter={() => setIsHoverZoomActive(true)}
                 onMouseLeave={() => setIsHoverZoomActive(false)}
                 onMouseMove={handleMainImageMouseMove}
-                onClick={() => setIsImageLightboxOpen(true)}
+                onPointerDown={handleGalleryPointerDown}
+                onPointerMove={handleGalleryPointerMove}
+                onPointerUp={handleGalleryPointerUp}
+                onPointerCancel={handleGalleryPointerCancel}
+                onClick={handleMainImageClick}
               >
                 <Image
                   src={activeImageSrc}
-                  alt={product.name}
+                  alt={productCopy?.name ?? product.name}
                   fill
                   sizes="(max-width: 1024px) 100vw, 42vw"
                   style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}
@@ -956,7 +1089,7 @@ export default function OrderPage({ params }: PageProps) {
                         goToPrevImage()
                       }}
                       className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#d4d4d7] bg-white/90 text-[#111] transition-colors hover:bg-white"
-                      aria-label="Previous image"
+                      aria-label={locale === "ru" ? "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435" : "Previous image"}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                         <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -969,7 +1102,7 @@ export default function OrderPage({ params }: PageProps) {
                         goToNextImage()
                       }}
                       className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#d4d4d7] bg-white/90 text-[#111] transition-colors hover:bg-white"
-                      aria-label="Next image"
+                      aria-label={locale === "ru" ? "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435" : "Next image"}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                         <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -987,13 +1120,14 @@ export default function OrderPage({ params }: PageProps) {
 
           <div className="px-4 py-5 sm:px-6 sm:py-6 lg:max-h-[calc(100vh-126px)] lg:overflow-y-auto lg:px-7 lg:py-7 lg:pr-2 lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden xl:px-8">
             <h1 className="font-serif text-2xl font-semibold leading-tight text-[#101010] sm:text-3xl">
-              {product.name}
+              {productCopy?.name ?? product.name}
             </h1>
             <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-[#555] sm:text-xs">
-              {product.longDescription}
+              {productCopy?.longDescription ?? product.longDescription}
             </p>
 
             <SelectLengthComponent
+              locale={locale}
               basePrice={product.basePrice}
               pricePerInch={product.pricePerInch}
               slug={product.slug}
@@ -1023,7 +1157,7 @@ export default function OrderPage({ params }: PageProps) {
               type="button"
               onClick={() => setIsImageLightboxOpen(false)}
               className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white transition-colors hover:bg-white/30"
-              aria-label="Close image preview"
+              aria-label={locale === "ru" ? "\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440" : "Close image preview"}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-6 w-6" aria-hidden="true">
                 <path d="M18 6 6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1040,7 +1174,7 @@ export default function OrderPage({ params }: PageProps) {
                   type="button"
                   onClick={goToPrevImage}
                   className="absolute left-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white text-[#111] transition-colors hover:bg-[#f3f3f4]"
-                  aria-label="Previous image"
+                  aria-label={locale === "ru" ? "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435" : "Previous image"}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
                     <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1050,7 +1184,7 @@ export default function OrderPage({ params }: PageProps) {
                   type="button"
                   onClick={goToNextImage}
                   className="absolute right-4 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white text-[#111] transition-colors hover:bg-[#f3f3f4]"
-                  aria-label="Next image"
+                  aria-label={locale === "ru" ? "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435" : "Next image"}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
                     <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1063,7 +1197,7 @@ export default function OrderPage({ params }: PageProps) {
               <div className="relative h-full w-full">
                 <Image
                   src={activeImageSrc}
-                  alt={`${product.name} full preview`}
+                  alt={`${productCopy?.name ?? product.name} full preview`}
                   fill
                   sizes="100vw"
                   className="object-contain"
@@ -1077,13 +1211,19 @@ export default function OrderPage({ params }: PageProps) {
         {suggestedProducts.length > 0 && (
           <section className="mt-5 border-t border-[#d8d8db] px-0 py-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7b7b80]">Our Product</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7b7b80]">
+                {locale === "ru" ? "\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438" : "Our Product"}
+              </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => scrollSuggestedProducts("prev")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d0d3] bg-white text-[#444] transition-colors hover:bg-[#f4f4f5]"
-                  aria-label="Previous recommended products"
+                  aria-label={
+                    locale === "ru"
+                      ? "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438"
+                      : "Previous recommended products"
+                  }
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                     <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1093,7 +1233,11 @@ export default function OrderPage({ params }: PageProps) {
                   type="button"
                   onClick={() => scrollSuggestedProducts("next")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d0d3] bg-white text-[#444] transition-colors hover:bg-[#f4f4f5]"
-                  aria-label="Next recommended products"
+                  aria-label={
+                    locale === "ru"
+                      ? "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0435 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438"
+                      : "Next recommended products"
+                  }
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                     <path d="m9 6 6 6-6 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1107,18 +1251,19 @@ export default function OrderPage({ params }: PageProps) {
             >
               {suggestedProducts.map((item) => {
                 const suggestedPrice = getDiscountedPriceLabel(item.price)
-
+                const copy = getProductDisplayCopy(item, locale)
+ 
                 return (
                   <Link
                     key={item.slug}
-                    href={`/order/${item.slug}`}
+                    href={localizedHref(`/order/${item.slug}`)}
                     data-suggest-card="true"
                     className="group w-[190px] min-w-[190px] shrink-0 snap-start rounded-xl border border-[#e0e0e3] bg-[#fcfcfd] p-2 transition-colors hover:border-[#c8c8cc] hover:bg-white sm:w-[210px] sm:min-w-[210px]"
                   >
                     <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-[#ececef]">
                       <Image
                         src={item.image}
-                        alt={item.name}
+                        alt={copy.name}
                         fill
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
@@ -1126,9 +1271,9 @@ export default function OrderPage({ params }: PageProps) {
                     </div>
                     <div className="px-0.5 pt-2">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7b7b80]">
-                        {item.category}
+                        {copy.category}
                       </p>
-                      <h3 className="mt-1 text-sm font-semibold leading-snug text-[#111]">{item.name}</h3>
+                      <h3 className="mt-1 text-sm font-semibold leading-snug text-[#111]">{copy.name}</h3>
                       <div className="mt-1 flex items-baseline gap-2">
                         <p className="text-sm font-semibold leading-none text-[#111] tabular-nums">{suggestedPrice.discountedLabel}</p>
                         <p className="text-xs font-medium leading-none text-[#6f6f73] line-through tabular-nums">{suggestedPrice.originalLabel}</p>
@@ -1148,6 +1293,7 @@ export default function OrderPage({ params }: PageProps) {
 }
 
 function SelectLengthComponent({ 
+  locale,
   basePrice, 
   pricePerInch,
   slug,
@@ -1163,6 +1309,7 @@ function SelectLengthComponent({
   activeTextureLabel,
   onTextureSelect,
 }: { 
+  locale: SupportedLocale
   basePrice: number
   pricePerInch: number
   slug: string
@@ -1179,6 +1326,142 @@ function SelectLengthComponent({
   onTextureSelect?: (textureKey: string) => void
 }) {
   const router = useRouter()
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
+  const isRu = locale === "ru"
+
+  const displayCopy = getProductDisplayCopy(
+    {
+      slug,
+      name,
+      category,
+      price: "",
+      image,
+      description: "",
+      longDescription: "",
+      basePrice,
+      pricePerInch,
+    },
+    locale
+  )
+
+  const ui = {
+    sizeLabel: isRu ? "\u0414\u043b\u0438\u043d\u0430" : "Size",
+    typeLabel: isRu ? "\u0422\u0438\u043f" : "Type",
+    colorLabel: isRu ? "\u0426\u0432\u0435\u0442" : "Color",
+    defaultLabel: isRu ? "\u041f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e" : "Default",
+    features: isRu
+      ? [
+          "100% \u043d\u0430\u0442\u0443\u0440\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u043e\u043b\u043e\u0441\u044b",
+          "\u041c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u043e\u0435 \u0432\u044b\u043f\u0430\u0434\u0435\u043d\u0438\u0435",
+          "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u0430\u044f \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0430",
+          "\u0412 \u043d\u0430\u043b\u0438\u0447\u0438\u0438 \u0438 \u0433\u043e\u0442\u043e\u0432\u043e \u043a \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0435",
+          "\u0422\u0435\u0440\u043c\u043e\u0441\u0442\u043e\u0439\u043a\u0438\u0435 \u0438 \u043f\u043e\u0434\u0445\u043e\u0434\u044f\u0442 \u0434\u043b\u044f \u0437\u0430\u0432\u0438\u0432\u043a\u0438",
+        ]
+      : [
+          "100% Human Hair",
+          "Minimal Shedding",
+          "Free Shipping Available",
+          "In Stock & Ready to Ship",
+          "Heat Resistant & Curlable",
+        ],
+    reviewsHeading: isRu ? "\u041e\u0442\u0437\u044b\u0432\u044b \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432" : "Customer Reviews",
+    reviewsCta: isRu
+      ? "\u041d\u0430\u0436\u043c\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c \u043e\u0442\u0437\u044b\u0432\u044b"
+      : "Tap to read testimonials",
+    subtotalLabel: isRu ? "\u041f\u043e\u0434\u044b\u0442\u043e\u0433" : "Subtotal",
+    quantityLabel: isRu ? "\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e" : "Quantity",
+    addToCart: isRu ? "\u0414\u041e\u0411\u0410\u0412\u0418\u0422\u042c \u0412 \u041a\u041e\u0420\u0417\u0418\u041d\u0423" : "ADD TO CART",
+    adding: isRu ? "\u0414\u041e\u0411\u0410\u0412\u041b\u042f\u0415\u041c..." : "ADDING...",
+    addToWishlist: isRu ? "\u0412 \u0418\u0417\u0411\u0420\u0410\u041d\u041d\u041e\u0415" : "ADD TO WISHLIST",
+    wishlistNotConfigured: isRu
+      ? "\u0421\u043f\u0438\u0441\u043e\u043a \u0436\u0435\u043b\u0430\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d."
+      : "Wishlist is not configured.",
+    wishlistSaved: isRu ? "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435." : "Saved to wishlist.",
+    whyPickHeading: isRu
+      ? "\u041f\u043e\u0447\u0435\u043c\u0443 \u0432\u044b\u0431\u0438\u0440\u0430\u044e\u0442 \u044d\u0442\u043e\u0442 \u043f\u0440\u043e\u0434\u0443\u043a\u0442"
+      : "Why Clients Pick This",
+    productDetailsHeading: isRu ? "\u0414\u0435\u0442\u0430\u043b\u0438 \u0442\u043e\u0432\u0430\u0440\u0430" : "Product Details",
+    specs: {
+      texture: isRu ? "\u0422\u0435\u043a\u0441\u0442\u0443\u0440\u0430" : "Texture",
+      colorOption: isRu ? "\u0426\u0432\u0435\u0442" : "Color Option",
+      hairType: isRu ? "\u0422\u0438\u043f \u0432\u043e\u043b\u043e\u0441" : "Hair Type",
+      quality: isRu ? "\u041a\u0430\u0447\u0435\u0441\u0442\u0432\u043e" : "Quality",
+      category: isRu ? "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f" : "Category",
+      selectedSize: isRu ? "\u0414\u043b\u0438\u043d\u0430" : "Selected Size",
+      pack: isRu ? "\u041a\u043e\u043c\u043f\u043b\u0435\u043a\u0442" : "Pack",
+      weight: isRu ? "\u0412\u0435\u0441" : "Weight",
+      singlePrice: isRu ? "\u0426\u0435\u043d\u0430 \u0437\u0430 1 \u0448\u0442." : "Single Price",
+      coloring: isRu ? "\u041e\u043a\u0440\u0430\u0448\u0438\u0432\u0430\u043d\u0438\u0435" : "Coloring",
+      wearLife: isRu ? "\u0421\u0440\u043e\u043a \u043d\u043e\u0441\u043a\u0438" : "Wear Life",
+    },
+    specValues: {
+      defaultNatural: isRu
+        ? "\u041f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e / \u043d\u0430\u0442\u0443\u0440\u0430\u043b\u044c\u043d\u044b\u0439"
+        : "Default / Natural",
+      humanHair: isRu ? "100% \u043d\u0430\u0442\u0443\u0440\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u043e\u043b\u043e\u0441\u044b" : "100% Human Hair",
+      doubleDrawn: "Double Drawn",
+      oneBundle: isRu ? "1 \u043f\u0443\u0447\u043e\u043a" : "1 bundles",
+      weight: isRu ? "100 \u0433" : "100 grams",
+      coloring: isRu
+        ? "\u041f\u043e\u0434\u0445\u043e\u0434\u0438\u0442 \u0434\u043b\u044f \u043f\u0440\u043e\u0444\u0435\u0441\u0441\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e\u0433\u043e \u0442\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f \u0438 \u043e\u043a\u0440\u0430\u0448\u0438\u0432\u0430\u043d\u0438\u044f"
+        : "Suitable for professional toning or dyeing",
+      wearLife: isRu
+        ? "\u0414\u043e\u043b\u0433\u043e\u0432\u0435\u0447\u043d\u044b\u0435 \u043f\u0440\u0438 \u0440\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u043e\u043c \u0443\u0445\u043e\u0434\u0435"
+        : "Long-lasting with consistent maintenance",
+    },
+    benefits: isRu
+      ? [
+          {
+            title: "\u041a\u0430\u0447\u0435\u0441\u0442\u0432\u043e Double Drawn",
+            description:
+              "\u0420\u0430\u0432\u043d\u043e\u043c\u0435\u0440\u043d\u0430\u044f \u043f\u043b\u043e\u0442\u043d\u043e\u0441\u0442\u044c \u043e\u0442 \u043a\u043e\u0440\u043d\u0435\u0439 \u0434\u043e \u043a\u043e\u043d\u0447\u0438\u043a\u043e\u0432 \u0434\u043b\u044f \u0431\u043e\u043b\u0435\u0435 \u043f\u044b\u0448\u043d\u043e\u0433\u043e \u0438 \u0440\u043e\u0432\u043d\u043e\u0433\u043e \u0432\u0438\u0434\u0430.",
+          },
+          {
+            title: "\u0421\u0432\u043e\u0431\u043e\u0434\u0430 \u0443\u043a\u043b\u0430\u0434\u043a\u0438",
+            description:
+              "\u041d\u043e\u0441\u0438\u0442\u0435 \u0433\u043b\u0430\u0434\u043a\u0438\u043c\u0438, \u0432\u043e\u043b\u043d\u0438\u0441\u0442\u044b\u043c\u0438 \u0438\u043b\u0438 \u043a\u0443\u0434\u0440\u044f\u0432\u044b\u043c\u0438 \u2014 \u0441 \u0435\u0441\u0442\u0435\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u043c \u0444\u0438\u043d\u0438\u0448\u0435\u043c.",
+          },
+          {
+            title: "\u0415\u0441\u0442\u0435\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u0432\u0438\u0434",
+            description:
+              "\u041c\u044f\u0433\u043a\u0430\u044f \u0442\u0435\u043a\u0441\u0442\u0443\u0440\u0430 \u0438 \u043b\u0435\u0433\u043a\u043e\u0435 \u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0435, \u043a\u043e\u0442\u043e\u0440\u043e\u0435 \u0433\u0430\u0440\u043c\u043e\u043d\u0438\u0447\u043d\u043e \u0441\u043c\u043e\u0442\u0440\u0438\u0442\u0441\u044f \u0441 \u0432\u0430\u0448\u0438\u043c\u0438 \u0432\u043e\u043b\u043e\u0441\u0430\u043c\u0438.",
+          },
+          {
+            title: "\u041c\u043d\u043e\u0433\u043e\u0440\u0430\u0437\u043e\u0432\u043e\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u0435",
+            description:
+              "\u041c\u0435\u043d\u044c\u0448\u0435 \u0441\u043f\u0443\u0442\u044b\u0432\u0430\u043d\u0438\u044f, \u043c\u0435\u043d\u044c\u0448\u0435 \u0432\u044b\u043f\u0430\u0434\u0435\u043d\u0438\u044f \u0438 \u0432\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u043e\u0433\u043e \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u044f \u043f\u0440\u0438 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e\u043c \u0443\u0445\u043e\u0434\u0435.",
+          },
+          {
+            title: "\u041a\u043e\u043c\u0444\u043e\u0440\u0442 \u043d\u0430 \u043a\u0430\u0436\u0434\u044b\u0439 \u0434\u0435\u043d\u044c",
+            description:
+              "\u041f\u043e\u0434\u0445\u043e\u0434\u0438\u0442 \u0434\u043b\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u043e\u0439 \u043d\u043e\u0441\u043a\u0438, \u043e\u0441\u043e\u0431\u044b\u0445 \u0441\u043e\u0431\u044b\u0442\u0438\u0439 \u0438 \u0441\u044a\u0435\u043c\u043e\u043a.",
+          },
+        ]
+      : [
+          {
+            title: "Double Drawn Quality",
+            description:
+              "Our hair is double drawn, so it stays fuller from top to bottom with balanced thickness and even length.",
+          },
+          {
+            title: "Styling Freedom",
+            description: "Wear it sleek, wavy, or curled while keeping a natural finish.",
+          },
+          {
+            title: "Natural Blend",
+            description: "Soft texture and clean movement that sits smoothly with your own hair.",
+          },
+          {
+            title: "Built for Repeat Use",
+            description: "Low tangling, low shedding, and reusable with proper care.",
+          },
+          {
+            title: "Daily-Ready Comfort",
+            description: "Suitable for regular wear, events, and camera-ready looks.",
+          },
+        ],
+  } as const
+
   const [selectedLength, setSelectedLength] = useState<string>("18")
   const [quantity, setQuantity] = useState<number>(1)
   const [selectedColorCode, setSelectedColorCode] = useState<string>("")
@@ -1198,16 +1481,17 @@ function SelectLengthComponent({
   const normalizedColorCode = selectedColorCode.toLowerCase()
   const selectedColor = availableColors.find((color) => color.code.toLowerCase() === normalizedColorCode)
   const selectedColorLabel = selectedColor?.label ?? ""
+  const isGreyAlias = normalizedColorCode === "#ash" || normalizedColorCode === "#grey"
+  const displayColorCode = selectedColorCode ? (isGreyAlias ? "#grey" : selectedColorCode) : ""
+  const displayColorLabel = selectedColorLabel ? (isGreyAlias ? "grey" : selectedColorLabel) : ""
   const selectedColorDisplay =
-    selectedColorLabel && selectedColorCode
-      ? `${selectedColorLabel} ${selectedColorCode}`
-      : selectedColorLabel || selectedColorCode
+    displayColorLabel && displayColorCode ? `${displayColorLabel} ${displayColorCode}` : displayColorLabel || displayColorCode
   const selectedTextureOption =
     textureOptions.find((option) => option.key === activeTextureKey) ?? textureOptions[0]
   const activeTextureValue = activeTextureKey ?? selectedTextureOption?.key ?? ""
   const selectedTextureLabel = activeTextureLabel ?? selectedTextureOption?.label ?? ""
   const selectedOptionSuffix = hasTextureOptions ? selectedTextureLabel : selectedColorDisplay
-  const textureLabel = name
+  const textureLabel = displayCopy.name
     .replace(/\s*weft\s*/gi, " ")
     .replace(/\s*bulk\s*/gi, " ")
     .replace(/\s*wig\s*/gi, " ")
@@ -1221,7 +1505,23 @@ function SelectLengthComponent({
   const discountedGrandTotal = discountedSinglePrice * quantity
   const discountedPriceClass = "text-xl font-semibold leading-none text-[#111] tabular-nums sm:text-2xl"
   const originalPriceClass = "text-sm font-medium leading-none text-[#7a7a7d] line-through tabular-nums sm:text-base"
-  const reviewLabel = `${testimonialsCount} ${testimonialsCount === 1 ? "Review" : "Reviews"}`
+  const reviewLabel = (() => {
+    if (!isRu) {
+      return `${testimonialsCount} ${testimonialsCount === 1 ? "Review" : "Reviews"}`
+    }
+
+    const n = Math.abs(testimonialsCount)
+    const mod10 = n % 10
+    const mod100 = n % 100
+    const word =
+      mod10 === 1 && mod100 !== 11
+        ? "\u043e\u0442\u0437\u044b\u0432"
+        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? "\u043e\u0442\u0437\u044b\u0432\u0430"
+          : "\u043e\u0442\u0437\u044b\u0432\u043e\u0432"
+
+    return `${testimonialsCount} ${word}`
+  })()
   const selectedImage = hasTextureOptions
     ? activePreviewImage || selectedTextureOption?.image || image
     : normalizedColorCode && colorImageMap?.[normalizedColorCode]
@@ -1361,13 +1661,13 @@ function SelectLengthComponent({
     setWishlistMessage(null)
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
-      setWishlistMessage("Wishlist is not configured.")
+      setWishlistMessage(ui.wishlistNotConfigured)
       return
     }
 
     const { data } = await supabase.auth.getUser()
     if (!data.user) {
-      router.push("/login")
+      router.push(localizedHref("/login"))
       return
     }
 
@@ -1383,7 +1683,7 @@ function SelectLengthComponent({
       addedAt: new Date().toISOString(),
     })
 
-    setWishlistMessage("Saved to wishlist.")
+    setWishlistMessage(ui.wishlistSaved)
   }
 
   return (
@@ -1397,7 +1697,16 @@ function SelectLengthComponent({
 
       {supportsHairTypeSelection && (
         <div>
-          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Type: {selectedHairType}</p>
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">
+            {ui.typeLabel}:{" "}
+            {selectedHairType === "Bulk Hair"
+              ? isRu
+                ? "\u0412\u043e\u043b\u043e\u0441\u044b Bulk"
+                : "Bulk Hair"
+              : isRu
+                ? "\u0422\u0440\u0435\u0441\u0441\u044b"
+                : "Weft Hair"}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1408,7 +1717,7 @@ function SelectLengthComponent({
                   : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
               }`}
             >
-              Bulk Hair
+              {isRu ? "\u0412\u043e\u043b\u043e\u0441\u044b Bulk" : "Bulk Hair"}
             </button>
             <button
               type="button"
@@ -1419,7 +1728,7 @@ function SelectLengthComponent({
                   : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
               }`}
             >
-              Weft Hair
+              {isRu ? "\u0422\u0440\u0435\u0441\u0441\u044b" : "Weft Hair"}
             </button>
           </div>
         </div>
@@ -1427,7 +1736,9 @@ function SelectLengthComponent({
 
       {hasTextureOptions && (
         <div>
-          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Type: {selectedTextureLabel || "Default"}</p>
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">
+            {ui.typeLabel}: {selectedTextureLabel || ui.defaultLabel}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {textureOptions.map((option) => {
               const isSelectedTexture = option.key === activeTextureValue
@@ -1441,7 +1752,11 @@ function SelectLengthComponent({
                       ? "border-black bg-black text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,0.6)]"
                       : "border-[#d1d1d4] bg-white text-[#1f1f20] hover:bg-[#f5f5f6]"
                   }`}
-                  aria-label={`Select texture ${option.label}`}
+                  aria-label={
+                    isRu
+                      ? `\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0442\u0435\u043a\u0441\u0442\u0443\u0440\u0443 ${option.label}`
+                      : `Select texture ${option.label}`
+                  }
                 >
                   {option.label}
                 </button>
@@ -1453,7 +1768,9 @@ function SelectLengthComponent({
 
       {!hasTextureOptions && availableColors.length > 0 && (
         <div>
-          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Color: {selectedColorDisplay || "Default"}</p>
+          <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">
+            {ui.colorLabel}: {selectedColorDisplay || ui.defaultLabel}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {availableColors.map((color) => {
               const isSelectedColor = selectedColorCode.toLowerCase() === color.code.toLowerCase()
@@ -1469,7 +1786,11 @@ function SelectLengthComponent({
                     isSelectedColor ? "border-black p-1 shadow-[0_0_0_2px_rgba(0,0,0,0.2)]" : "border-[#7c7c7f]"
                   }`}
                   title={`${color.label} (${color.code})`}
-                  aria-label={`Select color ${color.label}`}
+                  aria-label={
+                    isRu
+                      ? `\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0446\u0432\u0435\u0442 ${color.label}`
+                      : `Select color ${color.label}`
+                  }
                 >
                   <span
                     className="block h-full w-full rounded-full border border-black/10"
@@ -1483,7 +1804,9 @@ function SelectLengthComponent({
       )}
 
       <div>
-        <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">Size: {currentLength}&quot;</p>
+        <p className="text-[15px] font-medium text-[#5f5f61] sm:text-base">
+          {ui.sizeLabel}: {currentLength}&quot;
+        </p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {lengths.map((length) => {
             const isSelected = selectedLength === length.toString()
@@ -1507,13 +1830,7 @@ function SelectLengthComponent({
 
       <div className="space-y-3 border-y border-[#d6d6d8] py-4">
         <ul className="space-y-1.5 rounded-lg border border-[#cfcfd2] bg-[#f8f8f8] px-3 py-2.5 text-[14px] text-[#232323]">
-          {[
-            "100% Human Hair",
-            "Minimal Shedding",
-            "Free Shipping Available",
-            "In Stock & Ready to Ship",
-            "Heat Resistant & Curlable",
-          ].map((feature) => (
+          {ui.features.map((feature) => (
             <li key={feature} className="flex items-center gap-2">
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#d9ead7] text-[#2f7a38]">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3 w-3" strokeWidth="3">
@@ -1526,10 +1843,10 @@ function SelectLengthComponent({
         </ul>
 
         <Link
-          href="/#testimonials"
+          href={localizedHref("/#testimonials")}
           className="block rounded-lg border border-[#cfcfd2] bg-white px-3 py-2.5 transition-colors hover:bg-[#f7f7f7]"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#77777a]">Customer Reviews</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#77777a]">{ui.reviewsHeading}</p>
           <div className="mt-2 flex items-center gap-1">
             {Array.from({ length: 5 }).map((_, index) => (
               <svg key={index} viewBox="0 0 24 24" className="h-4 w-4 fill-[#111]" aria-hidden="true">
@@ -1538,11 +1855,11 @@ function SelectLengthComponent({
             ))}
             <span className="ml-2 text-sm font-semibold text-[#121212]">{reviewLabel}</span>
           </div>
-          <p className="mt-1 text-xs text-[#6a6a6d] sm:text-sm">Tap to read testimonials</p>
+          <p className="mt-1 text-xs text-[#6a6a6d] sm:text-sm">{ui.reviewsCta}</p>
         </Link>
 
         <div className="rounded-lg border border-[#cfcfd2] bg-white px-4 py-3">
-          <p className="text-sm text-[#6a6a6d]">Subtotal</p>
+          <p className="text-sm text-[#6a6a6d]">{ui.subtotalLabel}</p>
           <div className="mt-1 flex items-baseline gap-2">
             <p className={discountedPriceClass}>{formatUsdPrice(discountedGrandTotal)}</p>
             <p className={originalPriceClass}>{formatUsdPrice(originalGrandTotal)}</p>
@@ -1552,7 +1869,9 @@ function SelectLengthComponent({
 
       <div className="grid grid-cols-[1fr_1.2fr] items-end gap-3">
         <div>
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a7a7d]">Quantity</p>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a7a7d]">
+            {ui.quantityLabel}
+          </p>
           <div className="flex h-12 items-center rounded-2xl border border-[#d4d4d8] bg-white px-2 py-1 shadow-[0_8px_22px_-18px_rgba(0,0,0,0.45)] sm:h-14 sm:px-2.5">
             <button
               type="button"
@@ -1588,7 +1907,7 @@ function SelectLengthComponent({
           disabled={isAddingToCart}
           className="h-12 rounded-full bg-black px-5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#202022] disabled:cursor-not-allowed disabled:opacity-70 sm:h-14 sm:text-sm"
         >
-          {isAddingToCart ? "ADDING..." : "ADD TO CART"}
+          {isAddingToCart ? ui.adding : ui.addToCart}
         </button>
       </div>
 
@@ -1598,7 +1917,7 @@ function SelectLengthComponent({
           onClick={() => void handleAddToWishlist()}
           className="h-12 rounded-full border border-black bg-white px-5 text-xs font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f5f5f6] sm:h-14 sm:text-sm"
         >
-          ADD TO WISHLIST
+          {ui.addToWishlist}
         </button>
         {wishlistMessage && <p className="text-xs font-medium text-[#111]">{wishlistMessage}</p>}
       </div>
@@ -1610,31 +1929,19 @@ function SelectLengthComponent({
             onClick={() => setIsBenefitsOpen((prev) => !prev)}
             className="flex w-full items-center justify-between gap-3 text-left"
           >
-            <h3 className="text-lg font-semibold leading-none text-[#111]">Why Clients Pick This</h3>
+            <h3 className="text-lg font-semibold leading-none text-[#111]">{ui.whyPickHeading}</h3>
             <span className="text-xl font-medium text-[#1f1f1f]">{isBenefitsOpen ? "-" : "+"}</span>
           </button>
           {isBenefitsOpen && (
             <ul className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-[#222]">
-              <li className="flex gap-2.5">
-                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
-                <span><strong>Double Drawn Quality</strong> - Our hair is double drawn, so it stays fuller from top to bottom with balanced thickness and even length.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
-                <span><strong>Styling Freedom</strong> - Wear it sleek, wavy, or curled while keeping a natural finish.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
-                <span><strong>Natural Blend</strong> - Soft texture and clean movement that sits smoothly with your own hair.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
-                <span><strong>Built for Repeat Use</strong> - Low tangling, low shedding, and reusable with proper care.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
-                <span><strong>Daily-Ready Comfort</strong> - Suitable for regular wear, events, and camera-ready looks.</span>
-              </li>
+              {ui.benefits.map((benefit) => (
+                <li key={benefit.title} className="flex gap-2.5">
+                  <span aria-hidden="true" className="pt-0.5 text-[#1b1b1b]">✓</span>
+                  <span>
+                    <strong>{benefit.title}</strong> - {benefit.description}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
         </section>
@@ -1645,46 +1952,46 @@ function SelectLengthComponent({
             onClick={() => setIsSpecsOpen((prev) => !prev)}
             className="flex w-full items-center justify-between gap-3 text-left"
           >
-            <h3 className="text-lg font-semibold leading-none text-[#111]">Product Details</h3>
+            <h3 className="text-lg font-semibold leading-none text-[#111]">{ui.productDetailsHeading}</h3>
             <span className="text-xl font-medium text-[#1f1f1f]">{isSpecsOpen ? "-" : "+"}</span>
           </button>
           {isSpecsOpen && (
             <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[13px] leading-relaxed text-[#212121] sm:grid-cols-[160px_1fr]">
-              <dt className="font-medium text-[#111]">Texture</dt>
-              <dd>{textureLabel || name}</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.texture}</dt>
+              <dd>{textureLabel || displayCopy.name}</dd>
 
-              <dt className="font-medium text-[#111]">Color Option</dt>
-              <dd>{selectedColorDisplay || "Default / Natural"}</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.colorOption}</dt>
+              <dd>{selectedColorDisplay || ui.specValues.defaultNatural}</dd>
 
-              <dt className="font-medium text-[#111]">Hair Type</dt>
-              <dd>100% Human Hair</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.hairType}</dt>
+              <dd>{ui.specValues.humanHair}</dd>
 
-              <dt className="font-medium text-[#111]">Quality</dt>
-              <dd>Double Drawn</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.quality}</dt>
+              <dd>{ui.specValues.doubleDrawn}</dd>
 
-              <dt className="font-medium text-[#111]">Category</dt>
-              <dd>{category}</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.category}</dt>
+              <dd>{displayCopy.category}</dd>
 
-              <dt className="font-medium text-[#111]">Selected Size</dt>
+              <dt className="font-medium text-[#111]">{ui.specs.selectedSize}</dt>
               <dd>{currentLength}&quot;</dd>
 
-              <dt className="font-medium text-[#111]">Pack</dt>
-              <dd>1 bundles</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.pack}</dt>
+              <dd>{ui.specValues.oneBundle}</dd>
 
-              <dt className="font-medium text-[#111]">Weight</dt>
-              <dd>100 grams</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.weight}</dt>
+              <dd>{ui.specValues.weight}</dd>
 
-              <dt className="font-medium text-[#111]">Single Price</dt>
+              <dt className="font-medium text-[#111]">{ui.specs.singlePrice}</dt>
               <dd>
                 <span className={discountedPriceClass}>{formatUsdPrice(discountedSinglePrice)}</span>
                 <span className={`ml-2 ${originalPriceClass}`}>{formatUsdPrice(originalSinglePrice)}</span>
               </dd>
 
-              <dt className="font-medium text-[#111]">Coloring</dt>
-              <dd>Suitable for professional toning or dyeing</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.coloring}</dt>
+              <dd>{ui.specValues.coloring}</dd>
 
-              <dt className="font-medium text-[#111]">Wear Life</dt>
-              <dd>Long-lasting with consistent maintenance</dd>
+              <dt className="font-medium text-[#111]">{ui.specs.wearLife}</dt>
+              <dd>{ui.specValues.wearLife}</dd>
             </dl>
           )}
         </section>

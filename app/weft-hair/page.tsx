@@ -3,18 +3,28 @@ import { JsonLd } from "@/components/json-ld"
 import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { WEFT_HAIR_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
-import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
+import { absoluteUrl } from "@/lib/seo"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { withLocaleHref } from "@/lib/i18n"
 
-export const metadata: Metadata = buildPageMetadata({
-  title: "Bundles Collection",
-  description:
-    "Discover premium weft hair textures including body wave, curly, deep wave, and more. Designed for seamless installs and natural movement.",
-  path: "/weft-hair",
-  keywords: ["weft hair", "human hair weft", "body wave weft", "curly weft"],
-  images: ["/images/texture/all%20texture.png"],
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocaleFromRequestHeaders()
+  const title = locale === "ru" ? "Трессы — коллекция" : "Bundles Collection"
+  const description =
+    locale === "ru"
+      ? "Премиальные трессы (weft hair): body wave, curly, deep wave и другие текстуры. Для естественной установки и движения."
+      : "Discover premium weft hair textures including body wave, curly, deep wave, and more. Designed for seamless installs and natural movement."
 
-export default function WeftHairPage() {
+  return buildLocalizedPageMetadata({
+    title,
+    description,
+    keywords: ["weft hair", "human hair weft", "body wave weft", "curly weft"],
+    images: ["/images/texture/all%20texture.png"],
+  })
+}
+
+export default async function WeftHairPage() {
+  const locale = await getLocaleFromRequestHeaders()
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -34,14 +44,14 @@ export default function WeftHairPage() {
       {
         "@type": "ListItem",
         position: 1,
-        name: "Home",
-        item: absoluteUrl("/"),
+        name: locale === "ru" ? "Главная" : "Home",
+        item: absoluteUrl(withLocaleHref("/", locale)),
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: "Bundles",
-        item: absoluteUrl("/weft-hair"),
+        name: locale === "ru" ? "Трессы" : "Bundles",
+        item: absoluteUrl(withLocaleHref("/weft-hair", locale)),
       },
     ],
   }
@@ -52,10 +62,10 @@ export default function WeftHairPage() {
       <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={WEFT_PRODUCTS}
-        filterTitle="Hair Texture"
+        filterTitle={locale === "ru" ? "Текстура" : "Hair Texture"}
         sortId="sort-weft"
         activeCatalogGroup="weft"
-        faqHeading="Frequently Asked Questions About Bundles"
+        faqHeading={locale === "ru" ? "Часто задаваемые вопросы о трессах" : "Frequently Asked Questions About Bundles"}
         faqItems={WEFT_HAIR_FAQS}
       />
     </>

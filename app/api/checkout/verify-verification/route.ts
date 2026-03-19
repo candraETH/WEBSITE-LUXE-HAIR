@@ -8,7 +8,7 @@ import {
   setSecurityStoreValue,
 } from "@/lib/security-store"
 import { safeEqualOtpHash } from "@/lib/otp-utils"
-import { storeCheckoutVerificationTokenByFingerprint } from "@/lib/checkout-verification"
+import { issueCheckoutVerificationTokenByFingerprint } from "@/lib/checkout-verification"
 
 export const runtime = "nodejs"
 
@@ -86,8 +86,7 @@ export async function POST(request: Request) {
 
     await deleteSecurityStoreValue(challengeKey)
 
-    const verificationToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
-    await storeCheckoutVerificationTokenByFingerprint(verificationToken, challenge.fingerprint, VERIFIED_TOKEN_TTL_SECONDS)
+    const verificationToken = await issueCheckoutVerificationTokenByFingerprint(challenge.fingerprint, VERIFIED_TOKEN_TTL_SECONDS)
 
     return NextResponse.json({
       verificationToken,

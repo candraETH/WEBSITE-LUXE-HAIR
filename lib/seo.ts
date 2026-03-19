@@ -1,9 +1,10 @@
 import type { Metadata } from "next"
 
-export const SITE_NAME = "CANDRA'S HAIR"
-export const SITE_TITLE = "CANDRA'S HAIR | Premium Hair Extensions, Wigs & More"
-export const SITE_DESCRIPTION =
-  "Discover premium quality hair extensions, wigs, weft hair, and bulk hair. Luxury hair solutions for every style."
+import { SITE_NAME as BRAND_NAME, getSiteCopy } from "@/lib/site-copy"
+
+export const SITE_NAME = BRAND_NAME
+export const SITE_TITLE = getSiteCopy("en").title
+export const SITE_DESCRIPTION = getSiteCopy("en").description
 
 function trimTrailingSlash(value: string): string {
   return value.trim().replace(/\/+$/, "")

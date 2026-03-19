@@ -14,6 +14,9 @@ type CaptureOrderResponse = {
   status: string
 }
 
+type PersistedOrderStatus = "PAID" | "FAILED"
+type FailedReason = "DENIED" | "REVERSED" | "REFUNDED" | null
+
 const captureSchema = z.object({
   orderId: z
     .string()
@@ -39,6 +42,55 @@ function getBearerToken(request: Request): string | null {
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase()
+}
+
+function buildStatusDisplay(status: PersistedOrderStatus, failedReason: FailedReason): string {
+  if (status === "FAILED" && failedReason) {
+    return `FAILED (${failedReason})`
+  }
+  return status
+}
+
+function withUpdatedCartTextStatus(
+  value: unknown,
+  status: PersistedOrderStatus,
+  failedReason: FailedReason
+): string | null {
+  if (typeof value !== "string" || !value.trim()) {
+    return null
+  }
+
+  const statusDisplay = buildStatusDisplay(status, failedReason)
+  let updated = value
+  if (/^Status:\s*/m.test(value)) {
+    updated = value.replace(/^Status:\s*.*/m, `Status: ${statusDisplay}`)
+  } else {
+    updated = `Status: ${statusDisplay}\n${value}`
+  }
+
+  return updated
+}
+
+function withUpdatedCartJsonStatus(value: unknown, status: PersistedOrderStatus, failedReason: FailedReason): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value
+  }
+
+  const statusDisplay = buildStatusDisplay(status, failedReason)
+  const root = { ...(value as Record<string, unknown>) }
+  const order = root.order
+  if (order && typeof order === "object" && !Array.isArray(order)) {
+    root.order = {
+      ...(order as Record<string, unknown>),
+      status,
+      status_display: statusDisplay,
+    }
+    return root
+  }
+
+  root.status = status
+  root.status_display = statusDisplay
+  return root
 }
 
 function isLikelyAlreadyCapturedError(error: PayPalHttpError) {
@@ -103,7 +155,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("orders")
-      .select("status,customer_email,cart_json")
+      .select("status,customer_email,cart_json,cart_text")
       .eq("paypal_order_id", orderId)
       .maybeSingle()
 
@@ -149,15 +201,42 @@ export async function POST(request: Request) {
       body: JSON.stringify({}),
     })
 
+    const captureStatus = normalizeStatus(capture.status)
     if (stored) {
-      updatePayPalOrderStatus(orderId, "CAPTURED_PENDING_WEBHOOK")
+      updatePayPalOrderStatus(orderId, captureStatus === "COMPLETED" ? "PAID" : "CAPTURED_PENDING_WEBHOOK")
+    }
+
+    if (captureStatus === "COMPLETED" && hasSupabaseEnv) {
+      const updatePayload: Record<string, unknown> = { status: "PAID" }
+
+      const updatedCartText = withUpdatedCartTextStatus(data.cart_text, "PAID", null)
+      if (updatedCartText) {
+        updatePayload.cart_text = updatedCartText
+      }
+
+      const updatedCartJson = withUpdatedCartJsonStatus(data.cart_json, "PAID", null)
+      if (updatedCartJson !== undefined && updatedCartJson !== null) {
+        updatePayload.cart_json = updatedCartJson
+      }
+
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update(updatePayload)
+        .eq("paypal_order_id", orderId)
+
+      if (updateError) {
+        console.error("Supabase capture-order update failed:", updateError.message, `order=${orderId}`)
+      }
     }
 
     return NextResponse.json({
       orderId: capture.id,
       paypalStatus: capture.status,
-      status: "CAPTURED_PENDING_WEBHOOK",
-      message: "Capture submitted. Waiting for verified webhook confirmation.",
+      status: captureStatus === "COMPLETED" ? "PAID" : "CAPTURED_PENDING_WEBHOOK",
+      message:
+        captureStatus === "COMPLETED"
+          ? "Payment captured and confirmed."
+          : "Capture submitted. Waiting for verified webhook confirmation.",
     })
   } catch (error) {
     if (error instanceof PayPalHttpError) {

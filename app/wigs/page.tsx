@@ -3,18 +3,28 @@ import { JsonLd } from "@/components/json-ld"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import { WIGS_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
-import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
+import { absoluteUrl } from "@/lib/seo"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { withLocaleHref } from "@/lib/i18n"
 
-export const metadata: Metadata = buildPageMetadata({
-  title: "Human Hair Wigs Collection",
-  description:
-    "Explore premium human hair wigs including lace front and closure styles. Designed for natural hairlines, comfort, and long wear.",
-  path: "/wigs",
-  keywords: ["human hair wigs", "lace front wigs", "closure wigs", "premium wigs"],
-  images: ["/images/wig-1.jpg"],
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocaleFromRequestHeaders()
+  const title = locale === "ru" ? "Парики — коллекция" : "Human Hair Wigs Collection"
+  const description =
+    locale === "ru"
+      ? "Премиальные парики из натуральных волос: lace front и closure модели. Естественная линия роста, комфорт и длительная носка."
+      : "Explore premium human hair wigs including lace front and closure styles. Designed for natural hairlines, comfort, and long wear."
 
-export default function WigsPage() {
+  return buildLocalizedPageMetadata({
+    title,
+    description,
+    keywords: ["human hair wigs", "lace front wigs", "closure wigs", "premium wigs"],
+    images: ["/images/wig-1.jpg"],
+  })
+}
+
+export default async function WigsPage() {
+  const locale = await getLocaleFromRequestHeaders()
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -34,14 +44,14 @@ export default function WigsPage() {
       {
         "@type": "ListItem",
         position: 1,
-        name: "Home",
-        item: absoluteUrl("/"),
+        name: locale === "ru" ? "Главная" : "Home",
+        item: absoluteUrl(withLocaleHref("/", locale)),
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: "Wigs",
-        item: absoluteUrl("/wigs"),
+        name: locale === "ru" ? "Парики" : "Wigs",
+        item: absoluteUrl(withLocaleHref("/wigs", locale)),
       },
     ],
   }
@@ -52,10 +62,10 @@ export default function WigsPage() {
       <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={WIGS_PRODUCTS}
-        filterTitle="Wig Styles"
+        filterTitle={locale === "ru" ? "Стиль" : "Wig Styles"}
         sortId="sort-wigs"
         activeCatalogGroup="wigs"
-        faqHeading="Frequently Asked Questions About Human Hair Wigs"
+        faqHeading={locale === "ru" ? "Часто задаваемые вопросы о париках" : "Frequently Asked Questions About Human Hair Wigs"}
         faqItems={WIGS_FAQS}
       />
     </>

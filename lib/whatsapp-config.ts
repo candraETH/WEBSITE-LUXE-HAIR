@@ -1,4 +1,4 @@
-export const WHATSAPP_NUMBER = "6282234109177"
+export const WHATSAPP_NUMBER = "628978905657"
 
 // Toggle this to true when you want to re-enable WhatsApp links and actions.
 export const WHATSAPP_ENABLED = true

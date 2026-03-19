@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { withLocaleHref } from "@/lib/i18n"
+import { useLocale } from "@/context/LocaleContext"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -115,6 +117,9 @@ function appendReturnTo(target: string, returnTo: string | null) {
 
 export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; returnTo?: string }) {
   const router = useRouter()
+  const { locale } = useLocale()
+  const isRu = locale === "ru"
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -125,28 +130,38 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
 
   const registerSchema = z
     .object({
-      fullName: z.string().trim().min(2, "Please enter your full name."),
-      email: z.string().trim().email("Enter a valid email address."),
+      fullName: z
+        .string()
+        .trim()
+        .min(2, isRu ? "\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u0430\u0448\u0435 \u043f\u043e\u043b\u043d\u043e\u0435 \u0438\u043c\u044f." : "Please enter your full name."),
+      email: z
+        .string()
+        .trim()
+        .email(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 email-\u0430\u0434\u0440\u0435\u0441." : "Enter a valid email address."),
       phoneCountryCode: z
         .string()
         .trim()
-        .regex(/^\+\d{1,4}$/, "Select a valid country code."),
+        .regex(/^\+\d{1,4}$/, isRu ? "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043a\u043e\u0434 \u0441\u0442\u0440\u0430\u043d\u044b." : "Select a valid country code."),
       phoneNumber: z
         .string()
         .trim()
-        .min(6, "Enter a valid phone number.")
-        .max(14, "Enter a valid phone number.")
-        .regex(/^\d+$/, "Phone number must contain digits only."),
-      password: z.string().min(8, "Password must be at least 8 characters."),
-      confirmPassword: z.string().min(1, "Please confirm your password."),
-      agreeToTerms: z.boolean().refine((value) => value, "You must accept the terms to continue."),
+        .min(6, isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430." : "Enter a valid phone number.")
+        .max(14, isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430." : "Enter a valid phone number.")
+        .regex(/^\d+$/, isRu ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u0434\u043e\u043b\u0436\u0435\u043d \u0441\u043e\u0434\u0435\u0440\u0436\u0430\u0442\u044c \u0442\u043e\u043b\u044c\u043a\u043e \u0446\u0438\u0444\u0440\u044b." : "Phone number must contain digits only."),
+      password: z
+        .string()
+        .min(8, isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c \u0434\u043e\u043b\u0436\u0435\u043d \u0431\u044b\u0442\u044c \u043d\u0435 \u043c\u0435\u043d\u0435\u0435 8 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432." : "Password must be at least 8 characters."),
+      confirmPassword: z.string().min(1, isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043f\u0430\u0440\u043e\u043b\u044c." : "Please confirm your password."),
+      agreeToTerms: z
+        .boolean()
+        .refine((value) => value, isRu ? "\u0412\u044b \u0434\u043e\u043b\u0436\u043d\u044b \u043f\u0440\u0438\u043d\u044f\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u044f, \u0447\u0442\u043e\u0431\u044b \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c." : "You must accept the terms to continue."),
     })
     .refine((values) => /^\+\d{8,15}$/.test(`${values.phoneCountryCode}${values.phoneNumber}`), {
-      message: "Enter a valid phone number.",
+      message: isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430." : "Enter a valid phone number.",
       path: ["phoneNumber"],
     })
     .refine((values) => values.password === values.confirmPassword, {
-      message: "Passwords do not match.",
+      message: isRu ? "\u041f\u0430\u0440\u043e\u043b\u0438 \u043d\u0435 \u0441\u043e\u0432\u043f\u0430\u0434\u0430\u044e\u0442." : "Passwords do not match.",
       path: ["confirmPassword"],
     })
 
@@ -166,6 +181,17 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   })
 
   const passwordStrength = getPasswordStrength(form.watch("password"))
+  const passwordStrengthLabel = (() => {
+    if (!isRu) return passwordStrength.label
+    const map: Record<string, string> = {
+      "Not set": "\u041d\u0435 \u0437\u0430\u0434\u0430\u043d\u043e",
+      Weak: "\u0421\u043b\u0430\u0431\u044b\u0439",
+      Fair: "\u0421\u0440\u0435\u0434\u043d\u0438\u0439",
+      Good: "\u0425\u043e\u0440\u043e\u0448\u0438\u0439",
+      Strong: "\u0421\u0438\u043b\u044c\u043d\u044b\u0439",
+    }
+    return map[passwordStrength.label] ?? passwordStrength.label
+  })()
 
   async function handleSubmit(values: RegisterValues) {
     setSuccessMessage(null)
@@ -175,7 +201,9 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
     if (!supabase) {
       form.setError("root", {
         message:
-          "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
+          isRu
+            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 NEXT_PUBLIC_SUPABASE_URL \u0438 NEXT_PUBLIC_SUPABASE_ANON_KEY \u0432 \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 \u043e\u043a\u0440\u0443\u0436\u0435\u043d\u0438\u044f."
+            : "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
       })
       return
     }
@@ -200,15 +228,21 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       }
 
       if (!data.session) {
-        setSuccessMessage("Account created. Please check your email to verify your account, then sign in.")
+        setSuccessMessage(
+          isRu
+            ? "\u0410\u043a\u043a\u0430\u0443\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 email \u0434\u043b\u044f \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f, \u0437\u0430\u0442\u0435\u043c \u0432\u043e\u0439\u0434\u0438\u0442\u0435."
+            : "Account created. Please check your email to verify your account, then sign in."
+        )
         setNeedsSignIn(true)
         return
       }
 
-      setSuccessMessage("Account created successfully.")
+      setSuccessMessage(isRu ? "\u0410\u043a\u043a\u0430\u0443\u043d\u0442 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0441\u043e\u0437\u0434\u0430\u043d." : "Account created successfully.")
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
-      router.push(appendReturnTo(safeNext, safeReturnTo))
+      const nextTarget = localizedHref(safeNext)
+      const returnTarget = safeReturnTo ? localizedHref(safeReturnTo) : null
+      router.push(appendReturnTo(nextTarget, returnTarget))
       router.refresh()
     } finally {
       setIsSubmitting(false)
@@ -219,7 +253,9 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
     <div className="rounded-2xl border border-border/30 bg-card/60 p-6 shadow-sm">
       {!authEnabled && (
         <p className="mb-4 text-sm text-muted-foreground">
-          Auth is not configured yet. Ask an admin to add Supabase public env variables (anon key).
+          {isRu
+            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u0435\u0449\u0451 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u041f\u043e\u043f\u0440\u043e\u0441\u0438\u0442\u0435 \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0430 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 env \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 Supabase (\u0430\u043d\u043e\u043d\u0438\u043c\u043d\u044b\u0439 \u043a\u043b\u044e\u0447)."
+            : "Auth is not configured yet. Ask an admin to add Supabase public env variables (anon key)."}
         </p>
       )}
 
@@ -231,9 +267,13 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
               name="fullName"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Full name</FormLabel>
+                  <FormLabel>{isRu ? "\u0418\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" : "Full name"}</FormLabel>
                   <FormControl>
-                    <Input autoComplete="name" placeholder="Your name" {...field} />
+                    <Input
+                      autoComplete="name"
+                      placeholder={isRu ? "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f" : "Your name"}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -259,7 +299,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
               name="phoneCountryCode"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Phone number</FormLabel>
+                  <FormLabel>{isRu ? "\u0422\u0435\u043b\u0435\u0444\u043e\u043d" : "Phone number"}</FormLabel>
                   <div className="flex overflow-hidden rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                     <div className="w-[104px] shrink-0 border-r border-input">
                       <FormControl>
@@ -267,7 +307,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                           type="tel"
                           inputMode="tel"
                           autoComplete="tel-country-code"
-                          placeholder="Code"
+                          placeholder={isRu ? "\u041a\u043e\u0434" : "Code"}
                           list="country-calling-codes"
                           className="w-full rounded-none border-0 bg-transparent px-3 py-2 text-center text-sm tabular-nums focus-visible:ring-0 focus-visible:ring-offset-0"
                           {...field}
@@ -298,7 +338,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                                 type="tel"
                                 inputMode="numeric"
                                 autoComplete="tel-national"
-                                placeholder="Phone number"
+                                placeholder={isRu ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Phone number"}
                                 className="rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                                 {...phoneField}
                                 onChange={(event) => phoneField.onChange(event.target.value.replace(/\D/g, ""))}
@@ -310,7 +350,11 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                     </div>
                   </div>
 
-                  <FormDescription className="text-xs">Digits only. Enter your country code first.</FormDescription>
+                  <FormDescription className="text-xs">
+                    {isRu
+                      ? "\u0422\u043e\u043b\u044c\u043a\u043e \u0446\u0438\u0444\u0440\u044b. \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0441\u0442\u0440\u0430\u043d\u044b."
+                      : "Digits only. Enter your country code first."}
+                  </FormDescription>
 
                   {(form.formState.errors.phoneCountryCode?.message || form.formState.errors.phoneNumber?.message) && (
                     <div className="space-y-1">
@@ -331,13 +375,19 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
               name="password"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>{isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c" : "Password"}</FormLabel>
                   <FormControl>
                     <Input type="password" autoComplete="new-password" {...field} />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    <span className="block">Use at least 8 characters.</span>
-                    <span className="block">Lowercase, uppercase letters, digits and symbols</span>
+                    <span className="block">
+                      {isRu ? "\u041c\u0438\u043d\u0438\u043c\u0443\u043c 8 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432." : "Use at least 8 characters."}
+                    </span>
+                    <span className="block">
+                      {isRu
+                        ? "\u0421\u0442\u0440\u043e\u0447\u043d\u044b\u0435 \u0438 \u043f\u0440\u043e\u043f\u0438\u0441\u043d\u044b\u0435 \u0431\u0443\u043a\u0432\u044b, \u0446\u0438\u0444\u0440\u044b \u0438 \u0441\u0438\u043c\u0432\u043e\u043b\u044b"
+                        : "Lowercase, uppercase letters, digits and symbols"}
+                    </span>
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -349,7 +399,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Confirm password</FormLabel>
+                  <FormLabel>{isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043f\u0430\u0440\u043e\u043b\u044c" : "Confirm password"}</FormLabel>
                   <FormControl>
                     <Input type="password" autoComplete="new-password" {...field} />
                   </FormControl>
@@ -360,9 +410,11 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
 
             <div className="space-y-2 rounded-xl border border-border/40 bg-background/40 p-4 sm:col-span-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">Password strength</p>
+                <p className="text-sm font-medium text-foreground">
+                  {isRu ? "\u041d\u0430\u0434\u0451\u0436\u043d\u043e\u0441\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044f" : "Password strength"}
+                </p>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  {passwordStrength.label}
+                  {passwordStrengthLabel}
                 </p>
               </div>
               <div className="h-2 w-full rounded-full bg-secondary">
@@ -384,9 +436,13 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                     <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>I agree to the terms</FormLabel>
+                    <FormLabel>
+                      {isRu ? "\u042f \u0441\u043e\u0433\u043b\u0430\u0441\u0435\u043d(\u043d\u0430) \u0441 \u0443\u0441\u043b\u043e\u0432\u0438\u044f\u043c\u0438" : "I agree to the terms"}
+                    </FormLabel>
                     <FormDescription className="text-xs">
-                      By creating an account, you agree to receive account-related emails.
+                      {isRu
+                        ? "\u0421\u043e\u0437\u0434\u0430\u0432\u0430\u044f \u0430\u043a\u043a\u0430\u0443\u043d\u0442, \u0432\u044b \u0441\u043e\u0433\u043b\u0430\u0448\u0430\u0435\u0442\u0435\u0441\u044c \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u044c \u043f\u0438\u0441\u044c\u043c\u0430 \u043f\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0443."
+                        : "By creating an account, you agree to receive account-related emails."}
                     </FormDescription>
                   </div>
                 </div>
@@ -403,38 +459,44 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
            {needsSignIn && (
              <Button asChild type="button" variant="outline" className="w-full">
                <Link
-                 href={`/login${(() => {
-                   const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
-                   const safeReturnTo = sanitizeInternalPath(returnTo)
-                   const params = new URLSearchParams({ next: safeNext })
-                   if (safeReturnTo) params.set("returnTo", safeReturnTo)
-                   return `?${params.toString()}`
-                 })()}`}
-               >
-                 Go to Sign In
-               </Link>
-             </Button>
-           )}
+                  href={`${localizedHref("/login")}${(() => {
+                    const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
+                    const safeReturnTo = sanitizeInternalPath(returnTo)
+                    const params = new URLSearchParams({ next: localizedHref(safeNext) })
+                    if (safeReturnTo) params.set("returnTo", localizedHref(safeReturnTo))
+                    return `?${params.toString()}`
+                  })()}`}
+                >
+                  {isRu ? "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a\u043e \u0432\u0445\u043e\u0434\u0443" : "Go to Sign In"}
+                </Link>
+              </Button>
+            )}
 
            <Button type="submit" className="w-full" disabled={!authEnabled || isSubmitting}>
-             {isSubmitting ? "Creating account..." : "Create account"}
+              {isSubmitting
+                ? isRu
+                  ? "\u0421\u043e\u0437\u0434\u0430\u0451\u043c \u0430\u043a\u043a\u0430\u0443\u043d\u0442..."
+                  : "Creating account..."
+                : isRu
+                  ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442"
+                  : "Create account"}
            </Button>
 
            <p className="text-center text-sm text-muted-foreground">
-             Already have an account?{" "}
-             <Link
-               href={`/login${(() => {
-                 const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
-                 const safeReturnTo = sanitizeInternalPath(returnTo)
-                 const params = new URLSearchParams({ next: safeNext })
-                 if (safeReturnTo) params.set("returnTo", safeReturnTo)
-                 return `?${params.toString()}`
-               })()}`}
-               className="font-medium text-foreground underline underline-offset-4"
-             >
-               Sign in
-             </Link>
-           </p>
+              {isRu ? "\u0423\u0436\u0435 \u0435\u0441\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442?" : "Already have an account?"}{" "}
+              <Link
+                href={`${localizedHref("/login")}${(() => {
+                  const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
+                  const safeReturnTo = sanitizeInternalPath(returnTo)
+                  const params = new URLSearchParams({ next: localizedHref(safeNext) })
+                  if (safeReturnTo) params.set("returnTo", localizedHref(safeReturnTo))
+                  return `?${params.toString()}`
+                })()}`}
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                {isRu ? "\u0412\u043e\u0439\u0442\u0438" : "Sign in"}
+              </Link>
+            </p>
          </form>
        </Form>
      </div>

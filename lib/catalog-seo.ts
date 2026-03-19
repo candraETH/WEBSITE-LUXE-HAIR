@@ -12,7 +12,7 @@ export type CatalogSeoContent = {
   relatedCollections: SeoLink[]
 }
 
-export const CATALOG_SEO_CONTENT: Record<CatalogGroupKey, CatalogSeoContent> = {
+const CATALOG_SEO_CONTENT_EN: Record<CatalogGroupKey, CatalogSeoContent> = {
   bulk: {
     breadcrumbLabel: "Bulk Hair",
     guideTitle: "Bulk Hair Buying Guide",
@@ -66,3 +66,65 @@ export const CATALOG_SEO_CONTENT: Record<CatalogGroupKey, CatalogSeoContent> = {
     ],
   },
 }
+
+const CATALOG_SEO_CONTENT_RU: Record<CatalogGroupKey, CatalogSeoContent> = {
+  bulk: {
+    breadcrumbLabel: "Bulk Hair",
+    guideTitle: "Гид по выбору Bulk Hair",
+    paragraphs: [
+      "Bulk hair отлично подходит для плетения, создания париков и hand-tied установок — свободные пряди дают максимум гибкости.",
+      "Выбирая bulk hair, обращайте внимание на однородность текстуры, совпадение оттенка и количество прядей, чтобы установка выглядела плотной и естественной.",
+    ],
+    relatedCollections: [
+      { href: "/weft-hair", label: "Трессы" },
+      { href: "/extensions", label: "Наращивание" },
+      { href: "/wigs", label: "Парики" },
+    ],
+  },
+  weft: {
+    breadcrumbLabel: "Трессы",
+    guideTitle: "Гид по текстурам тресс",
+    paragraphs: [
+      "Weft hair сочетает прочность и универсальность для sew-in и салонных установок — мягкое смешивание и длительная носка.",
+      "Сравнивайте волны и завитки, чтобы выбранная текстура подходила вашему стилю, уходу и желаемому объему.",
+    ],
+    relatedCollections: [
+      { href: "/bulk-hair", label: "Bulk Hair" },
+      { href: "/extensions", label: "Наращивание" },
+      { href: "/wigs", label: "Парики" },
+    ],
+  },
+  extensions: {
+    breadcrumbLabel: "Наращивание",
+    guideTitle: "Советы по выбору наращивания",
+    paragraphs: [
+      "Наращивание — быстрый способ добавить длину и густоту: клипсы, тейпы и пряди под разные сценарии носки.",
+      "Выбирайте метод под образ жизни, частоту укладки и желаемый эффект — так будет комфортно и максимально натурально.",
+    ],
+    relatedCollections: [
+      { href: "/bulk-hair", label: "Bulk Hair" },
+      { href: "/weft-hair", label: "Трессы" },
+      { href: "/wigs", label: "Парики" },
+    ],
+  },
+  wigs: {
+    breadcrumbLabel: "Парики",
+    guideTitle: "Гид по парикам из натуральных волос",
+    paragraphs: [
+      "Парики из натуральных волос дают реалистичную линию роста, свободу укладки и надежную ежедневную носку — lace front и closure варианты.",
+      "Для лучшего результата подберите тип шапочки и плотность под форму лица, комфорт и привычный уровень ухода.",
+    ],
+    relatedCollections: [
+      { href: "/bulk-hair", label: "Bulk Hair" },
+      { href: "/weft-hair", label: "Трессы" },
+      { href: "/extensions", label: "Наращивание" },
+    ],
+  },
+}
+
+export function getCatalogSeoContent(locale: "en" | "ru", group: CatalogGroupKey): CatalogSeoContent {
+  return locale === "ru" ? CATALOG_SEO_CONTENT_RU[group] : CATALOG_SEO_CONTENT_EN[group]
+}
+
+// Backwards compatible export (English).
+export const CATALOG_SEO_CONTENT: Record<CatalogGroupKey, CatalogSeoContent> = CATALOG_SEO_CONTENT_EN

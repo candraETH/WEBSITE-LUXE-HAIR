@@ -189,6 +189,19 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
 
+function getCookieValue(request: Request, name: string): string | null {
+  const cookieHeader = request.headers.get("cookie") ?? ""
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(";")
+  for (const part of parts) {
+    const [key, ...rest] = part.trim().split("=")
+    if (key === name) {
+      return decodeURIComponent(rest.join("="))
+    }
+  }
+  return null
+}
+
 async function getTotalPaidSpendUsdByEmail(email: string) {
   const { data, error } = await supabase
     .from("orders")
@@ -557,6 +570,28 @@ export async function POST(request: Request) {
         },
         { status: 500 }
       )
+    }
+
+    try {
+      const analyticsSessionId = getCookieValue(request, "analytics_session_id")
+      if (analyticsSessionId) {
+        const { error: eventError } = await supabase.from("analytics_events").insert([
+          {
+            session_id: analyticsSessionId,
+            event_name: "purchase_completed",
+            metadata: {
+              order_id: response.id,
+              amount: totalAmount,
+              currency: "USD",
+            },
+          },
+        ])
+        if (eventError) {
+          console.error("Analytics purchase event insert failed:", eventError.message)
+        }
+      }
+    } catch (eventError) {
+      console.error("Analytics purchase event error:", eventError instanceof Error ? eventError.message : "Unknown")
     }
 
     return NextResponse.json({

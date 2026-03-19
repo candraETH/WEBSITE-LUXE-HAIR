@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-server"
 import { logServerError, publicErrorMessage } from "@/lib/api-errors"
+import { extractPhoneFromCartJson } from "@/lib/order-lookup"
 
 type OrderSummary = {
   orderId: string
@@ -9,6 +10,7 @@ type OrderSummary = {
   currency: string
   createdAt: string | null
   products: string[]
+  phoneNumber: string
 }
 
 const PENDING_EXPIRES_AFTER_MS = 6 * 60 * 60 * 1000
@@ -45,6 +47,20 @@ function extractProducts(cartJson: unknown): string[] {
       return qty && qty > 1 ? `${name} x ${qty}` : name
     })
     .filter(Boolean)
+}
+
+function extractPhone(row: Record<string, unknown>): string {
+  const directCandidates = [
+    row.customer_whatsapp,
+    row.customer_phone,
+    row.phone_number,
+    row.whatsapp,
+  ]
+  const direct = directCandidates.find((value) => typeof value === "string" && Boolean(value.trim()))
+  if (typeof direct === "string") {
+    return direct.trim()
+  }
+  return extractPhoneFromCartJson(row.cart_json) ?? ""
 }
 
 function extractCreatedAt(row: Record<string, unknown>): string | null {
@@ -117,6 +133,7 @@ export async function GET(request: Request) {
         currency: safeString(row.currency).trim() || "USD",
         createdAt,
         products: extractProducts(row.cart_json),
+        phoneNumber: extractPhone(row),
       }
     })
     .filter(Boolean) as OrderSummary[]

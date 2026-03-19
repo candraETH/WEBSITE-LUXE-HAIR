@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { useLocale } from "@/context/LocaleContext"
 
 type TrackedOrder = {
   orderId: string
@@ -32,9 +33,9 @@ type SendInvoiceResponse = {
 
 const DHL_TRACKING_BASE_URL = "https://www.dhl.com/global-en/home/tracking.html"
 
-function formatCurrency(value: number, currency: string): string {
+function formatCurrency(value: number, currency: string, locale: "en" | "ru"): string {
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value)
+    return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", { style: "currency", currency }).format(value)
   } catch {
     return `${currency} ${value.toFixed(2)}`
   }
@@ -119,32 +120,38 @@ function statusClass(status: string): string {
   return "bg-slate-100 text-slate-700"
 }
 
-function paymentStatusTitle(status: string): string {
+function paymentStatusTitle(status: string, isRu: boolean): string {
   const normalized = status.trim().toUpperCase()
   if (normalized === "PAID") {
-    return "Payment Successful"
+    return isRu ? "\u041e\u043f\u043b\u0430\u0442\u0430 \u043f\u0440\u043e\u0448\u043b\u0430 \u0443\u0441\u043f\u0435\u0448\u043d\u043e" : "Payment Successful"
   }
   if (normalized.startsWith("FAILED")) {
-    return "Payment Failed"
+    return isRu ? "\u041e\u043f\u043b\u0430\u0442\u0430 \u043d\u0435 \u0443\u0434\u0430\u043b\u0430\u0441\u044c" : "Payment Failed"
   }
   if (normalized === "PENDING") {
-    return "Processing Payment"
+    return isRu ? "\u041e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0430 \u043e\u043f\u043b\u0430\u0442\u044b" : "Processing Payment"
   }
-  return "Payment Update"
+  return isRu ? "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u043e\u043f\u043b\u0430\u0442\u044b" : "Payment Update"
 }
 
-function paymentStatusMessage(status: string): string {
+function paymentStatusMessage(status: string, isRu: boolean): string {
   const normalized = status.trim().toUpperCase()
   if (normalized === "PAID") {
-    return "Payment completed. Your order has been confirmed."
+    return isRu
+      ? "\u041e\u043f\u043b\u0430\u0442\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430. \u0417\u0430\u043a\u0430\u0437 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d."
+      : "Payment completed. Your order has been confirmed."
   }
   if (normalized.startsWith("FAILED")) {
-    return "Payment was not completed. Please contact support for assistance."
+    return isRu
+      ? "\u041e\u043f\u043b\u0430\u0442\u0430 \u043d\u0435 \u0431\u044b\u043b\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430. \u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u0441\u0432\u044f\u0436\u0438\u0442\u0435\u0441\u044c \u0441 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u043e\u0439."
+      : "Payment was not completed. Please contact support for assistance."
   }
   if (normalized === "PENDING") {
-    return "Finalizing your payment. Please check again shortly."
+    return isRu
+      ? "\u0417\u0430\u0432\u0435\u0440\u0448\u0430\u0435\u043c \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0443 \u043f\u043b\u0430\u0442\u0435\u0436\u0430. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0447\u0443\u0442\u044c \u043f\u043e\u0437\u0436\u0435."
+      : "Finalizing your payment. Please check again shortly."
   }
-  return "Payment status update received."
+  return isRu ? "\u041f\u043e\u043b\u0443\u0447\u0435\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430 \u043e\u043f\u043b\u0430\u0442\u044b." : "Payment status update received."
 }
 
 function getDhlTrackingUrl(trackingNumber: string): string {
@@ -159,10 +166,12 @@ function isDhlCarrier(value: string): boolean {
   return value.trim().toUpperCase().includes("DHL")
 }
 
-function renderItemsFromCartJson(cartJson: unknown, currency: string) {
+function renderItemsFromCartJson(cartJson: unknown, currency: string, locale: "en" | "ru") {
   if (!cartJson) {
     return null
   }
+
+  const isRu = locale === "ru"
 
   let items: Array<Record<string, unknown>> = []
   let summary: Record<string, unknown> | null = null
@@ -188,10 +197,12 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
 
   return (
     <div className="mt-4 space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Items</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        {isRu ? "\u0422\u043e\u0432\u0430\u0440\u044b" : "Items"}
+      </p>
       <div className="space-y-2">
         {items.map((item, index) => {
-          const name = typeof item.name === "string" ? item.name : "Item"
+          const name = typeof item.name === "string" ? item.name : isRu ? "\u0422\u043e\u0432\u0430\u0440" : "Item"
           const lengthValue = asNumber(item.length)
           const category = typeof item.category === "string" ? item.category : "-"
           const quantity =
@@ -201,14 +212,16 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
                 ? item.quantity
                 : "-"
           const lineTotalNumber = asNumber(item.line_total)
-          const lineTotal = lineTotalNumber === null ? "-" : formatCurrency(lineTotalNumber, currency)
+          const lineTotal = lineTotalNumber === null ? "-" : formatCurrency(lineTotalNumber, currency, locale)
           const lengthLabel = typeof lengthValue === "number" ? `${lengthValue}"` : "-"
 
           return (
             <div key={`${name}-${index}`} className="rounded-lg border border-border/40 bg-background/70 px-3 py-2">
               <p className="text-sm font-semibold text-foreground">{name}</p>
               <p className="text-xs text-muted-foreground">
-                {lengthLabel} - {category} - x{quantity} - {lineTotal}
+                {isRu
+                  ? `${lengthLabel} • ${category} • ${quantity} \u0448\u0442. • ${lineTotal}`
+                  : `${lengthLabel} • ${category} • x${quantity} • ${lineTotal}`}
               </p>
             </div>
           )
@@ -217,12 +230,24 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
 
       {summary && (
         <div className="rounded-lg border border-border/40 bg-white px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Order Summary</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {isRu ? "\u0421\u0432\u043e\u0434\u043a\u0430 \u0437\u0430\u043a\u0430\u0437\u0430" : "Order Summary"}
+          </p>
           <div className="mt-1 grid gap-1 text-xs text-foreground">
-            <p>Subtotal: {formatCurrency(asNumber(summary.subtotal) ?? 0, currency)}</p>
-            <p>Tax: {formatCurrency(asNumber(summary.tax) ?? 0, currency)}</p>
-            <p>Shipping: {formatCurrency(asNumber(summary.shipping) ?? 0, currency)}</p>
-            <p className="font-semibold">Total: {formatCurrency(asNumber(summary.total) ?? 0, currency)}</p>
+            <p>
+              {isRu ? "\u041f\u043e\u0434\u044b\u0442\u043e\u0433" : "Subtotal"}:{" "}
+              {formatCurrency(asNumber(summary.subtotal) ?? 0, currency, locale)}
+            </p>
+            <p>
+              {isRu ? "\u041d\u0430\u043b\u043e\u0433" : "Tax"}: {formatCurrency(asNumber(summary.tax) ?? 0, currency, locale)}
+            </p>
+            <p>
+              {isRu ? "\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430" : "Shipping"}:{" "}
+              {formatCurrency(asNumber(summary.shipping) ?? 0, currency, locale)}
+            </p>
+            <p className="font-semibold">
+              {isRu ? "\u0418\u0442\u043e\u0433\u043e" : "Total"}: {formatCurrency(asNumber(summary.total) ?? 0, currency, locale)}
+            </p>
           </div>
         </div>
       )}
@@ -231,6 +256,8 @@ function renderItemsFromCartJson(cartJson: unknown, currency: string) {
 }
 
 function TrackOrderContent() {
+  const { locale } = useLocale()
+  const isRu = locale === "ru"
   const searchParams = useSearchParams()
   const hasPrefilledOrderId = useRef(false)
   const [orderId, setOrderId] = useState("")
@@ -278,13 +305,17 @@ function TrackOrderContent() {
     event.preventDefault()
 
     if (!canTrackOrder) {
-      setError("Enter both Order ID and Phone Number.")
+      setError(
+        isRu
+          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal \u0438 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
+          : "Enter both PayPal Order ID and Phone Number."
+      )
       return
     }
 
     const normalizedPhone = normalizePhone()
     if (!normalizedPhone) {
-      setError("Enter a valid phone number.")
+      setError(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430." : "Enter a valid phone number.")
       return
     }
 
@@ -309,17 +340,21 @@ function TrackOrderContent() {
 
       const data = (await response.json().catch(() => ({}))) as TrackReadResponse
       if (!response.ok) {
-        throw new Error(data.error || "Unable to track order.")
+        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437." : data.error || "Unable to track order.")
       }
 
       const nextOrders = Array.isArray(data.orders) ? data.orders : []
       setOrders(nextOrders)
       setSearched(true)
       if (nextOrders.length === 0) {
-        setError("No order found.")
+        setError(isRu ? "\u0417\u0430\u043a\u0430\u0437 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d." : "No order found.")
       }
     } catch (requestError) {
-      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to track order."
+      const safeMessage = isRu
+        ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437."
+        : requestError instanceof Error
+          ? requestError.message
+          : "Unable to track order."
       setError(safeMessage)
     } finally {
       setLoading(false)
@@ -330,7 +365,9 @@ function TrackOrderContent() {
     if (!invoiceOptInByOrder[targetOrderId]) {
       setInvoiceErrorByOrder((prev) => ({
         ...prev,
-        [targetOrderId]: "Select the invoice option first.",
+        [targetOrderId]: isRu
+          ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043c\u0435\u0442\u044c\u0442\u0435 \u043e\u043f\u0446\u0438\u044e \u0434\u043b\u044f \u0441\u0447\u0451\u0442\u0430."
+          : "Select the invoice option first.",
       }))
       return
     }
@@ -339,7 +376,9 @@ function TrackOrderContent() {
     if (!normalizedPhone) {
       setInvoiceErrorByOrder((prev) => ({
         ...prev,
-        [targetOrderId]: "Phone number is missing. Please search the order again.",
+        [targetOrderId]: isRu
+          ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u0438\u0441\u043a \u0437\u0430\u043a\u0430\u0437\u0430."
+          : "Phone number is missing. Please search the order again.",
       }))
       return
     }
@@ -360,12 +399,12 @@ function TrackOrderContent() {
 
       const data = (await response.json().catch(() => ({}))) as SendInvoiceResponse
       if (!response.ok) {
-        throw new Error(data.error || "Unable to send invoice.")
+        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442." : data.error || "Unable to send invoice.")
       }
 
       const successMessage = data.destination
-        ? `${data.message || "Invoice sent successfully."} (${data.destination})`
-        : data.message || "Invoice sent successfully."
+        ? `${data.message || (isRu ? "\u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d." : "Invoice sent successfully.")} (${data.destination})`
+        : data.message || (isRu ? "\u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d." : "Invoice sent successfully.")
 
       setInvoiceSuccessByOrder((prev) => ({
         ...prev,
@@ -376,7 +415,11 @@ function TrackOrderContent() {
         [targetOrderId]: false,
       }))
     } catch (requestError) {
-      const safeMessage = requestError instanceof Error ? requestError.message : "Unable to send invoice."
+      const safeMessage = isRu
+        ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442."
+        : requestError instanceof Error
+          ? requestError.message
+          : "Unable to send invoice."
       setInvoiceErrorByOrder((prev) => ({
         ...prev,
         [targetOrderId]: safeMessage,
@@ -394,29 +437,39 @@ function TrackOrderContent() {
         <div className="rounded-2xl border border-border/40 bg-card/80 p-6 shadow-lg sm:p-8">
           {primaryOrder && (
             <section className="mb-6 rounded-xl border border-border/40 bg-white p-4 sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Payment Status</p>
-              <h2 className="mt-2 font-serif text-2xl font-bold text-foreground">{paymentStatusTitle(primaryOrder.status)}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{paymentStatusMessage(primaryOrder.status)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                {isRu ? "\u0421\u0442\u0430\u0442\u0443\u0441 \u043e\u043f\u043b\u0430\u0442\u044b" : "Payment Status"}
+              </p>
+              <h2 className="mt-2 font-serif text-2xl font-bold text-foreground">
+                {paymentStatusTitle(primaryOrder.status, isRu)}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">{paymentStatusMessage(primaryOrder.status, isRu)}</p>
               <p className="mt-3 text-sm text-muted-foreground">
-                PayPal Order ID: <span className="font-semibold text-foreground">{primaryOrder.orderId}</span>
+                {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal" : "PayPal Order ID"}:{" "}
+                <span className="font-semibold text-foreground">{primaryOrder.orderId}</span>
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Current status: <span className="font-semibold text-foreground">{primaryOrder.status}</span>
+                {isRu ? "\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441" : "Current status"}:{" "}
+                <span className="font-semibold text-foreground">{primaryOrder.status}</span>
               </p>
             </section>
           )}
 
           <p id="order-tracking" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Order Tracking
+            {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430" : "Order Tracking"}
           </p>
-          <h1 className="mt-3 font-serif text-3xl font-bold text-foreground sm:text-4xl">Track Your Order</h1>
+          <h1 className="mt-3 font-serif text-3xl font-bold text-foreground sm:text-4xl">
+            {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437" : "Track Your Order"}
+          </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Enter your PayPal Order ID and WhatsApp number to view order details.
+            {isRu
+              ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 PayPal Order ID \u0438 \u043d\u043e\u043c\u0435\u0440 WhatsApp, \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0434\u0435\u0442\u0430\u043b\u0438 \u0437\u0430\u043a\u0430\u0437\u0430."
+              : "Enter your PayPal Order ID and WhatsApp number to view order details."}
           </p>
 
           <form className="mt-6 space-y-4" onSubmit={handleTrackOrder}>
             <label className="block text-xs font-medium text-muted-foreground">
-              Order ID
+              {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal" : "PayPal Order ID"}
               <input
                 type="text"
                 value={orderId}
@@ -424,13 +477,13 @@ function TrackOrderContent() {
                   setOrderId(event.target.value)
                   resetTrackingState()
                 }}
-                placeholder="Example: 5PE7892813655042E"
+                placeholder={isRu ? "\u041f\u0440\u0438\u043c\u0435\u0440: 5PE7892813655042E" : "Example: 5PE7892813655042E"}
                 className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
               />
             </label>
 
             <label className="block text-xs font-medium text-muted-foreground">
-              Phone Number
+              {isRu ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Phone Number"}
               <input
                 type="tel"
                 value={phoneNumber}
@@ -438,7 +491,7 @@ function TrackOrderContent() {
                   setPhoneNumber(event.target.value)
                   resetTrackingState()
                 }}
-                placeholder="Example: +62812xxxxxxx"
+                placeholder={isRu ? "\u041f\u0440\u0438\u043c\u0435\u0440: +62812xxxxxxx" : "Example: +62812xxxxxxx"}
                 className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
               />
             </label>
@@ -450,14 +503,22 @@ function TrackOrderContent() {
                 loading || !canTrackOrder ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
               }`}
             >
-              {loading ? "Checking..." : "Track Order"}
+              {loading
+                ? isRu
+                  ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
+                  : "Checking..."
+                : isRu
+                  ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c"
+                  : "Track Order"}
             </button>
           </form>
 
           {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
 
           {!error && searched && !loading && orders.length === 0 && (
-            <p className="mt-4 text-sm text-muted-foreground">No order found for the provided data.</p>
+            <p className="mt-4 text-sm text-muted-foreground">
+              {isRu ? "\u0417\u0430\u043a\u0430\u0437 \u043f\u043e \u0443\u043a\u0430\u0437\u0430\u043d\u043d\u044b\u043c \u0434\u0430\u043d\u043d\u044b\u043c \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d." : "No order found for the provided data."}
+            </p>
           )}
 
           {orders.length > 0 && (
@@ -465,33 +526,49 @@ function TrackOrderContent() {
               {orders.map((order) => (
                 <article key={order.orderId} className="rounded-xl border border-border/40 bg-background/60 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-foreground">Order ID: {order.orderId}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {isRu ? "Order ID" : "Order ID"}: {order.orderId}
+                    </p>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(order.status)}`}>
                       {order.status}
                     </span>
                   </div>
 
                   <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
-                    {order.customerName && <p>Name: {maskCustomerName(order.customerName)}</p>}
-                    {order.phoneNumber && <p>Phone: {maskPhoneNumber(order.phoneNumber)}</p>}
+                    {order.customerName && (
+                      <p>
+                        {isRu ? "\u0418\u043c\u044f" : "Name"}: {maskCustomerName(order.customerName)}
+                      </p>
+                    )}
+                    {order.phoneNumber && (
+                      <p>
+                        {isRu ? "\u0422\u0435\u043b\u0435\u0444\u043e\u043d" : "Phone"}: {maskPhoneNumber(order.phoneNumber)}
+                      </p>
+                    )}
                     <p>
-                      Amount: {order.currency} {Number(order.amount).toFixed(2)}
+                      {isRu ? "\u0421\u0443\u043c\u043c\u0430" : "Amount"}: {order.currency} {Number(order.amount).toFixed(2)}
                     </p>
                   </div>
 
-                  {renderItemsFromCartJson(order.cartJson, order.currency)}
+                  {renderItemsFromCartJson(order.cartJson, order.currency, locale)}
 
                   <section className="mt-4 rounded-xl border border-[#D4AF37]/30 bg-[#FFFDF8] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">Shipment Tracking</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">
+                      {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438" : "Shipment Tracking"}
+                    </p>
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-lg border border-[#D4AF37]/20 bg-white px-3 py-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tracking Number</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {isRu ? "\u0422\u0440\u0435\u043a-\u043d\u043e\u043c\u0435\u0440" : "Tracking Number"}
+                        </p>
                         <p className="mt-1 break-all text-sm font-semibold text-foreground">{order.trackingNumber || "-"}</p>
                       </div>
 
                       <div className="rounded-lg border border-[#D4AF37]/20 bg-white px-3 py-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Carrier</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {isRu ? "\u041f\u0435\u0440\u0435\u0432\u043e\u0437\u0447\u0438\u043a" : "Carrier"}
+                        </p>
                         <p className="mt-1 text-sm font-semibold text-foreground">{order.shippingCarrier || "-"}</p>
                       </div>
                     </div>
@@ -503,23 +580,31 @@ function TrackOrderContent() {
                         rel="noopener noreferrer"
                         className="mt-3 inline-flex items-center justify-center rounded-lg bg-[#FFCC00] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#1F1F1F] transition-colors hover:bg-[#E7B900]"
                       >
-                        Track on DHL
+                        {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0432 DHL" : "Track on DHL"}
                       </a>
                     )}
 
                     {!order.trackingNumber && (
                       <p className="mt-3 text-xs text-muted-foreground">
-                        Tracking info will appear here once your shipment is dispatched.
+                        {isRu
+                          ? "\u0422\u0440\u0435\u043a-\u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c \u043f\u043e\u0441\u043b\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u043f\u043e\u0441\u044b\u043b\u043a\u0438."
+                          : "Tracking info will appear here once your shipment is dispatched."}
                       </p>
                     )}
                   </section>
 
                   <section className="mt-4 rounded-xl border border-border/40 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Invoice</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                      {isRu ? "\u0421\u0447\u0451\u0442" : "Invoice"}
+                    </p>
                     <p className="mt-2 text-sm text-muted-foreground">
                       {order.canSendInvoice
-                        ? "If you need an invoice, we can send it to your registered email."
-                        : "Invoice email is not available for this order."}
+                        ? isRu
+                          ? "\u0415\u0441\u043b\u0438 \u0432\u0430\u043c \u043d\u0443\u0436\u0435\u043d \u0441\u0447\u0451\u0442, \u043c\u044b \u043c\u043e\u0436\u0435\u043c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0435\u0433\u043e \u043d\u0430 \u0432\u0430\u0448 email."
+                          : "If you need an invoice, we can send it to your registered email."
+                        : isRu
+                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 \u0441\u0447\u0451\u0442\u0430 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0434\u043b\u044f \u044d\u0442\u043e\u0433\u043e \u0437\u0430\u043a\u0430\u0437\u0430."
+                          : "Invoice email is not available for this order."}
                     </p>
 
                     <label
@@ -541,8 +626,12 @@ function TrackOrderContent() {
                       />
                       <span>
                         {order.canSendInvoice
-                          ? `Send invoice to ${order.customerEmailMasked || "your registered email"}`
-                          : "Please contact support if you need manual invoice assistance."}
+                          ? isRu
+                            ? `\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442 \u043d\u0430 ${order.customerEmailMasked || "\u0432\u0430\u0448 email"}`
+                            : `Send invoice to ${order.customerEmailMasked || "your registered email"}`
+                          : isRu
+                            ? "\u0415\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u0430 \u043f\u043e\u043c\u043e\u0449\u044c \u0441\u043e \u0441\u0447\u0451\u0442\u043e\u043c, \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435 \u0432 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0443."
+                            : "Please contact support if you need manual invoice assistance."}
                       </span>
                     </label>
 
@@ -562,7 +651,13 @@ function TrackOrderContent() {
                           : "hover:bg-secondary"
                       }`}
                     >
-                      {invoiceLoadingByOrder[order.orderId] ? "Sending Invoice..." : "Send Invoice to Email"}
+                      {invoiceLoadingByOrder[order.orderId]
+                        ? isRu
+                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c \u0441\u0447\u0451\u0442..."
+                          : "Sending Invoice..."
+                        : isRu
+                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442 \u043d\u0430 email"
+                          : "Send Invoice to Email"}
                     </button>
 
                     {invoiceSuccessByOrder[order.orderId] && (

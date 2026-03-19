@@ -81,10 +81,9 @@ type OrderStatsState =
   | { status: "error"; message: string }
   | {
       status: "ready"
-      windowDays: number
       totalOrders: number
-      newOrders: number
-      completedOrders: number
+      deliveredOrders: number
+      shippedOrders: number
       cancelledOrders: number
     }
 
@@ -98,6 +97,13 @@ function formatCount(value: number) {
   } catch {
     return String(safe)
   }
+}
+
+function formatPercent(part: number, total: number) {
+  const safePart = Number.isFinite(part) ? part : 0
+  const safeTotal = Number.isFinite(total) ? total : 0
+  if (safeTotal <= 0) return 0
+  return Math.round((safePart / safeTotal) * 100)
 }
 
 function formatMoney(amount: number, currency: string) {
@@ -174,17 +180,18 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
     }
 
     setStats({ status: "loading" })
-    const response = await fetch("/api/admin/orders/stats", {
+    const response = await fetch("/api/admin/stats", {
       headers: { authorization: `Bearer ${token}` },
     })
 
     const payload = (await response.json().catch(() => ({}))) as {
       error?: string
-      windowDays?: number
-      totalOrders?: number
-      newOrders?: number
-      completedOrders?: number
-      cancelledOrders?: number
+      orders?: {
+        total?: number
+        delivered?: number
+        shipped?: number
+        cancelled?: number
+      }
     }
 
     if (!response.ok) {
@@ -192,15 +199,14 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
       return
     }
 
+    const orders = payload.orders ?? {}
+
     setStats({
       status: "ready",
-      windowDays: typeof payload.windowDays === "number" ? payload.windowDays : 365,
-      totalOrders: typeof payload.totalOrders === "number" ? payload.totalOrders : Number(payload.totalOrders ?? 0),
-      newOrders: typeof payload.newOrders === "number" ? payload.newOrders : Number(payload.newOrders ?? 0),
-      completedOrders:
-        typeof payload.completedOrders === "number" ? payload.completedOrders : Number(payload.completedOrders ?? 0),
-      cancelledOrders:
-        typeof payload.cancelledOrders === "number" ? payload.cancelledOrders : Number(payload.cancelledOrders ?? 0),
+      totalOrders: typeof orders.total === "number" ? orders.total : Number(orders.total ?? 0),
+      deliveredOrders: typeof orders.delivered === "number" ? orders.delivered : Number(orders.delivered ?? 0),
+      shippedOrders: typeof orders.shipped === "number" ? orders.shipped : Number(orders.shipped ?? 0),
+      cancelledOrders: typeof orders.cancelled === "number" ? orders.cancelled : Number(orders.cancelled ?? 0),
     })
   }
 
@@ -471,45 +477,52 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
             ) : (
               <Skeleton className="mt-3 h-6 w-24" />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              Total Orders last {stats.status === "ready" ? stats.windowDays : 365} days
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">All orders from analytics</p>
           </div>
 
           <div className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">New Orders</p>
+            <p className="text-xs font-medium text-muted-foreground">Delivered</p>
             {stats.status === "ready" ? (
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCount(stats.newOrders)}</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">
+                {formatCount(stats.deliveredOrders)}{" "}
+                <span className="text-xs font-medium text-muted-foreground">
+                  ({formatPercent(stats.deliveredOrders, stats.totalOrders)}%)
+                </span>
+              </p>
             ) : (
               <Skeleton className="mt-3 h-6 w-24" />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              New Orders last {stats.status === "ready" ? stats.windowDays : 365} days
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Delivered orders</p>
           </div>
 
           <div className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Completed Orders</p>
+            <p className="text-xs font-medium text-muted-foreground">Shipped</p>
             {stats.status === "ready" ? (
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCount(stats.completedOrders)}</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">
+                {formatCount(stats.shippedOrders)}{" "}
+                <span className="text-xs font-medium text-muted-foreground">
+                  ({formatPercent(stats.shippedOrders, stats.totalOrders)}%)
+                </span>
+              </p>
             ) : (
               <Skeleton className="mt-3 h-6 w-24" />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              Completed Order last {stats.status === "ready" ? stats.windowDays : 365} days
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Shipped orders</p>
           </div>
 
           <div className="p-4">
             <p className="text-xs font-medium text-muted-foreground">Cancelled Orders</p>
             {stats.status === "ready" ? (
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCount(stats.cancelledOrders)}</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">
+                {formatCount(stats.cancelledOrders)}{" "}
+                <span className="text-xs font-medium text-muted-foreground">
+                  ({formatPercent(stats.cancelledOrders, stats.totalOrders)}%)
+                </span>
+              </p>
             ) : (
               <Skeleton className="mt-3 h-6 w-24" />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              Cancelled Order last {stats.status === "ready" ? stats.windowDays : 365} days
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Cancelled orders</p>
           </div>
         </div>
 
@@ -524,9 +537,9 @@ export function AdminOrdersClient({ initialQuery, initialStatus }: { initialQuer
           <p className="mt-1 text-xs text-muted-foreground">Use the top search bar to filter orders.</p>
         </div>
 
-        <div className="w-full sm:w-[200px]">
+        <div className="w-full sm:w-fit">
           <Select value={status} onValueChange={(value) => setStatus(value as StatusOption)}>
-            <SelectTrigger className="h-9 w-full">
+            <SelectTrigger className="h-9 w-full sm:w-fit sm:min-w-[150px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>

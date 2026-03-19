@@ -4,6 +4,7 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { useLocale } from "@/context/LocaleContext"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,8 @@ import {
 export function WelcomeCouponPopup() {
   const coupon = getWelcomeCoupon()
   const pathname = usePathname()
+  const { locale } = useLocale()
+  const isRu = locale === "ru"
   const [open, setOpen] = useState(false)
   const [alreadyClaimed, setAlreadyClaimed] = useState(false)
 
@@ -48,6 +51,30 @@ export function WelcomeCouponPopup() {
     }
   }
 
+  const copy = isRu
+    ? {
+        imageAlt: "Премиальные коллекции волос",
+        badge: "Подарок новым клиентам",
+        title: "Купон на скидку 25%",
+        description: "Используйте этот приветственный купон при оформлении заказа и сэкономьте на первой покупке.",
+        codeLabel: "Промокод",
+        useNow: "Использовать купон",
+        claim: "Получить купон",
+        later: "Позже",
+        couponDescriptionFallback: "Скидка 25% на первый заказ.",
+      }
+    : {
+        imageAlt: "Premium hair collections",
+        badge: "New Visitor Gift",
+        title: "Claim 25% Coupon",
+        description: "Use this welcome coupon at checkout for extra savings on your first order.",
+        codeLabel: "Coupon Code",
+        useNow: "Use Coupon Now",
+        claim: "Claim Coupon",
+        later: "Maybe Later",
+        couponDescriptionFallback: "25% off your first order.",
+      }
+
   return (
     <Dialog
       open={open}
@@ -63,31 +90,31 @@ export function WelcomeCouponPopup() {
         <div className="relative h-44">
           <Image
             src="/images/hero.jpg"
-            alt="Premium hair collections"
+            alt={copy.imageAlt}
             fill
             sizes="(max-width: 640px) 100vw, 576px"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
           <div className="absolute left-5 top-5 rounded-full bg-[#D4AF37] px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-[#1b1814]">
-            New Visitor Gift
+            {copy.badge}
           </div>
         </div>
 
         <div className="space-y-4 p-6">
           <DialogHeader className="space-y-2 text-left">
             <DialogTitle className="font-serif text-3xl leading-none text-[#171411]">
-              Claim 25% Coupon
+              {copy.title}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Use this welcome coupon at checkout for extra savings on your first order.
+              {copy.description}
             </DialogDescription>
           </DialogHeader>
 
           <div className="rounded-lg border border-dashed border-[#D4AF37]/60 bg-[#FFF7E6] px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#8A6510]">Coupon Code</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#8A6510]">{copy.codeLabel}</p>
             <p className="mt-1 text-2xl font-bold tracking-wider text-[#1F1810]">{coupon.code}</p>
-            <p className="mt-1 text-xs text-[#7A6A4A]">{coupon.description}</p>
+            <p className="mt-1 text-xs text-[#7A6A4A]">{coupon.description || copy.couponDescriptionFallback}</p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -96,10 +123,10 @@ export function WelcomeCouponPopup() {
               onClick={handleClaimCoupon}
               className="bg-[#1F1810] text-white hover:bg-[#2A2218] sm:flex-1"
             >
-              {alreadyClaimed ? "Use Coupon Now" : "Claim Coupon"}
+              {alreadyClaimed ? copy.useNow : copy.claim}
             </Button>
             <Button type="button" variant="outline" onClick={closePopup} className="sm:flex-1">
-              Maybe Later
+              {copy.later}
             </Button>
           </div>
         </div>

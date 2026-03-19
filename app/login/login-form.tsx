@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { withLocaleHref } from "@/lib/i18n"
+import { useLocale } from "@/context/LocaleContext"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -28,6 +30,9 @@ function appendReturnTo(target: string, returnTo: string | null) {
 
 export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?: string }) {
   const router = useRouter()
+  const { locale } = useLocale()
+  const isRu = locale === "ru"
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -36,8 +41,8 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
   const authEnabled = Boolean(supabase)
 
   const loginSchema = z.object({
-    email: z.string().trim().email("Enter a valid email address."),
-    password: z.string().min(1, "Password is required."),
+    email: z.string().trim().email(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 email-\u0430\u0434\u0440\u0435\u0441." : "Enter a valid email address."),
+    password: z.string().min(1, isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d." : "Password is required."),
   })
 
   type LoginValues = z.infer<typeof loginSchema>
@@ -57,7 +62,9 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
     if (!supabase) {
       form.setError("root", {
         message:
-          "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
+          isRu
+            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 NEXT_PUBLIC_SUPABASE_URL \u0438 NEXT_PUBLIC_SUPABASE_ANON_KEY \u0432 \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 \u043e\u043a\u0440\u0443\u0436\u0435\u043d\u0438\u044f."
+            : "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
       })
       return
     }
@@ -74,10 +81,12 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
         return
       }
 
-      setSuccessMessage("Signed in successfully.")
+      setSuccessMessage(isRu ? "\u0412\u0445\u043e\u0434 \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d." : "Signed in successfully.")
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
-      router.push(appendReturnTo(safeNext, safeReturnTo))
+      const nextTarget = localizedHref(safeNext)
+      const returnTarget = safeReturnTo ? localizedHref(safeReturnTo) : null
+      router.push(appendReturnTo(nextTarget, returnTarget))
       router.refresh()
     } finally {
       setIsSubmitting(false)
@@ -88,7 +97,9 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
     <div className="rounded-2xl border border-border/30 bg-card/60 p-6 shadow-sm">
       {!authEnabled && (
         <p className="mb-4 text-sm text-muted-foreground">
-          Auth is not configured yet. Ask an admin to add Supabase public env variables (anon key).
+          {isRu
+            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u0435\u0449\u0451 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u041f\u043e\u043f\u0440\u043e\u0441\u0438\u0442\u0435 \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0430 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 env \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 Supabase (\u0430\u043d\u043e\u043d\u0438\u043c\u043d\u044b\u0439 \u043a\u043b\u044e\u0447)."
+            : "Auth is not configured yet. Ask an admin to add Supabase public env variables (anon key)."}
         </p>
       )}
 
@@ -99,7 +110,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>{isRu ? "Email" : "Email"}</FormLabel>
                 <FormControl>
                   <Input type="email" autoComplete="email" placeholder="you@example.com" {...field} />
                 </FormControl>
@@ -113,7 +124,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>{isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c" : "Password"}</FormLabel>
                 <FormControl>
                   <Input type="password" autoComplete="current-password" {...field} />
                 </FormControl>
@@ -128,22 +139,28 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
           {successMessage && <p className="text-sm text-foreground">{successMessage}</p>}
 
           <Button type="submit" className="w-full" disabled={!authEnabled || isSubmitting}>
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting
+              ? isRu
+                ? "\u0412\u0445\u043e\u0434..."
+                : "Signing in..."
+              : isRu
+                ? "\u0412\u043e\u0439\u0442\u0438"
+                : "Sign in"}
           </Button>
 
            <p className="text-center text-sm text-muted-foreground">
-             New here?{" "}
+             {isRu ? "\u0412\u043f\u0435\u0440\u0432\u044b\u0435 \u0443 \u043d\u0430\u0441?" : "New here?"}{" "}
              <Link
-               href={`/register${(() => {
+               href={`${localizedHref("/register")}${(() => {
                  const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
                  const safeReturnTo = sanitizeInternalPath(returnTo)
-                 const params = new URLSearchParams({ next: safeNext })
-                 if (safeReturnTo) params.set("returnTo", safeReturnTo)
+                 const params = new URLSearchParams({ next: localizedHref(safeNext) })
+                 if (safeReturnTo) params.set("returnTo", localizedHref(safeReturnTo))
                  return `?${params.toString()}`
                })()}`}
                className="font-medium text-foreground underline underline-offset-4"
              >
-               Create an account
+               {isRu ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442" : "Create an account"}
              </Link>
            </p>
         </form>

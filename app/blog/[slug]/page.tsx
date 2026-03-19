@@ -8,7 +8,10 @@ import { RecommendedProductsCarousel } from "@/components/recommended-products-c
 import { JsonLd } from "@/components/json-ld"
 import { BLOG_POSTS, getBlogPostBySlug } from "@/lib/blog-posts"
 import { ALL_CATALOG_PRODUCTS } from "@/lib/catalog-index"
-import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
+import { absoluteUrl, getSiteUrl } from "@/lib/seo"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { withLocaleHref } from "@/lib/i18n"
+import { getMessages } from "@/lib/messages"
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -16,8 +19,9 @@ type BlogPostPageProps = {
   }>
 }
 
-function formatPublishedDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+function formatPublishedDate(value: string, locale: "en" | "ru"): string {
+  const localeTag = locale === "ru" ? "ru-RU" : "en-US"
+  return new Intl.DateTimeFormat(localeTag, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -31,26 +35,29 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params
   const post = getBlogPostBySlug(slug)
+  const locale = await getLocaleFromRequestHeaders()
+  const messages = getMessages(locale)
 
   if (!post) {
-    return buildPageMetadata({
-      title: "Blog Article Not Found",
-      description: "The requested blog article could not be found.",
-      path: `/blog/${slug}`,
+    return buildLocalizedPageMetadata({
+      title: messages.blog.blogNotFoundTitle,
+      description: messages.blog.blogNotFoundDescription,
       noIndex: true,
     })
   }
 
-  return buildPageMetadata({
+  return buildLocalizedPageMetadata({
     title: post.title,
     description: post.excerpt,
-    path: `/blog/${post.slug}`,
     keywords: [post.category.toLowerCase(), "hair care", "human hair", "extensions tips"],
     images: [post.coverImage],
   })
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
+  const locale = await getLocaleFromRequestHeaders()
+  const messages = getMessages(locale)
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
   const { slug } = await params
   const post = getBlogPostBySlug(slug)
 
@@ -75,12 +82,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       name: "CANDRA'S HAIR",
       logo: {
         "@type": "ImageObject",
-        url: absoluteUrl("/images/logo-mark.png"),
+        url: `${getSiteUrl()}/images/logo-mark.png`,
       },
     },
     datePublished: post.publishedAt,
     dateModified: post.publishedAt,
-    mainEntityOfPage: absoluteUrl(`/blog/${post.slug}`),
+    mainEntityOfPage: absoluteUrl(localizedHref(`/blog/${post.slug}`)),
   }
   const faqSchema =
     post.faqs.length > 0
@@ -110,16 +117,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <nav aria-label="Breadcrumb" className="mb-5">
               <ol className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-[#6b6b70]">
                 <li>
-                  <Link href="/" className="transition-colors hover:text-[#1f1f1f]">
-                    Home
+                  <Link href={localizedHref("/")} className="transition-colors hover:text-[#1f1f1f]">
+                    {messages.catalog.breadcrumbHome}
                   </Link>
                 </li>
                 <li aria-hidden="true" className="text-[#9a9aa0]">
                   /
                 </li>
                 <li>
-                  <Link href="/blog" className="transition-colors hover:text-[#1f1f1f]">
-                    Blog
+                  <Link href={localizedHref("/blog")} className="transition-colors hover:text-[#1f1f1f]">
+                    {messages.blog.breadcrumbBlog}
                   </Link>
                 </li>
                 <li aria-hidden="true" className="text-[#9a9aa0]">
@@ -132,7 +139,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6b22]">{post.category}</p>
             <h1 className="mt-3 font-serif text-4xl font-bold leading-tight text-[#151515] sm:text-5xl">{post.title}</h1>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#616167]">
-              <span>{formatPublishedDate(post.publishedAt)}</span>
+              <span>{formatPublishedDate(post.publishedAt, locale)}</span>
               <span aria-hidden="true" className="text-[#b7aea4]">|</span>
               <span>{post.readingTime}</span>
               <span aria-hidden="true" className="text-[#b7aea4]">|</span>
@@ -168,7 +175,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             {post.faqs.length > 0 && (
               <section className="mt-12 rounded-2xl border border-[#ddd2c8] bg-white p-5 sm:p-6">
                 <h2 className="text-2xl font-semibold leading-tight text-[#171717]">
-                  Frequently Asked Questions
+                  {messages.catalog.faqFallbackHeading}
                 </h2>
                 <div className="mt-4 divide-y divide-[#e7dfd7]">
                   {post.faqs.map((item) => (
@@ -183,23 +190,23 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
             <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-[#ddd2c8] pt-6">
               <Link
-                href="/blog"
+                href={localizedHref("/blog")}
                 className="inline-flex items-center rounded-md border border-[#c9beb3] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#222] transition-colors hover:bg-[#f7efe6]"
               >
-                Back to Blog
+                {messages.blog.backToBlog}
               </Link>
               <Link
-                href="/bulk-hair"
+                href={localizedHref("/bulk-hair")}
                 className="inline-flex items-center rounded-md bg-[#1f1f1f] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-[#332f2a]"
               >
-                Shop Collection
+                {messages.blog.shopCollection}
               </Link>
             </div>
           </article>
 
           <aside className="h-fit rounded-2xl border border-[#ddd2c8] bg-white p-4 lg:sticky lg:top-[132px]">
-            <h2 className="text-lg font-semibold uppercase tracking-[0.14em] text-[#171717]">Blog Preview</h2>
-            <p className="mt-1 text-sm text-[#66666d]">More articles you might enjoy.</p>
+            <h2 className="text-lg font-semibold uppercase tracking-[0.14em] text-[#171717]">{messages.blog.previewTitle}</h2>
+            <p className="mt-1 text-sm text-[#66666d]">{messages.blog.previewSubtitle}</p>
 
             <div className="mt-4 space-y-4">
               {previewPosts.map((preview) => (
@@ -207,7 +214,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   key={preview.slug}
                   className="overflow-hidden rounded-xl border border-[#e6ddd4] bg-[#fbfaf8]"
                 >
-                  <Link href={`/blog/${preview.slug}`} className="block">
+                  <Link href={localizedHref(`/blog/${preview.slug}`)} className="block">
                     <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#efe7dd]">
                       <Image
                         src={preview.coverImage}
@@ -224,18 +231,20 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                       {preview.category}
                     </p>
                     <h3 className="mt-1 text-base font-semibold leading-tight text-[#111]">
-                      <Link href={`/blog/${preview.slug}`} className="transition-colors hover:text-[#8a6b22]">
+                      <Link href={localizedHref(`/blog/${preview.slug}`)} className="transition-colors hover:text-[#8a6b22]">
                         {preview.title}
                       </Link>
                     </h3>
-                    <p className="mt-1 text-xs text-[#6e6e75]">Publish Date: {formatPublishedDate(preview.publishedAt)}</p>
+                    <p className="mt-1 text-xs text-[#6e6e75]">
+                      {messages.blog.publishDateLabel}: {formatPublishedDate(preview.publishedAt, locale)}
+                    </p>
                     <p className="mt-2 text-sm leading-relaxed text-[#35353b]">{preview.excerpt}</p>
                     <div className="mt-3">
                       <Link
-                        href={`/blog/${preview.slug}`}
+                        href={localizedHref(`/blog/${preview.slug}`)}
                         className="text-xs font-semibold uppercase tracking-[0.14em] text-[#222] hover:text-[#8a6b22]"
                       >
-                        View More -&gt;
+                        {messages.blog.viewMoreLabel}
                       </Link>
                     </div>
                   </div>
@@ -246,7 +255,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </div>
 
         <div className="mt-10 border-t border-[#ddd2c8] pt-8">
-          <RecommendedProductsCarousel products={recommendedProducts} title="Recommended for You" />
+          <RecommendedProductsCarousel products={recommendedProducts} />
         </div>
       </section>
 

@@ -163,7 +163,8 @@ const PRODUCT_PRICING: Record<
 }
 
 const COLOR_LABELS: Record<string, string> = {
-  "#ash": "Ash",
+  "#ash": "grey",
+  "#grey": "grey",
   "#60": "Light Blonde",
   "#613": "Gold Blonde",
   "#24": "Medium Ash",
@@ -178,7 +179,7 @@ const COLOR_LABELS: Record<string, string> = {
 }
 
 const BULK_COLOR_PLUS_30_CODES = new Set(["#4", "#8", "#10"])
-const BULK_COLOR_PLUS_40_CODES = new Set(["#12", "#14", "#16", "#18", "#24", "#60", "#613", "#ash"])
+const BULK_COLOR_PLUS_40_CODES = new Set(["#12", "#14", "#16", "#18", "#24", "#60", "#613", "#ash", "#grey"])
 
 export const checkoutItemSchema = z.object({
   slug: z.string().trim().min(1).max(128),
@@ -211,10 +212,13 @@ function normalizeColorCodeVariant(normalizedVariant: string | null): string | n
   }
 
   if (normalizedVariant.startsWith("#")) {
-    return normalizedVariant
+    return normalizedVariant === "#ash" ? "#grey" : normalizedVariant
   }
 
-  if (/^(ash|\d{1,3})$/.test(normalizedVariant)) {
+  if (/^(ash|grey|\d{1,3})$/.test(normalizedVariant)) {
+    if (normalizedVariant === "ash" || normalizedVariant === "grey") {
+      return "#grey"
+    }
     return `#${normalizedVariant}`
   }
 
@@ -260,14 +264,15 @@ function getColorDisplay(variant?: string): string | null {
   }
 
   const normalized = normalizeVariant(variant)
-  if (!normalized || normalized === "default") {
+  const colorCode = normalizeColorCodeVariant(normalized)
+  if (!colorCode) {
     return null
   }
 
-  const colorCode = normalized.startsWith("#") ? normalized : `#${normalized}`
   const label = COLOR_LABELS[colorCode]
   if (label) {
-    return `${label} ${colorCode.toUpperCase()}`
+    const displayCode = colorCode === "#grey" ? "#grey" : colorCode.toUpperCase()
+    return `${label} ${displayCode}`
   }
 
   return variant.trim()
@@ -358,8 +363,9 @@ export function calculateOrderFromItems(
       )
     : 0
   const subtotalCents = lineItemsSubtotalCents - couponDiscountCents
-  const taxCents = Math.round(subtotalCents * TAX_RATE)
-  const shippingCents = subtotalCents >= dollarsToCents(FREE_SHIPPING_THRESHOLD_DOLLARS) ? 0 : dollarsToCents(SHIPPING_DOLLARS)
+  const taxCents = Math.round(lineItemsSubtotalCents * TAX_RATE)
+  const shippingCents =
+    lineItemsSubtotalCents >= dollarsToCents(FREE_SHIPPING_THRESHOLD_DOLLARS) ? 0 : dollarsToCents(SHIPPING_DOLLARS)
   const totalCents = subtotalCents + taxCents + shippingCents
 
   return {

@@ -3,18 +3,28 @@ import { JsonLd } from "@/components/json-ld"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { EXTENSIONS_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
-import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
+import { absoluteUrl } from "@/lib/seo"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { withLocaleHref } from "@/lib/i18n"
 
-export const metadata: Metadata = buildPageMetadata({
-  title: "Hair Extensions Collection",
-  description:
-    "Shop premium clip-in, tape-in, and bundle hair extensions made from 100% human hair for natural length and volume.",
-  path: "/extensions",
-  keywords: ["hair extensions", "clip in hair extensions", "tape in extensions", "human hair bundles"],
-  images: ["/images/extensions-1.jpg"],
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocaleFromRequestHeaders()
+  const title = locale === "ru" ? "Наращивание — коллекция" : "Hair Extensions Collection"
+  const description =
+    locale === "ru"
+      ? "Премиальные clip-in, tape-in и пряди из 100% натуральных волос — для естественной длины и объема."
+      : "Shop premium clip-in, tape-in, and bundle hair extensions made from 100% human hair for natural length and volume."
 
-export default function ExtensionsPage() {
+  return buildLocalizedPageMetadata({
+    title,
+    description,
+    keywords: ["hair extensions", "clip in hair extensions", "tape in extensions", "human hair bundles"],
+    images: ["/images/extensions-1.jpg"],
+  })
+}
+
+export default async function ExtensionsPage() {
+  const locale = await getLocaleFromRequestHeaders()
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -34,14 +44,14 @@ export default function ExtensionsPage() {
       {
         "@type": "ListItem",
         position: 1,
-        name: "Home",
-        item: absoluteUrl("/"),
+        name: locale === "ru" ? "Главная" : "Home",
+        item: absoluteUrl(withLocaleHref("/", locale)),
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: "Extensions",
-        item: absoluteUrl("/extensions"),
+        name: locale === "ru" ? "Наращивание" : "Extensions",
+        item: absoluteUrl(withLocaleHref("/extensions", locale)),
       },
     ],
   }
@@ -52,10 +62,10 @@ export default function ExtensionsPage() {
       <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={EXTENSIONS_PRODUCTS}
-        filterTitle="Extension Types"
+        filterTitle={locale === "ru" ? "Тип" : "Extension Types"}
         sortId="sort-extensions"
         activeCatalogGroup="extensions"
-        faqHeading="Frequently Asked Questions About Hair Extensions"
+        faqHeading={locale === "ru" ? "Часто задаваемые вопросы о наращивании" : "Frequently Asked Questions About Hair Extensions"}
         faqItems={EXTENSIONS_FAQS}
       />
     </>

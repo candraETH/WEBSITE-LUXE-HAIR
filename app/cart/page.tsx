@@ -4,9 +4,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { MAX_ITEM_QUANTITY, useCart } from "@/context/CartContext"
+import { useLocale } from "@/context/LocaleContext"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/footer"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
+import { withLocaleHref } from "@/lib/i18n"
 import {
   EMPTY_CHECKOUT_DETAILS,
   isValidEmail,
@@ -19,6 +21,8 @@ import { containsDisallowedAddressMarker, hasAddressLettersAndNumbers } from "@/
 import { formatUsdPrice, recoverOriginalPriceFromDiscounted } from "@/lib/pricing"
 import { readAddresses } from "@/lib/address-book"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { getProductDisplayCopy } from "@/lib/product-copy"
+import { formatVariantDisplay } from "@/lib/variant-display"
 import {
   calculateCouponDiscount,
   clearActiveCouponCode,
@@ -45,6 +49,9 @@ type VerifyVerificationResponse = {
 
 export default function CartPage() {
   const { items, isCartReady, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart()
+  const { locale } = useLocale()
+  const isRu = locale === "ru"
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
   const [continueShoppingHref, setContinueShoppingHref] = useState("/")
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
@@ -67,6 +74,53 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState("")
   const [didAutofillAddress, setDidAutofillAddress] = useState(false)
 
+  const ui = {
+    loadingCart: isRu ? "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043a\u043e\u0440\u0437\u0438\u043d\u044b..." : "Loading cart...",
+    backToShop: isRu ? "\u041d\u0430\u0437\u0430\u0434 \u0432 \u043c\u0430\u0433\u0430\u0437\u0438\u043d" : "Back to Shop",
+    cartEmptyTitle: isRu ? "\u041a\u043e\u0440\u0437\u0438\u043d\u0430 \u043f\u0443\u0441\u0442\u0430" : "Your Cart is Empty",
+    cartEmptyDescription: isRu
+      ? "\u041f\u043e\u0441\u043c\u043e\u0442\u0440\u0438\u0442\u0435 \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u044e \u0438 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0442\u043e\u0432\u0430\u0440\u044b, \u0447\u0442\u043e\u0431\u044b \u043d\u0430\u0447\u0430\u0442\u044c."
+      : "Browse our collection and add some items to get started.",
+    continueShopping: isRu ? "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u043f\u043e\u043a\u0443\u043f\u043a\u0438" : "Continue Shopping",
+    shoppingCartTitle: isRu ? "\u041a\u043e\u0440\u0437\u0438\u043d\u0430" : "Shopping Cart",
+    lengthLabel: isRu ? "\u0414\u043b\u0438\u043d\u0430" : "Length",
+    eachLabel: isRu ? "\u0437\u0430 \u0448\u0442." : "each",
+    orderSummary: isRu ? "\u0418\u0442\u043e\u0433 \u0437\u0430\u043a\u0430\u0437\u0430" : "Order Summary",
+    couponCode: isRu ? "\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434" : "Coupon Code",
+    enterCoupon: isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434" : "Enter coupon",
+    apply: isRu ? "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c" : "Apply",
+    removeCoupon: isRu ? "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434" : "Remove coupon",
+    subtotal: isRu ? "\u041f\u043e\u0434\u044b\u0442\u043e\u0433" : "Subtotal",
+    shipping: isRu ? "\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430" : "Shipping",
+    shippingFree: isRu ? "\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e" : "Free",
+    shippingCalc: isRu ? "\u0420\u0430\u0441\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043f\u0440\u0438 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0438" : "Calculated at checkout",
+    tax: isRu ? "\u041d\u0430\u043b\u043e\u0433" : "Tax",
+    total: isRu ? "\u0418\u0442\u043e\u0433\u043e:" : "Total:",
+    clearCart: isRu ? "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u043a\u043e\u0440\u0437\u0438\u043d\u0443" : "Clear Cart",
+    paypalCancelled: isRu ? "\u041f\u043b\u0430\u0442\u0451\u0436 PayPal \u0431\u044b\u043b \u043e\u0442\u043c\u0435\u043d\u0451\u043d." : "PayPal payment was cancelled.",
+  } as const
+
+  const continueShoppingLocalized = localizedHref(continueShoppingHref)
+
+  const cartItemsLabel = (count: number) => {
+    if (!isRu) return `${count} item(s) in your cart`
+    const n = Math.abs(count)
+    const mod10 = n % 10
+    const mod100 = n % 100
+    const word =
+      mod10 === 1 && mod100 !== 11
+        ? "\u0442\u043e\u0432\u0430\u0440"
+        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? "\u0442\u043e\u0432\u0430\u0440\u0430"
+          : "\u0442\u043e\u0432\u0430\u0440\u043e\u0432"
+    return `${count} ${word} \u0432 \u043a\u043e\u0440\u0437\u0438\u043d\u0435`
+  }
+
+  const getAnalyticsSessionId = () => {
+    if (typeof window === "undefined") return ""
+    return window.localStorage.getItem("analytics_session_id") ?? ""
+  }
+
   useEffect(() => {
     const storedRoute = window.localStorage.getItem(LAST_VISITED_ROUTE_KEY)
     if (storedRoute && !storedRoute.startsWith("/cart")) {
@@ -88,6 +142,26 @@ export default function CartPage() {
       // ignore invalid referrer
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCartReady || items.length === 0) return
+    const sessionId = getAnalyticsSessionId()
+    if (!sessionId) return
+
+    const sentKey = `analytics_checkout_started:${sessionId}`
+    if (window.sessionStorage.getItem(sentKey)) return
+    window.sessionStorage.setItem(sentKey, "1")
+
+    fetch("/api/analytics/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        name: "checkout_started",
+        metadata: { items: getTotalItems(), total: getTotalPrice() },
+      }),
+    }).catch(() => {})
+  }, [isCartReady, items.length, getTotalItems, getTotalPrice])
 
   useEffect(() => {
     setCheckoutDetails(loadCheckoutDetails())
@@ -201,12 +275,14 @@ export default function CartPage() {
     const paypalStatus = params.get("paypal")
 
     if (paypalStatus === "cancel") {
-      setPaypalInfo("PayPal payment was cancelled.")
+      setPaypalInfo(
+        isRu ? "\u041f\u043b\u0430\u0442\u0451\u0436 PayPal \u0431\u044b\u043b \u043e\u0442\u043c\u0435\u043d\u0451\u043d." : "PayPal payment was cancelled."
+      )
       setPaypalError("")
-      window.history.replaceState({}, "", "/cart")
+      window.history.replaceState({}, "", withLocaleHref("/cart", locale))
       return
     }
-  }, [])
+  }, [isRu, locale])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -303,7 +379,7 @@ export default function CartPage() {
     return (
       <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-24">
-          <p className="text-center text-muted-foreground">Loading cart...</p>
+          <p className="text-center text-muted-foreground">{ui.loadingCart}</p>
         </div>
       </main>
     )
@@ -313,7 +389,7 @@ export default function CartPage() {
     return (
       <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
-          <Link href={continueShoppingHref}>
+          <Link href={continueShoppingLocalized}>
             <Button
               variant="ghost"
               className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
@@ -321,17 +397,17 @@ export default function CartPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Back to Shop
+              {ui.backToShop}
             </Button>
           </Link>
         </div>
 
         <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-24">
           <div className="text-center">
-            <h1 className="mb-4 font-serif text-4xl font-bold text-foreground">Your Cart is Empty</h1>
-            <p className="mb-8 text-muted-foreground">Browse our collection and add some items to get started.</p>
-            <Link href={continueShoppingHref}>
-              <Button className="bg-[#D4AF37] hover:bg-[#C4951F] text-white">Continue Shopping</Button>
+            <h1 className="mb-4 font-serif text-4xl font-bold text-foreground">{ui.cartEmptyTitle}</h1>
+            <p className="mb-8 text-muted-foreground">{ui.cartEmptyDescription}</p>
+            <Link href={continueShoppingLocalized}>
+              <Button className="bg-[#D4AF37] hover:bg-[#C4951F] text-white">{ui.continueShopping}</Button>
             </Link>
           </div>
         </div>
@@ -349,29 +425,48 @@ export default function CartPage() {
     ? isCouponEligibleForSubtotal(activeCouponDefinition, totalPrice)
     : false
   const activeCoupon = isActiveCouponEligible ? activeCouponDefinition : null
-  const couponDiscount = activeCoupon ? calculateCouponDiscount(totalPrice, activeCoupon.discountRate) : 0
-  const subtotalAfterCoupon = parseFloat((Math.max(0, totalPrice - couponDiscount)).toFixed(2))
+  const couponDiscountRaw = activeCoupon ? calculateCouponDiscount(totalPrice, activeCoupon.discountRate) : 0
+  const couponDiscount = Math.min(totalPrice, Math.max(0, couponDiscountRaw))
   const couponMinimumNotice =
     activeCouponDefinition && !isActiveCouponEligible
-      ? `${activeCouponDefinition.code} requires minimum subtotal ${formatUsdPrice(activeCouponDefinition.minimumSubtotal)}.`
+      ? isRu
+        ? `${activeCouponDefinition.code} \u0442\u0440\u0435\u0431\u0443\u0435\u0442 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u0443\u044e \u0441\u0443\u043c\u043c\u0443 ${formatUsdPrice(activeCouponDefinition.minimumSubtotal)}.`
+        : `${activeCouponDefinition.code} requires minimum subtotal ${formatUsdPrice(activeCouponDefinition.minimumSubtotal)}.`
       : ""
   const isFreeShipping = totalPrice >= FREE_SHIPPING_THRESHOLD
-  const taxAmount = parseFloat((subtotalAfterCoupon * TAX_RATE).toFixed(2))
-  const finalTotal = parseFloat((subtotalAfterCoupon + taxAmount).toFixed(2))
+  const taxAmount = parseFloat((totalPrice * TAX_RATE).toFixed(2))
+  const finalTotal = parseFloat((Math.max(0, totalPrice - couponDiscount) + taxAmount).toFixed(2))
   const CHECKOUT_OTP_THRESHOLD_DOLLARS = 2500
   const requiresCheckoutOtp = finalTotal >= CHECKOUT_OTP_THRESHOLD_DOLLARS
 
+  const getItemCopy = (item: (typeof items)[number]) =>
+    getProductDisplayCopy(
+      {
+        slug: item.slug,
+        name: item.name,
+        category: item.category,
+        price: "",
+        image: item.image,
+        description: "",
+        longDescription: "",
+        basePrice: 0,
+        pricePerInch: 0,
+      },
+      locale
+    )
+
   const getDisplayName = (item: (typeof items)[number]) => {
-    const variant = item.variant?.trim()
-    if (!variant || variant === "default") {
-      return item.name
+    const baseName = getItemCopy(item).name
+    const displayVariant = formatVariantDisplay(item.variant)
+    if (!displayVariant) {
+      return baseName
     }
 
-    if (item.name.toLowerCase().includes(variant.toLowerCase())) {
-      return item.name
+    if (baseName.toLowerCase().includes(displayVariant.toLowerCase())) {
+      return baseName
     }
 
-    return `${item.name} ${variant}`
+    return `${baseName} ${displayVariant}`
   }
 
   const updateCheckoutField = (field: keyof CheckoutDetails, value: string) => {
@@ -394,7 +489,9 @@ export default function CartPage() {
   const applyCouponCode = async () => {
     const normalizedCode = normalizeCouponCode(couponInput)
     if (!normalizedCode) {
-      setCouponError("Enter a coupon code first.")
+      setCouponError(
+        isRu ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434." : "Enter a coupon code first."
+      )
       setCouponInfo("")
       return
     }
@@ -418,13 +515,17 @@ export default function CartPage() {
         })()
 
     if (!coupon) {
-      setCouponError("Coupon code is not valid.")
+      setCouponError(isRu ? "\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u0435\u043d." : "Coupon code is not valid.")
       setCouponInfo("")
       return
     }
 
     if (!isCouponEligibleForSubtotal(coupon, totalPrice)) {
-      setCouponError(`Coupon is valid for subtotal minimum ${formatUsdPrice(coupon.minimumSubtotal)}.`)
+      setCouponError(
+        isRu
+          ? `\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 \u043f\u0440\u0438 \u0441\u0443\u043c\u043c\u0435 \u043e\u0442 ${formatUsdPrice(coupon.minimumSubtotal)}.`
+          : `Coupon is valid for subtotal minimum ${formatUsdPrice(coupon.minimumSubtotal)}.`
+      )
       setCouponInfo("")
       return
     }
@@ -432,7 +533,9 @@ export default function CartPage() {
     setCouponInput(coupon.code)
     setResolvedCouponDefinition(coupon)
     saveActiveCouponCode(coupon.code)
-    setCouponInfo(`${coupon.code} applied successfully.`)
+    setCouponInfo(
+      isRu ? `${coupon.code} \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u043f\u0440\u0438\u043c\u0435\u043d\u0451\u043d.` : `${coupon.code} applied successfully.`
+    )
     setCouponError("")
   }
 
@@ -440,7 +543,7 @@ export default function CartPage() {
     setCouponInput("")
     setResolvedCouponDefinition(null)
     clearActiveCouponCode()
-    setCouponInfo("Coupon removed.")
+    setCouponInfo(isRu ? "\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0443\u0434\u0430\u043b\u0451\u043d." : "Coupon removed.")
     setCouponError("")
   }
 
@@ -465,54 +568,66 @@ export default function CartPage() {
 
   const validateCheckoutDetails = () => {
     if (!checkoutDetails.fullName.trim()) {
-      return "Full name is required before payment."
+      return isRu
+        ? "\u0418\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439."
+        : "Full name is required before payment."
     }
 
     if (!checkoutDetails.email.trim()) {
-      return "Email is required before payment."
+      return isRu ? "Email \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439." : "Email is required before payment."
     }
 
     if (!isValidEmail(checkoutDetails.email)) {
-      return "Please enter a valid email address."
+      return isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 email-\u0430\u0434\u0440\u0435\u0441." : "Please enter a valid email address."
     }
 
     const compactWhatsApp = checkoutDetails.whatsapp.replace(/[\s()-]/g, "")
     if (!compactWhatsApp) {
-      return "WhatsApp number is required before payment."
+      return isRu
+        ? "\u041d\u043e\u043c\u0435\u0440 WhatsApp \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439."
+        : "WhatsApp number is required before payment."
     }
 
     if (!/^\+\d{8,15}$/.test(compactWhatsApp)) {
-      return "Use WhatsApp format with country code, e.g. +62812xxxxxxx."
+      return isRu
+        ? "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 WhatsApp \u0441 \u043a\u043e\u0434\u043e\u043c \u0441\u0442\u0440\u0430\u043d\u044b, \u043d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: +62812xxxxxxx."
+        : "Use WhatsApp format with country code, e.g. +62812xxxxxxx."
     }
 
     if (checkoutDetails.country.trim().toLowerCase() === "indonesia" && !compactWhatsApp.startsWith("+62")) {
-      return "For Indonesia, WhatsApp number must start with +62."
+      return isRu
+        ? "\u0414\u043b\u044f \u0418\u043d\u0434\u043e\u043d\u0435\u0437\u0438\u0438 \u043d\u043e\u043c\u0435\u0440 WhatsApp \u0434\u043e\u043b\u0436\u0435\u043d \u043d\u0430\u0447\u0438\u043d\u0430\u0442\u044c\u0441\u044f \u0441 +62."
+        : "For Indonesia, WhatsApp number must start with +62."
     }
 
     if (!checkoutDetails.addressLine.trim()) {
-      return "Shipping address is required before payment."
+      return isRu
+        ? "\u0410\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439."
+        : "Shipping address is required before payment."
     }
     if (!hasAddressLettersAndNumbers(checkoutDetails.addressLine)) {
-      return "Shipping address must include letters and numbers."
+      return isRu
+        ? "\u0410\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438 \u0434\u043e\u043b\u0436\u0435\u043d \u0441\u043e\u0434\u0435\u0440\u0436\u0430\u0442\u044c \u0431\u0443\u043a\u0432\u044b \u0438 \u0446\u0438\u0444\u0440\u044b."
+        : "Shipping address must include letters and numbers."
     }
     if (containsDisallowedAddressMarker(checkoutDetails.addressLine)) {
-      return "Please enter a valid shipping address."
+      return isRu ? "\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u0430\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438." : "Please enter a valid shipping address."
     }
 
     if (!checkoutDetails.city.trim()) {
-      return "City is required before payment."
+      return isRu ? "\u0413\u043e\u0440\u043e\u0434 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439." : "City is required before payment."
     }
 
     if (!checkoutDetails.province.trim()) {
-      return "Province is required before payment."
+      return isRu ? "\u0420\u0435\u0433\u0438\u043e\u043d/\u043f\u0440\u043e\u0432\u0438\u043d\u0446\u0438\u044f \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439." : "Province is required before payment."
     }
 
     if (!checkoutDetails.postalCode.trim()) {
-      return "Postal code is required before payment."
+      return isRu ? "\u041f\u043e\u0447\u0442\u043e\u0432\u044b\u0439 \u0438\u043d\u0434\u0435\u043a\u0441 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439." : "Postal code is required before payment."
     }
 
     if (!checkoutDetails.country.trim()) {
-      return "Country is required before payment."
+      return isRu ? "\u0421\u0442\u0440\u0430\u043d\u0430 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u0430 \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439." : "Country is required before payment."
     }
 
     return ""
@@ -542,16 +657,36 @@ export default function CartPage() {
 
       const payload = (await response.json().catch(() => ({}))) as RequestVerificationResponse
       if (!response.ok || !payload.challengeId) {
-        throw new Error(payload.error || "Unable to send verification code.")
+        throw new Error(
+          payload.error ||
+            (isRu
+              ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f."
+              : "Unable to send verification code.")
+        )
       }
 
       setVerificationChallengeId(payload.challengeId)
       setVerificationCode("")
-      setVerificationInfo(payload.destination ? `Verification code sent to ${payload.destination}.` : "Verification code sent.")
+      setVerificationToken("")
+      setVerificationInfo(
+        payload.destination
+          ? isRu
+            ? `\u041a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 ${payload.destination}.`
+            : `Verification code sent to ${payload.destination}.`
+          : isRu
+            ? "\u041a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d."
+            : "Verification code sent."
+      )
       setVerificationDevCode(payload.devOtpCode ?? "")
       setCheckoutError("")
+      setPaypalError("")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to send verification code."
+      const message =
+        error instanceof Error
+          ? error.message
+          : isRu
+            ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f."
+            : "Unable to send verification code."
       setVerificationError(message)
     } finally {
       setVerificationLoading(false)
@@ -560,12 +695,18 @@ export default function CartPage() {
 
   const handleVerifyCheckoutCode = async () => {
     if (!verificationChallengeId) {
-      setVerificationError("Request a verification code first.")
+      setVerificationError(
+        isRu
+          ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0437\u0430\u043f\u0440\u043e\u0441\u0438\u0442\u0435 \u043a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f."
+          : "Request a verification code first."
+      )
       return
     }
 
     if (!/^\d{6}$/.test(verificationCode.trim())) {
-      setVerificationError("Enter a valid 6-digit verification code.")
+      setVerificationError(
+        isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 \u043a\u043e\u0434." : "Enter a valid 6-digit verification code."
+      )
       return
     }
 
@@ -585,15 +726,25 @@ export default function CartPage() {
 
       const payload = (await response.json().catch(() => ({}))) as VerifyVerificationResponse
       if (!response.ok || !payload.verificationToken) {
-        throw new Error(payload.error || "Unable to verify code.")
+        throw new Error(payload.error || (isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043a\u043e\u0434." : "Unable to verify code."))
       }
 
       setVerificationToken(payload.verificationToken)
-      setVerificationInfo("Phone and shipping details verified.")
+      setVerificationInfo(
+        isRu
+          ? "\u0422\u0435\u043b\u0435\u0444\u043e\u043d \u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u044b."
+          : "Phone and shipping details verified."
+      )
       setVerificationError("")
       setCheckoutError("")
+      setPaypalError("")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to verify code."
+      const message =
+        error instanceof Error
+          ? error.message
+          : isRu
+            ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043a\u043e\u0434."
+            : "Unable to verify code."
       setVerificationError(message)
     } finally {
       setVerificationLoading(false)
@@ -602,18 +753,23 @@ export default function CartPage() {
 
   const handlePayPalCheckout = async () => {
     if (items.length === 0) {
-      setPaypalError("Your cart is empty.")
+      setPaypalError(isRu ? "\u0412\u0430\u0448\u0430 \u043a\u043e\u0440\u0437\u0438\u043d\u0430 \u043f\u0443\u0441\u0442\u0430." : "Your cart is empty.")
       return
     }
 
     if (!supabase) {
-      setPaypalError("Auth is not configured. Please try again later.")
+      setPaypalError(
+        isRu
+          ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u043f\u043e\u0437\u0436\u0435."
+          : "Auth is not configured. Please try again later."
+      )
       return
     }
 
-    const returnTo = "/cart?checkout=1"
-    const registerUrl = `/register?next=${encodeURIComponent("/account/address/new")}&returnTo=${encodeURIComponent(returnTo)}`
-    const addressUrl = `/account/address/new?returnTo=${encodeURIComponent(returnTo)}`
+    const returnTo = localizedHref("/cart?checkout=1")
+    const nextAddress = localizedHref("/account/address/new")
+    const registerUrl = `${localizedHref("/register")}?next=${encodeURIComponent(nextAddress)}&returnTo=${encodeURIComponent(returnTo)}`
+    const addressUrl = `${nextAddress}?returnTo=${encodeURIComponent(returnTo)}`
 
     const { data: checkoutUserData } = await supabase.auth.getUser()
     const checkoutUser = checkoutUserData.user
@@ -644,7 +800,11 @@ export default function CartPage() {
     }
 
     if (requiresCheckoutOtp && !verificationToken) {
-      setCheckoutError("Verification code is required for orders of $2500 or more.")
+      setCheckoutError(
+        isRu
+          ? "\u041a\u043e\u0434 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d \u0434\u043b\u044f \u0437\u0430\u043a\u0430\u0437\u043e\u0432 \u043e\u0442 $2500 \u0438 \u0432\u044b\u0448\u0435."
+          : "Verification code is required for orders of $2500 or more."
+      )
       setPaypalError("")
       return
     }
@@ -667,9 +827,8 @@ export default function CartPage() {
       const { data: checkoutSessionData } = await supabase.auth.getSession()
       const accessToken = checkoutSessionData.session?.access_token ?? ""
       if (!accessToken) {
-        window.location.href = `/login?next=${encodeURIComponent("/account/address/new")}&returnTo=${encodeURIComponent(
-          "/cart?checkout=1"
-        )}`
+        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(nextAddress)}&returnTo=${encodeURIComponent(returnTo)}`
+        window.location.href = loginUrl
         return
       }
 
@@ -702,14 +861,19 @@ export default function CartPage() {
       }
 
       if (!response.ok || !data.approveUrl || !data.orderId) {
-        throw new Error(data.error || "Unable to initialize PayPal checkout.")
+        throw new Error(
+          data.error ||
+            (isRu
+              ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043e\u043f\u043b\u0430\u0442\u0443 PayPal."
+              : "Unable to initialize PayPal checkout.")
+        )
       }
 
       savePaymentDraft({
         orderId: data.orderId,
         status: "PENDING",
         currency: "USD",
-        subtotal: subtotalAfterCoupon,
+        subtotal: totalPrice,
         tax: taxAmount,
         total: finalTotal,
         customer: normalizedDetails,
@@ -731,7 +895,12 @@ export default function CartPage() {
 
       window.location.href = data.approveUrl
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to initialize PayPal checkout."
+      const message =
+        error instanceof Error
+          ? error.message
+          : isRu
+            ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043e\u043f\u043b\u0430\u0442\u0443 PayPal."
+            : "Unable to initialize PayPal checkout."
       setPaypalError(message)
       setPaypalLoading(false)
     }
@@ -747,7 +916,7 @@ export default function CartPage() {
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
       {/* Back Button */}
       <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-10">
-        <Link href={continueShoppingHref}>
+        <Link href={continueShoppingLocalized}>
           <Button
             variant="ghost"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
@@ -755,15 +924,15 @@ export default function CartPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
               <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Back to Shop
+            {ui.backToShop}
           </Button>
         </Link>
       </div>
 
       {/* Cart Section */}
       <div className="mx-auto max-w-7xl px-4 md:px-5 lg:px-6 py-8 lg:py-16">
-        <h1 className="mb-2 font-serif text-5xl font-bold text-foreground">Shopping Cart</h1>
-        <p className="mb-12 text-muted-foreground">{getTotalItems()} item(s) in your cart</p>
+        <h1 className="mb-2 font-serif text-5xl font-bold text-foreground">{ui.shoppingCartTitle}</h1>
+        <p className="mb-12 text-muted-foreground">{cartItemsLabel(getTotalItems())}</p>
 
         <div className="grid gap-8 lg:gap-16 lg:grid-cols-3">
           {/* Cart Items */}
@@ -788,13 +957,13 @@ export default function CartPage() {
                 <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-accent/80">
-                      {item.category}
+                      {getItemCopy(item).category}
                     </p>
                     <h3 className="mb-2 font-serif text-lg sm:text-xl font-semibold text-foreground">
                       {getDisplayName(item)}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Length: <span className="font-semibold text-foreground">{item.length}&quot;</span>
+                      {ui.lengthLabel}: <span className="font-semibold text-foreground">{item.length}&quot;</span>
                     </p>
                   </div>
 
@@ -807,7 +976,7 @@ export default function CartPage() {
                         disabled={item.quantity <= 1}
                         className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-600"
                       >
-                        −
+                        -
                       </button>
                       <input
                         type="text"
@@ -840,7 +1009,7 @@ export default function CartPage() {
                       onClick={() => removeFromCart(item.slug, item.length, item.variant)}
                       className="text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
                     >
-                      Remove
+                      {isRu ? "\u0423\u0434\u0430\u043b\u0438\u0442\u044c" : "Remove"}
                     </button>
                   </div>
                 </div>
@@ -849,10 +1018,10 @@ export default function CartPage() {
                 <div className="flex flex-row items-center justify-between sm:flex-col sm:items-end sm:justify-between">
                   <div className="text-right">
                     <p className="text-xs sm:text-sm text-muted-foreground/80">
-                      {formatUsdPrice(item.price)} each
+                      {formatUsdPrice(item.price)} {ui.eachLabel}
                     </p>
                     <p className="text-[11px] sm:text-xs text-muted-foreground/70 line-through">
-                      {formatUsdPrice(recoverOriginalPriceFromDiscounted(item.price))} each
+                      {formatUsdPrice(recoverOriginalPriceFromDiscounted(item.price))} {ui.eachLabel}
                     </p>
                   </div>
                   <div className="text-right">
@@ -873,19 +1042,19 @@ export default function CartPage() {
             <div className="rounded-xl bg-gradient-to-b from-[#FBF8F3] to-[#FAF6F0] border border-[#D4AF37]/30 p-5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 lg:sticky lg:top-8">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-[#D4AF37] mb-4">
-                  Order Summary
+                  {ui.orderSummary}
                 </p>
 
                 <div className="mb-4 rounded-lg border border-[#D4AF37]/25 bg-white/70 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-[#8A6510]">
-                    Coupon Code
+                    {ui.couponCode}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={(event) => updateCouponInput(event.target.value)}
-                      placeholder="Enter coupon"
+                      placeholder={ui.enterCoupon}
                       className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm font-semibold uppercase tracking-wider text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                     <button
@@ -893,7 +1062,7 @@ export default function CartPage() {
                       onClick={applyCouponCode}
                       className="h-10 rounded-md bg-[#1F1810] px-4 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-[#2A2218]"
                     >
-                      Apply
+                      {ui.apply}
                     </button>
                   </div>
 
@@ -903,7 +1072,7 @@ export default function CartPage() {
                       onClick={removeCouponCode}
                       className="mt-2 text-[11px] font-semibold uppercase tracking-widest text-[#A94442] hover:text-[#7F2E2D]"
                     >
-                      Remove coupon
+                      {ui.removeCoupon}
                     </button>
                   )}
 
@@ -914,35 +1083,29 @@ export default function CartPage() {
 
                 <div className="space-y-3 border-b border-[#D4AF37]/20 pb-4">
                   <div className="flex justify-between text-sm">
-                    <p className="text-gray-600">Subtotal</p>
+                    <p className="text-gray-600">{ui.subtotal}</p>
                     <p className="font-semibold text-foreground">${totalPrice.toFixed(2)}</p>
                   </div>
                   {activeCoupon && couponDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <p className="text-gray-600">Coupon ({activeCoupon.code})</p>
+                      <p className="text-gray-600">{isRu ? `\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 (${activeCoupon.code})` : `Coupon (${activeCoupon.code})`}</p>
                       <p className="font-semibold text-[#2E7D32]">- ${couponDiscount.toFixed(2)}</p>
                     </div>
                   )}
-                  {activeCoupon && couponDiscount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <p className="text-gray-600">Subtotal after coupon</p>
-                      <p className="font-semibold text-foreground">${subtotalAfterCoupon.toFixed(2)}</p>
-                    </div>
-                  )}
                   <div className="flex justify-between text-sm">
-                    <p className="text-gray-600">Shipping</p>
+                    <p className="text-gray-600">{ui.shipping}</p>
                     <p className="text-right font-semibold text-foreground">
-                      {isFreeShipping ? "Free" : "Calculated at checkout"}
+                      {isFreeShipping ? ui.shippingFree : ui.shippingCalc}
                     </p>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <p className="text-gray-600">Tax</p>
+                    <p className="text-gray-600">{ui.tax}</p>
                     <p className="text-right font-semibold text-foreground">${taxAmount.toFixed(2)}</p>
                   </div>
                 </div>
 
                 <div className="flex justify-between pt-4">
-                  <p className="font-semibold text-foreground">Total:</p>
+                  <p className="font-semibold text-foreground">{ui.total}</p>
                   <p className="font-serif text-2xl font-bold text-[#D4AF37]">
                     ${finalTotal.toFixed(2)}
                   </p>
@@ -952,16 +1115,18 @@ export default function CartPage() {
               {showCheckoutForm && (
                 <div className="space-y-3 rounded-xl border border-[#D4AF37]/25 bg-white/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#A77B15]">
-                    Contact & Shipping (All fields are required)
+                    {isRu
+                      ? "\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b \u0438 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0430 (\u0432\u0441\u0435 \u043f\u043e\u043b\u044f \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b)"
+                      : "Contact & Shipping (All fields are required)"}
                   </p>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Full Name *
+                    {isRu ? "\u041f\u043e\u043b\u043d\u043e\u0435 \u0438\u043c\u044f *" : "Full Name *"}
                     <input
                       type="text"
                       value={checkoutDetails.fullName}
                       onChange={(event) => updateCheckoutField("fullName", event.target.value)}
-                      placeholder="Your full name"
+                      placeholder={isRu ? "\u0412\u0430\u0448\u0435 \u043f\u043e\u043b\u043d\u043e\u0435 \u0438\u043c\u044f" : "Your full name"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
@@ -978,67 +1143,71 @@ export default function CartPage() {
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    WhatsApp Number *
+                    {isRu ? "\u041d\u043e\u043c\u0435\u0440 WhatsApp *" : "WhatsApp Number *"}
                     <input
                       type="tel"
                       value={checkoutDetails.whatsapp}
                       onChange={(event) => updateCheckoutField("whatsapp", normalizeWhatsAppInput(event.target.value))}
-                      placeholder="Country code + WhatsApp number"
+                      placeholder={isRu ? "\u041a\u043e\u0434 \u0441\u0442\u0440\u0430\u043d\u044b + \u043d\u043e\u043c\u0435\u0440 WhatsApp" : "Country code + WhatsApp number"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Shipping Address *
+                    {isRu ? "\u0410\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438 *" : "Shipping Address *"}
                     <textarea
                       value={checkoutDetails.addressLine}
                       onChange={(event) => updateCheckoutField("addressLine", event.target.value)}
                       rows={3}
-                      placeholder="Street, building, district, and notes for delivery"
+                      placeholder={
+                        isRu
+                          ? "\u0423\u043b\u0438\u0446\u0430, \u0434\u043e\u043c, \u0440\u0430\u0439\u043e\u043d \u0438 \u043f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u044f \u0434\u043b\u044f \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438"
+                          : "Street, building, district, and notes for delivery"
+                      }
                       className="mt-1 w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    City *
+                    {isRu ? "\u0413\u043e\u0440\u043e\u0434 *" : "City *"}
                     <input
                       type="text"
                       value={checkoutDetails.city}
                       onChange={(event) => updateCheckoutField("city", event.target.value)}
-                      placeholder="City"
+                      placeholder={isRu ? "\u0413\u043e\u0440\u043e\u0434" : "City"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Province *
+                    {isRu ? "\u0420\u0435\u0433\u0438\u043e\u043d/\u041f\u0440\u043e\u0432\u0438\u043d\u0446\u0438\u044f *" : "Province *"}
                     <input
                       type="text"
                       value={checkoutDetails.province}
                       onChange={(event) => updateCheckoutField("province", event.target.value)}
-                      placeholder="Province"
+                      placeholder={isRu ? "\u0420\u0435\u0433\u0438\u043e\u043d/\u041f\u0440\u043e\u0432\u0438\u043d\u0446\u0438\u044f" : "Province"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Postal Code *
+                    {isRu ? "\u041f\u043e\u0447\u0442\u043e\u0432\u044b\u0439 \u0438\u043d\u0434\u0435\u043a\u0441 *" : "Postal Code *"}
                     <input
                       type="text"
                       value={checkoutDetails.postalCode}
                       onChange={(event) => updateCheckoutField("postalCode", event.target.value)}
-                      placeholder="Postal code"
+                      placeholder={isRu ? "\u041f\u043e\u0447\u0442\u043e\u0432\u044b\u0439 \u0438\u043d\u0434\u0435\u043a\u0441" : "Postal code"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
 
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Country *
+                    {isRu ? "\u0421\u0442\u0440\u0430\u043d\u0430 *" : "Country *"}
                     <input
                       type="text"
                       value={checkoutDetails.country}
                       onChange={(event) => updateCheckoutField("country", event.target.value)}
-                      placeholder="Country"
+                      placeholder={isRu ? "\u0421\u0442\u0440\u0430\u043d\u0430" : "Country"}
                       className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                     />
                   </label>
@@ -1046,10 +1215,14 @@ export default function CartPage() {
                   {requiresCheckoutOtp ? (
                     <div className="space-y-2 rounded-lg border border-[#D4AF37]/20 bg-[#FFFDF8] p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-widest text-[#A77B15]">
-                        Security Verification Required
+                        {isRu
+                          ? "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438"
+                          : "Security Verification Required"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Orders of $2500 or more must be verified before final checkout.
+                        {isRu
+                          ? "\u0417\u0430\u043a\u0430\u0437\u044b \u043e\u0442 $2500 \u0438 \u0432\u044b\u0448\u0435 \u0434\u043e\u043b\u0436\u043d\u044b \u0431\u044b\u0442\u044c \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u044b \u043f\u0435\u0440\u0435\u0434 \u043e\u043f\u043b\u0430\u0442\u043e\u0439."
+                          : "Orders of $2500 or more must be verified before final checkout."}
                       </p>
 
                       <button
@@ -1060,7 +1233,13 @@ export default function CartPage() {
                           verificationLoading ? "cursor-not-allowed opacity-70" : "hover:bg-secondary"
                         }`}
                       >
-                        {verificationLoading ? "Sending..." : "Send Verification Code"}
+                        {verificationLoading
+                          ? isRu
+                            ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c..."
+                            : "Sending..."
+                          : isRu
+                            ? "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u0434"
+                            : "Send Verification Code"}
                       </button>
 
                       {verificationChallengeId && (
@@ -1072,7 +1251,7 @@ export default function CartPage() {
                             maxLength={6}
                             value={verificationCode}
                             onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
-                            placeholder="Enter 6-digit code"
+                            placeholder={isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 \u043a\u043e\u0434" : "Enter 6-digit code"}
                             className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
                           />
 
@@ -1084,7 +1263,13 @@ export default function CartPage() {
                               verificationLoading ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
                             }`}
                           >
-                            {verificationLoading ? "Verifying..." : "Verify Code"}
+                            {verificationLoading
+                              ? isRu
+                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
+                                : "Verifying..."
+                              : isRu
+                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043a\u043e\u0434"
+                                : "Verify Code"}
                           </button>
                         </div>
                       )}
@@ -1094,7 +1279,7 @@ export default function CartPage() {
                       )}
                       {verificationDevCode && (
                         <p className="text-xs font-medium text-amber-700">
-                          Dev verification code: {verificationDevCode}
+                          {isRu ? "\u041a\u043e\u0434 \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u043e\u0432:" : "Dev verification code:"} {verificationDevCode}
                         </p>
                       )}
                       {verificationError && (
@@ -1104,7 +1289,9 @@ export default function CartPage() {
                   ) : (
                     <div className="rounded-lg border border-[#D4AF37]/20 bg-[#FFFDF8] p-3">
                       <p className="text-xs text-muted-foreground">
-                        OTP verification applies only to orders of $2500 or more.
+                        {isRu
+                          ? "OTP-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043f\u0440\u0438\u043c\u0435\u043d\u044f\u0435\u0442\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u043a \u0437\u0430\u043a\u0430\u0437\u0430\u043c \u043e\u0442 $2500 \u0438 \u0432\u044b\u0448\u0435."
+                          : "OTP verification applies only to orders of $2500 or more."}
                       </p>
                     </div>
                   )}
@@ -1136,16 +1323,24 @@ export default function CartPage() {
                   </svg>
                   <span>
                     {paypalLoading
-                      ? "Processing PayPal..."
+                      ? isRu
+                        ? "\u041e\u0431\u0440\u0430\u0431\u0430\u0442\u044b\u0432\u0430\u0435\u043c PayPal..."
+                        : "Processing PayPal..."
                       : showCheckoutForm
-                        ? "Continue to PayPal"
-                        : "Pay with PayPal"}
+                        ? isRu
+                          ? "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u0432 PayPal"
+                          : "Continue to PayPal"
+                        : isRu
+                          ? "\u041e\u043f\u043b\u0430\u0442\u0438\u0442\u044c \u0447\u0435\u0440\u0435\u0437 PayPal"
+                          : "Pay with PayPal"}
                   </span>
                 </button>
 
                 {!showCheckoutForm && (
                   <p className="text-xs font-medium text-amber-700">
-                    Click &quot;Pay with PayPal&quot; first to open the required checkout form.
+                    {isRu
+                      ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00abPay with PayPal\u00bb, \u0447\u0442\u043e\u0431\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u0443\u044e \u0444\u043e\u0440\u043c\u0443 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u044f."
+                      : "Click \"Pay with PayPal\" first to open the required checkout form."}
                   </p>
                 )}
 
@@ -1153,14 +1348,18 @@ export default function CartPage() {
                   <p className="text-xs font-medium text-amber-600">
                     {liveCheckoutValidationError ||
                       (requiresCheckoutOtp
-                        ? "Complete verification to continue payment."
-                        : "Complete contact and shipping details to continue payment.")}
+                        ? isRu
+                          ? "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443, \u0447\u0442\u043e\u0431\u044b \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u043e\u043f\u043b\u0430\u0442\u0443."
+                          : "Complete verification to continue payment."
+                        : isRu
+                          ? "\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u0438 \u0430\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438, \u0447\u0442\u043e\u0431\u044b \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u043e\u043f\u043b\u0430\u0442\u0443."
+                          : "Complete contact and shipping details to continue payment.")}
                   </p>
                 )}
 
-                <Link href={continueShoppingHref} className="block">
+                <Link href={continueShoppingLocalized} className="block">
                   <Button variant="outline" className="w-full">
-                    Continue Shopping
+                    {ui.continueShopping}
                   </Button>
                 </Link>
 
@@ -1169,7 +1368,7 @@ export default function CartPage() {
                     onClick={clearCart}
                     className="w-full text-sm font-semibold text-red-500 hover:text-red-700 transition-colors py-2"
                   >
-                    Clear Cart
+                    {ui.clearCart}
                   </button>
                 )}
 
@@ -1185,19 +1384,30 @@ export default function CartPage() {
               </div>
 
               <div className="border-t border-[#D4AF37]/20 pt-4 text-xs text-gray-600 space-y-2">
-                <p>&#10003; 7-day return policy</p>
-                <p>&#10003; 24/7 customer service</p>
-                <p>&#10003; Fast Worldwide Delivery</p>
-                <p>&#10003; Premium Quality Guaranteed</p>
-                <p>&#10003; Free shipping on orders over $750</p>
+                <p>
+                  &#10003;{" "}
+                  {isRu ? "\u0412\u043e\u0437\u0432\u0440\u0430\u0442 \u0432 \u0442\u0435\u0447\u0435\u043d\u0438\u0435 7 \u0434\u043d\u0435\u0439" : "7-day return policy"}
+                </p>
+                <p>
+                  &#10003;{" "}
+                  {isRu ? "\u0421\u043b\u0443\u0436\u0431\u0430 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0438 24/7" : "24/7 customer service"}
+                </p>
+                <p>
+                  &#10003;{" "}
+                  {isRu ? "\u0411\u044b\u0441\u0442\u0440\u0430\u044f \u043c\u0435\u0436\u0434\u0443\u043d\u0430\u0440\u043e\u0434\u043d\u0430\u044f \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0430" : "Fast Worldwide Delivery"}
+                </p>
+                <p>
+                  &#10003;{" "}
+                  {isRu ? "\u0413\u0430\u0440\u0430\u043d\u0442\u0438\u044f \u043f\u0440\u0435\u043c\u0438\u0443\u043c \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430" : "Premium Quality Guaranteed"}
+                </p>
+                <p>
+                  &#10003;{" "}
+                  {isRu
+                    ? "\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u0430\u044f \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0430 \u043f\u0440\u0438 \u0437\u0430\u043a\u0430\u0437\u0435 \u043e\u0442 $750"
+                    : "Free shipping on orders over $750"}
+                </p>
               </div>
 
-              {/* Info */}
-              <div className="hidden border-t border-[#D4AF37]/20 pt-4 text-xs text-gray-600 space-y-2">
-                <p>✓ Free shipping on orders over $200</p>
-                <p>✓ 30-day return policy</p>
-                <p>✓ 24/7 customer support</p>
-              </div>
             </div>
           </div>
         </div>

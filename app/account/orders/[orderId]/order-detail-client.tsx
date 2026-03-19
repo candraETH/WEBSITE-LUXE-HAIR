@@ -37,6 +37,16 @@ function statusLabel(status: string): string {
   return key.toUpperCase()
 }
 
+type PaymentStatusKey = "pending" | "paid"
+
+function normalizePaymentStatus(status: string): PaymentStatusKey {
+  const normalized = status.trim().toLowerCase()
+  if (["paid", "processing", "shipped", "delivered", "completed"].includes(normalized)) {
+    return "paid"
+  }
+  return "pending"
+}
+
 function statusBadgeClass(key: StatusKey): string {
   const base = "border-0 font-medium"
   switch (key) {
@@ -238,13 +248,45 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const summaryShipping = asNumber(cartRoot.summary?.shipping) ?? null
   const summaryTotal = asNumber(cartRoot.summary?.total) ?? (Number.isFinite(amount) ? amount : null)
 
+  const statusKey = normalizeStatus(status)
+  const paymentStatusKey = normalizePaymentStatus(status)
+  const paymentStatusLabel = paymentStatusKey.toUpperCase()
+  const paymentTitle =
+    paymentStatusKey === "paid"
+      ? "Payment Successful"
+      : statusKey === "cancelled"
+        ? "Payment Pending"
+        : "Processing Payment"
+
+  const paymentDescription =
+    paymentStatusKey === "paid"
+      ? "Payment completed. Your order has been confirmed."
+      : statusKey === "cancelled"
+        ? "Payment was not completed. Please contact support if you believe this is an error."
+        : "Finalizing your payment..."
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <Button asChild variant="outline" size="sm">
           <Link href="/account/orders">Back</Link>
         </Button>
-        <Badge className={statusBadgeClass(normalizeStatus(status))}>{statusLabel(status)}</Badge>
+        <Badge className={statusBadgeClass(statusKey)}>{statusLabel(status)}</Badge>
+      </div>
+
+      <div className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+          Payment status
+        </p>
+        <h2 className="mt-2 font-serif text-2xl font-bold text-foreground sm:text-3xl">{paymentTitle}</h2>
+        <p className="mt-3 text-sm text-muted-foreground">{paymentDescription}</p>
+
+        <p className="mt-2 text-xs text-muted-foreground">
+          PayPal Order ID: <span className="font-medium text-foreground">{orderId}</span>
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Payment: <span className="font-medium text-foreground">{paymentStatusLabel}</span>
+        </p>
       </div>
 
       <div className="rounded-2xl border border-border/30 bg-card/60 p-6 shadow-sm">

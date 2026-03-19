@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { useCart } from "@/context/CartContext"
 import { calculateCheckoutUnitPrice } from "@/lib/paypal/catalog"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { formatVariantDisplay } from "@/lib/variant-display"
 import { readWishlist, removeFromWishlist, type WishlistItem } from "@/lib/wishlist"
 
 type UiState =
@@ -117,7 +118,7 @@ export function WishlistClient() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">{item.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {item.category} · {item.length}&quot; · {item.variant}
+                    {item.category} · {item.length}&quot; · {formatVariantDisplay(item.variant) || item.variant || "Default"}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -139,4 +140,3 @@ export function WishlistClient() {
     </div>
   )
 }
-

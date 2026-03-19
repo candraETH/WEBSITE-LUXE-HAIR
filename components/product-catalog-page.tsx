@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
@@ -11,16 +11,13 @@ import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import type { CatalogFaqItem } from "@/lib/catalog-faqs"
-import { CATALOG_SEO_CONTENT, type CatalogGroupKey } from "@/lib/catalog-seo"
+import { getCatalogSeoContent, type CatalogGroupKey } from "@/lib/catalog-seo"
+import { withLocaleHref } from "@/lib/i18n"
+import { getMessages } from "@/lib/messages"
+import { getProductDisplayCopy } from "@/lib/product-copy"
+import { useLocale } from "@/context/LocaleContext"
 
-const sortOptions = [
-  { value: "featured", label: "Featured" },
-  { value: "price-asc", label: "Price: Low to High" },
-  { value: "price-desc", label: "Price: High to Low" },
-  { value: "name-asc", label: "Name: A to Z" },
-] as const
-
-type SortValue = (typeof sortOptions)[number]["value"]
+type SortValue = "featured" | "price-asc" | "price-desc" | "name-asc"
 
 type ProductCatalogPageProps = {
   products: CatalogProduct[]
@@ -44,28 +41,34 @@ export function ProductCatalogPage({
   faqHeading,
   faqItems = [],
 }: ProductCatalogPageProps) {
+  const { locale } = useLocale()
+  const messages = getMessages(locale)
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
+
+  const sortOptions: Array<{ value: SortValue; label: string }> = [
+    { value: "featured", label: messages.catalog.sortOptions.featured },
+    { value: "price-asc", label: messages.catalog.sortOptions.priceAsc },
+    { value: "price-desc", label: messages.catalog.sortOptions.priceDesc },
+    { value: "name-asc", label: messages.catalog.sortOptions.nameAsc },
+  ]
+
   const [openCatalogGroups, setOpenCatalogGroups] = useState<string[]>([activeCatalogGroup])
   const [selectedProductSlugs, setSelectedProductSlugs] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<SortValue>("featured")
   const [openFaqIndex, setOpenFaqIndex] = useState<number>(0)
-  const seoContent = CATALOG_SEO_CONTENT[activeCatalogGroup]
+  const seoContent = getCatalogSeoContent(locale, activeCatalogGroup)
 
-  const catalogGroups = useMemo(
-    () => [
-      { key: "bulk", title: "Bulk Collection", href: "/bulk-hair", items: BULK_PRODUCTS },
-      { key: "weft", title: "Bundles", href: "/weft-hair", items: WEFT_PRODUCTS },
-      { key: "extensions", title: "Extensions", href: "/extensions", items: EXTENSIONS_PRODUCTS },
-      { key: "wigs", title: "Wigs", href: "/wigs", items: WIGS_PRODUCTS },
-    ],
-    []
-  )
+  const catalogGroups = [
+    { key: "bulk", title: messages.nav["Bulk Hair"], href: "/bulk-hair", items: BULK_PRODUCTS },
+    { key: "weft", title: messages.nav["Bundles"], href: "/weft-hair", items: WEFT_PRODUCTS },
+    { key: "extensions", title: messages.nav["Extensions"], href: "/extensions", items: EXTENSIONS_PRODUCTS },
+    { key: "wigs", title: messages.nav["Wigs"], href: "/wigs", items: WIGS_PRODUCTS },
+  ] as const
 
-  const currentGroup = useMemo(
-    () => catalogGroups.find((group) => group.key === activeCatalogGroup) ?? catalogGroups[0],
-    [activeCatalogGroup, catalogGroups]
-  )
+  const currentGroup =
+    catalogGroups.find((group) => group.key === activeCatalogGroup) ?? catalogGroups[0]
 
-  const allCatalogProducts = useMemo(() => {
+  const allCatalogProducts = (() => {
     const map = new Map<string, CatalogProduct>()
     for (const group of catalogGroups) {
       for (const item of group.items) {
@@ -75,14 +78,13 @@ export function ProductCatalogPage({
       }
     }
     return Array.from(map.values())
-  }, [catalogGroups])
+  })()
 
-  const selectedProducts = useMemo(
-    () => allCatalogProducts.filter((item) => selectedProductSlugs.includes(item.slug)),
-    [allCatalogProducts, selectedProductSlugs]
+  const selectedProducts = allCatalogProducts.filter((item) =>
+    selectedProductSlugs.includes(item.slug)
   )
 
-  const filteredProducts = useMemo(() => {
+  const filteredProducts = (() => {
     const baseProducts = selectedProductSlugs.length > 0 ? selectedProducts : products
     const sorted = [...baseProducts]
     if (sortBy === "price-asc") {
@@ -94,16 +96,12 @@ export function ProductCatalogPage({
     }
 
     return sorted
-  }, [sortBy, products, selectedProducts, selectedProductSlugs.length])
+  })()
 
-  const popularProductLinks = useMemo(
-    () =>
-      products.slice(0, 4).map((product) => ({
-        href: `/order/${product.slug}`,
-        label: product.name,
-      })),
-    [products]
-  )
+  const popularProductLinks = products.slice(0, 4).map((product) => ({
+    href: withLocaleHref(`/order/${product.slug}`, locale),
+    label: product.name,
+  }))
 
   const toggleProductSelection = (slug: string) => {
     setSelectedProductSlugs((prev) =>
@@ -125,8 +123,8 @@ export function ProductCatalogPage({
         <nav aria-label="Breadcrumb" className="mb-4">
           <ol className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-[#6b6b70]">
             <li>
-              <Link href="/" className="transition-colors hover:text-[#1f1f1f]">
-                Home
+              <Link href={localizedHref("/")} className="transition-colors hover:text-[#1f1f1f]">
+                {messages.catalog.breadcrumbHome}
               </Link>
             </li>
             <li aria-hidden="true" className="text-[#9a9aa0]">
@@ -137,10 +135,12 @@ export function ProductCatalogPage({
         </nav>
 
         <div className="mb-5 flex items-center justify-between gap-3 border-b border-[#dfd7cf] pb-4">
-          <p className="text-[24px] font-semibold leading-none text-[#171717] sm:text-[26px]">{filteredProducts.length} items</p>
+          <p className="text-[24px] font-semibold leading-none text-[#171717] sm:text-[26px]">
+            {locale === "ru" ? `${filteredProducts.length} \u0442\u043e\u0432\u0430\u0440\u043e\u0432` : `${filteredProducts.length} items`}
+          </p>
           <div className="flex items-center gap-2">
             <label htmlFor={sortId} className="text-sm font-semibold uppercase tracking-widest text-[#4b4b4f]">
-              Sort By
+              {locale === "ru" ? "\u0421\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u043a\u0430" : "Sort By"}
             </label>
             <select
               id={sortId}
@@ -166,7 +166,7 @@ export function ProductCatalogPage({
                 onClick={() => toggleProductSelection(item.slug)}
                 className="inline-flex h-9 items-center gap-2 rounded-md border border-[#b5aea6] bg-white px-3 text-sm font-medium text-[#1f1f1f] transition-colors hover:bg-[#f5f0e9]"
               >
-                <span>{item.name}</span>
+                <span>{getProductDisplayCopy(item, locale).name}</span>
                 <span className="text-base leading-none">×</span>
               </button>
             ))}
@@ -175,14 +175,14 @@ export function ProductCatalogPage({
               onClick={() => setSelectedProductSlugs([])}
               className="ml-1 text-sm font-semibold text-[#8a6b22] underline-offset-2 hover:underline"
             >
-              Clear Filter
+              {locale === "ru" ? "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u0444\u0438\u043b\u044c\u0442\u0440" : "Clear Filter"}
             </button>
           </div>
         )}
 
         <div className="mb-5 rounded-xl border border-[#dfd7cf] bg-white/60 p-3 sm:p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7a80]">
-            Popular in {currentGroup.title}
+            {locale === "ru" ? "\u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u043e\u0435 \u0432" : "Popular in"} {currentGroup.title}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {popularProductLinks.map((link) => (
@@ -284,7 +284,7 @@ export function ProductCatalogPage({
             {faqItems.length > 0 && (
               <section className="mt-16 sm:mt-20">
                 <h2 className="text-xl font-semibold leading-tight text-[#141414] sm:text-2xl">
-                  {faqHeading ?? "Frequently Asked Questions"}
+                  {faqHeading ?? messages.catalog.faqFallbackHeading}
                 </h2>
                 <div className="mt-4 border-t border-[#ddd2c8]">
                   {faqItems.map((faq, index) => {
@@ -325,13 +325,13 @@ export function ProductCatalogPage({
 
               <div className="mt-5 border-t border-[#e6ddd4] pt-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7a7a80]">
-                  Explore Related Collections
+                  {messages.catalog.relatedHeading}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {seoContent.relatedCollections.map((link) => (
                     <Link
                       key={link.href}
-                      href={link.href}
+                      href={localizedHref(link.href)}
                       className="inline-flex items-center rounded-full border border-[#cfc5ba] bg-white px-3 py-1.5 text-xs font-medium text-[#1f1f1f] transition-colors hover:bg-[#f5efe6]"
                     >
                       {link.label}

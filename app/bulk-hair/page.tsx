@@ -3,18 +3,28 @@ import { JsonLd } from "@/components/json-ld"
 import { BULK_PRODUCTS } from "@/lib/bulk-products"
 import { BULK_HAIR_FAQS } from "@/lib/catalog-faqs"
 import type { Metadata } from "next"
-import { absoluteUrl, buildPageMetadata } from "@/lib/seo"
+import { absoluteUrl } from "@/lib/seo"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { withLocaleHref } from "@/lib/i18n"
 
-export const metadata: Metadata = buildPageMetadata({
-  title: "Bulk Hair Collection",
-  description:
-    "Shop premium bulk human hair for braiding, custom wig making, and professional installs. Explore multiple textures and color options.",
-  path: "/bulk-hair",
-  keywords: ["bulk hair", "braiding hair", "human bulk hair", "premium bulk hair"],
-  images: ["/images/images1.png"],
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocaleFromRequestHeaders()
+  const title = locale === "ru" ? "Bulk Hair — коллекция" : "Bulk Hair Collection"
+  const description =
+    locale === "ru"
+      ? "Премиальные натуральные волосы bulk hair для плетения, париков и профессиональных установок. Разные текстуры и оттенки."
+      : "Shop premium bulk human hair for braiding, custom wig making, and professional installs. Explore multiple textures and color options."
 
-export default function BulkHairPage() {
+  return buildLocalizedPageMetadata({
+    title,
+    description,
+    keywords: ["bulk hair", "braiding hair", "human bulk hair", "premium bulk hair"],
+    images: ["/images/images1.png"],
+  })
+}
+
+export default async function BulkHairPage() {
+  const locale = await getLocaleFromRequestHeaders()
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -34,14 +44,14 @@ export default function BulkHairPage() {
       {
         "@type": "ListItem",
         position: 1,
-        name: "Home",
-        item: absoluteUrl("/"),
+        name: locale === "ru" ? "Главная" : "Home",
+        item: absoluteUrl(withLocaleHref("/", locale)),
       },
       {
         "@type": "ListItem",
         position: 2,
         name: "Bulk Hair",
-        item: absoluteUrl("/bulk-hair"),
+        item: absoluteUrl(withLocaleHref("/bulk-hair", locale)),
       },
     ],
   }
@@ -52,10 +62,10 @@ export default function BulkHairPage() {
       <JsonLd data={breadcrumbSchema} />
       <ProductCatalogPage
         products={BULK_PRODUCTS}
-        filterTitle="Bulk Collection"
+        filterTitle={locale === "ru" ? "Коллекция" : "Bulk Collection"}
         sortId="sort-bulk"
         activeCatalogGroup="bulk"
-        faqHeading="Frequently Asked Questions About Bulk Hair"
+        faqHeading={locale === "ru" ? "Часто задаваемые вопросы о Bulk Hair" : "Frequently Asked Questions About Bulk Hair"}
         faqItems={BULK_HAIR_FAQS}
       />
     </>

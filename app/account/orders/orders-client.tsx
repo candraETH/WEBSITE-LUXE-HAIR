@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { cn } from "@/lib/utils"
 
 type OrderSummary = {
   orderId: string
@@ -18,6 +17,7 @@ type OrderSummary = {
   currency: string
   createdAt: string | null
   products: string[]
+  phoneNumber: string
 }
 
 type UiState =
@@ -97,6 +97,9 @@ export function OrdersClient() {
   const [filter, setFilter] = useState<"all" | StatusKey>("all")
   const [resumingOrderId, setResumingOrderId] = useState<string | null>(null)
   const [resumeError, setResumeError] = useState("")
+  const [invoiceLoadingByOrder, setInvoiceLoadingByOrder] = useState<Record<string, boolean>>({})
+  const [invoiceSuccessByOrder, setInvoiceSuccessByOrder] = useState<Record<string, string>>({})
+  const [invoiceErrorByOrder, setInvoiceErrorByOrder] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -184,6 +187,40 @@ export function OrdersClient() {
       window.location.href = redirectUrl
     } finally {
       setResumingOrderId(null)
+    }
+  }
+
+  async function handleSendInvoice(orderId: string, phoneNumber: string) {
+    const phone = phoneNumber.trim()
+    setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: "" }))
+
+    if (!phone) {
+      setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "Phone number is required to send an invoice." }))
+      return
+    }
+
+    setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: true }))
+
+    try {
+      const response = await fetch("/api/order-tracking/send-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, phoneNumber: phone }),
+      })
+      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string; destination?: string }
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to send invoice.")
+      }
+      const message = data.destination ? `${data.message || "Invoice sent."} (${data.destination})` : data.message || "Invoice sent."
+      setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: message }))
+    } catch (error) {
+      setInvoiceErrorByOrder((prev) => ({
+        ...prev,
+        [orderId]: error instanceof Error ? error.message : "Unable to send invoice.",
+      }))
+    } finally {
+      setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: false }))
     }
   }
 
@@ -361,6 +398,9 @@ export function OrdersClient() {
             const remaining = Math.max(0, products.length - visibleProducts.length)
             const canContinuePayment = key === "pending" && !isExpired(order.createdAt)
             const isResuming = resumingOrderId === order.orderId
+            const invoiceLoading = Boolean(invoiceLoadingByOrder[order.orderId])
+            const invoiceError = invoiceErrorByOrder[order.orderId]
+            const invoiceSuccess = invoiceSuccessByOrder[order.orderId]
 
             return (
               <div key={order.orderId} className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm">
@@ -397,29 +437,43 @@ export function OrdersClient() {
                   </div>
                 </div>
 
-                <div
-                  className={cn(
-                    "mt-4 grid gap-2 sm:justify-end",
-                    canContinuePayment ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-2"
-                  )}
-                >
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:justify-end">
                   <Button asChild size="sm" variant="outline" className="w-full">
                     <Link href={`/track-order?orderId=${encodeURIComponent(order.orderId)}`}>Track Order</Link>
                   </Button>
                   <Button asChild size="sm" variant="outline" className="w-full">
                     <Link href={`/account/orders/${encodeURIComponent(order.orderId)}`}>View Order</Link>
                   </Button>
-                  {canContinuePayment ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={!order.phoneNumber || invoiceLoading}
+                    onClick={() => void handleSendInvoice(order.orderId, order.phoneNumber)}
+                  >
+                    {invoiceLoading ? "Sending..." : "Send Invoice"}
+                  </Button>
+                </div>
+
+                {canContinuePayment ? (
+                  <div className="mt-3">
                     <Button
                       size="sm"
-                      className="col-span-2 w-full sm:col-span-1"
+                      className="w-full sm:w-auto"
                       disabled={isResuming}
                       onClick={() => void handleResumePayment(order.orderId)}
                     >
                       {isResuming ? "Opening PayPal..." : "Continue Payment"}
                     </Button>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
+
+                {invoiceSuccess ? (
+                  <p className="mt-2 text-xs font-medium text-[#2E7D32]">{invoiceSuccess}</p>
+                ) : null}
+                {invoiceError ? (
+                  <p className="mt-2 text-xs font-medium text-red-500">{invoiceError}</p>
+                ) : null}
               </div>
             )
           })}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, Menu, X, ShoppingBag, Search, UserRound } from "lucide-react"
 import { useCart } from "@/context/CartContext"
 import {
@@ -15,6 +15,10 @@ import {
 import { TierBadge, getTierNameGradientClass } from "@/components/loyalty/tier-badge"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { getTierForSpend, type LoyaltyTierKey } from "@/lib/loyalty-tier"
+import { swapLocaleInPathname, withLocaleHref, type SupportedLocale } from "@/lib/i18n"
+import { getMessages } from "@/lib/messages"
+import { useLocale } from "@/context/LocaleContext"
+import { getProductDisplayCopy } from "@/lib/product-copy"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
@@ -24,8 +28,6 @@ const navLinks = [
   { label: "Wigs", href: "/wigs" },
   { label: "Blog", href: "/blog" },
 ]
-
-const PROMO_MARQUEE_MESSAGE = "Limited Offer: 25% OFF all hair collections - Shop now"
 
 type MegaMenuItem = {
   label: string
@@ -152,8 +154,38 @@ function resolveSearchTarget(query: string): string {
   return "/#home"
 }
 
+const CATEGORY_BY_MENU_LABEL: Record<string, string> = {
+  "Bulk Hair": "Bulk Hair",
+  Bundles: "Weft Hair",
+  Extensions: "Hair Extensions",
+  Wigs: "Wigs",
+}
+
 export function Navbar() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { locale, setLocale } = useLocale()
+  const messages = getMessages(locale)
+  const promoMarqueeMessage = messages.promoMarquee
+  const navLabel = (label: string) => {
+    return messages.nav[label] ?? label
+  }
+
+  const localizedHref = (href: string) => withLocaleHref(href, locale)
+
+  const megaMenuItemLabel = (item: MegaMenuItem, menuLabel: string) => {
+    if (locale !== "ru") return item.label
+    const slug = item.href.startsWith("/order/") ? item.href.replace("/order/", "") : item.href
+    const category = CATEGORY_BY_MENU_LABEL[menuLabel] ?? menuLabel
+    return getProductDisplayCopy({ slug, name: item.label, category, description: "" }, locale).name
+  }
+  const localeSwitchHref = (nextLocale: SupportedLocale) => {
+    const base = swapLocaleInPathname(pathname, nextLocale)
+    const query = searchParams?.toString()
+    return query ? `${base}?${query}` : base
+  }
+
   const [isOpen, setIsOpen] = useState(false)
   const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false)
   const [desktopSearchQuery, setDesktopSearchQuery] = useState("")
@@ -199,7 +231,7 @@ export function Navbar() {
       const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : ""
       const fallbackName = (data.user.email ?? "").split("@")[0] ?? ""
       const firstNameRaw = (fullName || fallbackName).trim().split(/\s+/)[0] ?? ""
-      const firstName = firstNameRaw || "Account"
+      const firstName = firstNameRaw || messages.account.accountFallback
 
       let tierKey: LoyaltyTierKey | null = null
       let tierName: string | null = null
@@ -231,7 +263,7 @@ export function Navbar() {
       isCancelled = true
       subscription.subscription.unsubscribe()
     }
-  }, [])
+  }, [messages.account.accountFallback])
 
   async function handleSignOut() {
     const supabase = getSupabaseBrowserClient()
@@ -340,7 +372,7 @@ export function Navbar() {
   }
 
   const handleSearchSubmit = (query: string) => {
-    router.push(resolveSearchTarget(query))
+    router.push(localizedHref(resolveSearchTarget(query)))
     setIsOpen(false)
   }
 
@@ -396,7 +428,7 @@ export function Navbar() {
               key={`promo-${index}`}
               className="mx-5 text-[10px] font-semibold uppercase tracking-[0.18em] sm:mx-7 sm:text-[11px]"
             >
-              {PROMO_MARQUEE_MESSAGE}
+              {promoMarqueeMessage}
             </span>
           ))}
         </div>
@@ -412,7 +444,7 @@ export function Navbar() {
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        <Link href="/#home" className="flex items-center gap-2.5 font-serif text-2xl font-bold tracking-wider text-foreground">
+        <Link href={localizedHref("/#home")} className="flex items-center gap-2.5 font-serif text-2xl font-bold tracking-wider text-foreground">
           <Image
             src="/images/logo-mark.png"
             alt="Candra's Hair logo"
@@ -428,15 +460,20 @@ export function Navbar() {
           {navLinks.map((link) => {
             const megaMenu = PRODUCT_MEGA_MENUS[link.label]
             const isMenuOpen = openDesktopMenu === link.label
+            const megaMenuHeading = navLabel(link.label)
+            const megaMenuViewAllLabel =
+              locale === "ru" ? `Смотреть все: ${megaMenuHeading}` : megaMenu?.viewAllLabel ?? ""
+            const megaMenuPreviewAlt =
+              locale === "ru" ? `${megaMenuHeading} — коллекция` : megaMenu?.previewAlt ?? ""
 
             if (!megaMenu) {
               return (
                 <li key={link.href}>
                   <Link
-                    href={link.href}
+                    href={localizedHref(link.href)}
                     className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {link.label}
+                    {navLabel(link.label)}
                   </Link>
                 </li>
               )
@@ -450,13 +487,13 @@ export function Navbar() {
                 onMouseLeave={handleDesktopMenuLeave}
               >
                 <Link
-                  href={link.href}
+                  href={localizedHref(link.href)}
                   onClick={() => setOpenDesktopMenu(null)}
                   className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                   aria-expanded={isMenuOpen}
                   aria-haspopup="menu"
                 >
-                  {link.label}
+                  {navLabel(link.label)}
                 </Link>
 
                 {isMenuOpen && (
@@ -468,16 +505,16 @@ export function Navbar() {
                           onClick={() =>
                             setPreviewLightbox({
                               src: megaMenu.previewImage,
-                              alt: megaMenu.previewAlt,
-                              heading: megaMenu.heading,
+                              alt: megaMenuPreviewAlt,
+                              heading: megaMenuHeading,
                             })
                           }
                           className="preview-shake-trigger group flex min-h-[300px] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl bg-[#f7f4ef] p-0"
-                          aria-label={`Open ${megaMenu.heading} preview image`}
+                          aria-label={`Open ${megaMenuHeading} preview image`}
                         >
                           <Image
                             src={megaMenu.previewImage}
-                            alt={megaMenu.previewAlt}
+                            alt={megaMenuPreviewAlt}
                             sizes="380px"
                             width={700}
                             height={700}
@@ -492,13 +529,13 @@ export function Navbar() {
 
                       <div className="min-w-0">
                         <div className="mb-3 flex items-center justify-between gap-4">
-                          <h3 className="text-base font-bold uppercase tracking-wide text-foreground">{megaMenu.heading}</h3>
+                          <h3 className="text-base font-bold uppercase tracking-wide text-foreground">{megaMenuHeading}</h3>
                           <Link
-                            href={megaMenu.viewAllHref}
+                            href={localizedHref(megaMenu.viewAllHref)}
                             onClick={() => setOpenDesktopMenu(null)}
                             className="text-xs font-semibold uppercase tracking-widest text-accent transition-colors hover:text-foreground"
                           >
-                            {megaMenu.viewAllLabel}
+                            {megaMenuViewAllLabel}
                           </Link>
                         </div>
 
@@ -506,11 +543,11 @@ export function Navbar() {
                           {megaMenu.items.map((item) => (
                             <li key={item.href}>
                               <Link
-                                href={item.href}
+                                href={localizedHref(item.href)}
                                 onClick={() => setOpenDesktopMenu(null)}
                                 className="text-[15px] text-foreground/90 transition-colors hover:text-accent"
                               >
-                                {item.label}
+                                {megaMenuItemLabel(item, link.label)}
                               </Link>
                             </li>
                           ))}
@@ -533,22 +570,22 @@ export function Navbar() {
                   : "w-10 border-transparent bg-transparent"
               }`}
             >
-              <input
-                ref={desktopSearchInputRef}
-                value={desktopSearchQuery}
-                onChange={(event) => setDesktopSearchQuery(event.target.value)}
-                onKeyDown={handleDesktopSearchEnter}
-                placeholder="Search products..."
-                aria-label="Search products"
-                className={`h-full w-full bg-transparent pl-3 pr-10 text-sm text-foreground outline-none transition-opacity duration-200 placeholder:text-muted-foreground ${
-                  isDesktopSearchOpen ? "opacity-100" : "pointer-events-none opacity-0"
-                }`}
-              />
+                <input
+                  ref={desktopSearchInputRef}
+                  value={desktopSearchQuery}
+                  onChange={(event) => setDesktopSearchQuery(event.target.value)}
+                  onKeyDown={handleDesktopSearchEnter}
+                  placeholder={messages.searchPlaceholder}
+                  aria-label={messages.searchPlaceholder}
+                  className={`h-full w-full bg-transparent pl-3 pr-10 text-sm text-foreground outline-none transition-opacity duration-200 placeholder:text-muted-foreground ${
+                    isDesktopSearchOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                  }`}
+                />
               <button
                 type="button"
                 onClick={handleDesktopSearchIconClick}
                 className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center text-foreground transition-colors hover:bg-accent/10"
-                aria-label="Search products"
+                aria-label={messages.searchPlaceholder}
                 title="Search"
               >
                 <Search size={22} strokeWidth={1.8} />
@@ -556,8 +593,39 @@ export function Navbar() {
             </div>
           </div>
 
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
+                aria-label="Change language"
+                title="Language"
+              >
+                {locale.toUpperCase()}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem
+                onSelect={() => {
+                  setLocale("en")
+                  router.push(localeSwitchHref("en"))
+                }}
+              >
+                English
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setLocale("ru")
+                  router.push(localeSwitchHref("ru"))
+                }}
+              >
+                Русский
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Link
-            href="/cart"
+            href={localizedHref("/cart")}
             data-cart-target="true"
             className="relative inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
             title="Shopping Cart"
@@ -611,8 +679,8 @@ export function Navbar() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onSelect={() => router.push("/account/profile")}>My account</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void handleSignOut()}>Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/account/profile"))}>{messages.account.myAccount}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleSignOut()}>{messages.account.signOut}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
@@ -625,12 +693,12 @@ export function Navbar() {
                     title="Register / Login"
                   >
                     <UserRound size={18} strokeWidth={1.8} />
-                    Register
+                    {messages.account.register}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onSelect={() => router.push("/register")}>Create account</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => router.push("/login")}>Sign in</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/register"))}>{messages.account.createAccount}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/login"))}>{messages.account.signIn}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -642,7 +710,7 @@ export function Navbar() {
             type="button"
             onClick={handleMobileSearchClick}
             className="inline-flex items-center justify-center rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10"
-            aria-label="Search products"
+            aria-label={messages.searchPlaceholder}
             title="Search"
           >
             <Search size={22} strokeWidth={1.8} />
@@ -653,6 +721,40 @@ export function Navbar() {
       {/* Mobile Nav */}
       {isOpen && (
         <div className="border-t border-border bg-background px-4 pb-6 sm:px-6 md:hidden">
+          <div className="flex items-center gap-2 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false)
+                setLocale("en")
+                router.push(localeSwitchHref("en"))
+              }}
+              className={`inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-widest transition-colors ${
+                locale === "en"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-background text-foreground hover:bg-accent/10"
+              }`}
+              aria-label="Switch to English"
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false)
+                setLocale("ru")
+                router.push(localeSwitchHref("ru"))
+              }}
+              className={`inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-widest transition-colors ${
+                locale === "ru"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-background text-foreground hover:bg-accent/10"
+              }`}
+              aria-label="Switch to Russian"
+            >
+              RU
+            </button>
+          </div>
           <ul className="flex flex-col gap-4 pt-4">
             {navLinks.map((link) => {
               const megaMenu = PRODUCT_MEGA_MENUS[link.label]
@@ -662,11 +764,11 @@ export function Navbar() {
                 return (
                   <li key={link.href}>
                     <Link
-                      href={link.href}
+                      href={localizedHref(link.href)}
                       onClick={() => setIsOpen(false)}
                       className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      {link.label}
+                      {navLabel(link.label)}
                     </Link>
                   </li>
                 )
@@ -676,11 +778,11 @@ export function Navbar() {
                 <li key={link.href}>
                   <div className="flex items-center justify-between">
                     <Link
-                      href={link.href}
+                      href={localizedHref(link.href)}
                       onClick={() => setIsOpen(false)}
                       className="text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      {link.label}
+                      {navLabel(link.label)}
                     </Link>
                     <button
                       type="button"
@@ -700,14 +802,14 @@ export function Navbar() {
                       {megaMenu.items.map((item) => (
                         <Link
                           key={item.href}
-                          href={item.href}
+                          href={localizedHref(item.href)}
                           onClick={() => {
                             setIsOpen(false)
                             setOpenMobileMenu(null)
                           }}
                           className="block py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                         >
-                          {item.label}
+                          {megaMenuItemLabel(item, link.label)}
                         </Link>
                       ))}
                     </div>
@@ -717,20 +819,20 @@ export function Navbar() {
             })}
             <li>
               <Link
-                href="/cart"
+                href={localizedHref("/cart")}
                 data-cart-target="true"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-2 text-sm font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ShoppingBag size={18} strokeWidth={1.5} />
-                Cart {totalItems > 0 && `(${totalItems})`}
+                {messages.cartLabel} {totalItems > 0 && `(${totalItems})`}
               </Link>
             </li>
           </ul>
           {authState.status === "signed_in" ? (
             <div className="mt-4 grid gap-2">
               <Link
-                href="/account"
+                href={localizedHref("/account")}
                 onClick={() => setIsOpen(false)}
                 className="flex w-full items-center justify-center gap-2 border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
               >
@@ -739,7 +841,7 @@ export function Navbar() {
                   <span
                     className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} max-w-[140px] truncate`}
                   >
-                    {accountLabel?.firstName || "Account"}
+                    {accountLabel?.firstName || messages.account.accountFallback}
                   </span>
                   {accountLabel?.tierKey && accountLabel.tierName ? (
                     <TierBadge
@@ -759,26 +861,26 @@ export function Navbar() {
                 className="flex w-full items-center justify-center gap-2 border border-border bg-background px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <UserRound size={18} strokeWidth={1.8} />
-                Sign out
+                {messages.account.signOut}
               </button>
             </div>
           ) : (
             <div className="mt-4 grid gap-2">
               <Link
-                href="/register"
+                href={localizedHref("/register")}
                 onClick={() => setIsOpen(false)}
                 className="flex w-full items-center justify-center gap-2 border border-foreground bg-primary px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <UserRound size={18} strokeWidth={1.8} />
-                Create account
+                {messages.account.createAccount}
               </Link>
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 onClick={() => setIsOpen(false)}
                 className="flex w-full items-center justify-center gap-2 border border-border bg-background px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <UserRound size={18} strokeWidth={1.8} />
-                Sign in
+                {messages.account.signIn}
               </Link>
             </div>
           )}

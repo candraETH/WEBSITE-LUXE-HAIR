@@ -12,31 +12,51 @@ import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { WEFT_PRODUCTS } from "@/lib/weft-products"
 import { WIGS_PRODUCTS } from "@/lib/wigs-products"
 import type { Metadata } from "next"
-import { buildPageMetadata, getSiteUrl } from "@/lib/seo"
+import { absoluteUrl, getSiteUrl } from "@/lib/seo"
 import { JsonLd } from "@/components/json-ld"
+import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
+import { getMessages } from "@/lib/messages"
+import { withLocaleHref } from "@/lib/i18n"
 
-export const metadata: Metadata = buildPageMetadata({
-  title: "Premium Hair Extensions, Wigs & More",
-  description:
-    "Shop premium human hair extensions, bulk hair, weft hair, and wigs with trusted quality, fast delivery, and professional support.",
-  path: "/",
-  keywords: [
-    "human hair extensions",
-    "premium wigs",
-    "weft hair",
-    "bulk hair",
-    "luxury hair store",
-  ],
-  images: ["/images/hero.jpg"],
-})
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocaleFromRequestHeaders()
+  const title =
+    locale === "ru"
+      ? "Премиальные наращивания, парики и многое другое"
+      : "Premium Hair Extensions, Wigs & More"
+  const description =
+    locale === "ru"
+      ? "Покупайте премиальные натуральные волосы: наращивания, bulk hair, трессы и парики — надежное качество, быстрая доставка и поддержка."
+      : "Shop premium human hair extensions, bulk hair, weft hair, and wigs with trusted quality, fast delivery, and professional support."
 
-export default function Page() {
+  return buildLocalizedPageMetadata({
+    title,
+    description,
+    keywords: [
+      "hair",
+      "weft hair",
+      "hair color",
+      "human hairs",
+      "cheap hair",
+      "human hair extensions",
+      "bulk hair",
+      "premium wigs",
+      "luxury hair store",
+    ],
+    images: ["/images/hero.jpg"],
+  })
+}
+
+export default async function Page() {
+  const locale = await getLocaleFromRequestHeaders()
+  const messages = getMessages(locale)
+  const pageUrl = absoluteUrl(withLocaleHref("/", locale))
   const siteUrl = getSiteUrl()
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "CANDRA'S HAIR",
-    url: siteUrl,
+    url: pageUrl,
   }
   const organizationSchema = {
     "@context": "https://schema.org",
@@ -56,9 +76,9 @@ export default function Page() {
 
       <ProductSection
         id="bulk"
-        title="Bulk Hair"
-        subtitle="Our Collection"
-        description="High-quality bulk hair perfect for braiding, custom wig construction, and creative styling. Available in all textures."
+        title={messages.home.sections.bulk.title}
+        subtitle={messages.home.sections.bulk.subtitle}
+        description={messages.home.sections.bulk.description}
         products={BULK_PRODUCTS}
       />
 
@@ -68,9 +88,9 @@ export default function Page() {
 
       <ProductSection
         id="weft"
-        title="Bundles"
-        subtitle="Professional Grade"
-        description="Machine-made and hand-tied weft options for professional installations. Designed for stylists who demand the best."
+        title={messages.home.sections.weft.title}
+        subtitle={messages.home.sections.weft.subtitle}
+        description={messages.home.sections.weft.description}
         products={WEFT_PRODUCTS}
         reverse
       />
@@ -81,9 +101,9 @@ export default function Page() {
 
       <ProductSection
         id="extensions"
-        title="Hair Extensions"
-        subtitle="Premium Selection"
-        description="Premium clip-in, tape-in, and bundle extensions crafted from 100% human hair. Achieve your dream length and volume effortlessly."
+        title={messages.home.sections.extensions.title}
+        subtitle={messages.home.sections.extensions.subtitle}
+        description={messages.home.sections.extensions.description}
         products={EXTENSIONS_PRODUCTS}
       />
 
@@ -93,9 +113,9 @@ export default function Page() {
 
       <ProductSection
         id="wigs"
-        title="Luxury Wigs"
-        subtitle="Handcrafted"
-        description="From lace front to full lace, our wigs offer the most natural look and feel. Custom options available upon request."
+        title={messages.home.sections.wigs.title}
+        subtitle={messages.home.sections.wigs.subtitle}
+        description={messages.home.sections.wigs.description}
         products={WIGS_PRODUCTS}
         reverse
       />
