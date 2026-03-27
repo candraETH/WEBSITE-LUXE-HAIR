@@ -5,6 +5,7 @@ import { SITE_NAME as BRAND_NAME, getSiteCopy } from "@/lib/site-copy"
 export const SITE_NAME = BRAND_NAME
 export const SITE_TITLE = getSiteCopy("en").title
 export const SITE_DESCRIPTION = getSiteCopy("en").description
+const DEFAULT_PRODUCTION_SITE_URL = "https://candrashair.com"
 
 function trimTrailingSlash(value: string): string {
   return value.trim().replace(/\/+$/, "")
@@ -17,7 +18,7 @@ export function getSiteUrl(): string {
   }
 
   if (process.env.NODE_ENV === "production") {
-    return "https://example.com"
+    return DEFAULT_PRODUCTION_SITE_URL
   }
 
   return "http://localhost:3000"

@@ -4,6 +4,7 @@ import { hasSupabaseEnv } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
 import { queryOrderByOrderAndPhone, extractEmailFromCartJson, extractPhoneFromCartJson } from "@/lib/order-lookup"
+import { getSiteUrl } from "@/lib/seo"
 
 export const runtime = "nodejs"
 
@@ -156,7 +157,7 @@ function getCompanyWebsite(request: Request): string {
   try {
     return new URL(request.url).origin
   } catch {
-    return "https://example.com"
+    return getSiteUrl()
   }
 }
 

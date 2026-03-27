@@ -4,6 +4,35 @@ import { DEFAULT_LOCALE, localeFromPathname, stripLocaleFromPathname } from "./l
 
 const isDevelopment = process.env.NODE_ENV !== "production"
 const PUBLIC_FILE_PATH = /\/[^/]+\.[a-z0-9]+$/i
+const DEFAULT_PRODUCTION_APP_URL = "https://candrashair.com"
+
+function getRedirectBaseUrl(request: NextRequest): URL {
+  const configured = process.env.APP_BASE_URL?.trim()
+  if (configured) {
+    try {
+      return new URL(configured)
+    } catch {
+      // Fall through to request-derived origin when APP_BASE_URL is invalid.
+    }
+  }
+
+  try {
+    const requestUrl = new URL(request.url)
+    if (requestUrl.protocol && requestUrl.host) {
+      return requestUrl
+    }
+  } catch {
+    // Fall through to the environment-specific fallback below.
+  }
+
+  return new URL(isDevelopment ? "http://localhost:3000" : DEFAULT_PRODUCTION_APP_URL)
+}
+
+function buildRedirectUrl(request: NextRequest, pathname: string): URL {
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`
+  const search = request.nextUrl.search
+  return new URL(`${normalizedPath}${search}`, getRedirectBaseUrl(request))
+}
 
 function getPayPalMode(): "live" | "sandbox" {
   const rawMode = process.env.PAYPAL_ENV?.trim().toLowerCase()
@@ -128,9 +157,9 @@ export function proxy(request: NextRequest) {
       if (!shouldBypassLocaleRouting(originalPathname)) {
         const cookieLocale = parseLocaleCookie(request.cookies.get("site_locale")?.value)
         const redirectLocale = cookieLocale ?? DEFAULT_LOCALE
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname =
+        const redirectPath =
           originalPathname === "/" ? `/${redirectLocale}` : `/${redirectLocale}${originalPathname}`
+        const redirectUrl = buildRedirectUrl(request, redirectPath)
         return withSecurityHeaders(NextResponse.redirect(redirectUrl), nonce)
       }
 
