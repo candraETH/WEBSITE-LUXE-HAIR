@@ -18,7 +18,7 @@ type SignedVerificationPayloadV1 = {
   exp: number
 }
 
-function buildCheckoutFingerprint(customer: CheckoutCustomerInput): string {
+function buildCheckoutFingerprintV1(customer: CheckoutCustomerInput): string {
   const normalized = normalizeCheckoutCustomer(customer)
   const payload = [
     normalized.fullName,
@@ -32,6 +32,26 @@ function buildCheckoutFingerprint(customer: CheckoutCustomerInput): string {
   ].join("|")
 
   return createHash("sha256").update(payload).digest("hex")
+}
+
+function buildCheckoutFingerprintV2(customer: CheckoutCustomerInput): string {
+  const normalized = normalizeCheckoutCustomer(customer)
+  const payload = JSON.stringify([
+    normalized.fullName,
+    normalized.email,
+    normalized.whatsapp,
+    normalized.addressLine,
+    normalized.city,
+    normalized.province,
+    normalized.postalCode,
+    normalized.country,
+  ])
+
+  return createHash("sha256").update(payload).digest("hex")
+}
+
+function buildCheckoutFingerprint(customer: CheckoutCustomerInput): string {
+  return buildCheckoutFingerprintV2(customer)
 }
 
 function checkoutTokenKey(token: string) {
@@ -106,7 +126,12 @@ function issueSignedTokenByFingerprint(fingerprint: string, ttlSeconds: number) 
 }
 
 function verifySignedToken(token: string, customer: CheckoutCustomerInput) {
-  const [payloadPart, signaturePart] = token.split(".")
+  const parts = token.split(".")
+  if (parts.length !== 2) {
+    return false
+  }
+
+  const [payloadPart, signaturePart] = parts
   if (!payloadPart || !signaturePart) {
     return false
   }
@@ -131,8 +156,13 @@ function verifySignedToken(token: string, customer: CheckoutCustomerInput) {
     return false
   }
 
-  const expectedFingerprint = buildCheckoutFingerprint(customer)
-  return payload.fp === expectedFingerprint
+  const expectedFingerprintV2 = buildCheckoutFingerprintV2(customer)
+  if (payload.fp === expectedFingerprintV2) {
+    return true
+  }
+
+  const expectedFingerprintV1 = buildCheckoutFingerprintV1(customer)
+  return payload.fp === expectedFingerprintV1
 }
 
 export async function storeCheckoutVerificationToken(
@@ -166,8 +196,8 @@ export async function consumeCheckoutVerificationToken(token: string, customer: 
     return false
   }
 
-  const expectedFingerprint = buildCheckoutFingerprint(customer)
-  const isMatch = stored.fingerprint === expectedFingerprint
+  const expectedFingerprintV2 = buildCheckoutFingerprintV2(customer)
+  const isMatch = stored.fingerprint === expectedFingerprintV2 || stored.fingerprint === buildCheckoutFingerprintV1(customer)
   if (!isMatch) {
     return false
   }
