@@ -2,7 +2,7 @@ import "server-only"
 import { maskEmail, maskPhone } from "@/lib/otp-utils"
 
 type OtpDeliveryInput = {
-  purpose: "track_order" | "checkout_verification"
+  purpose: "track_order" | "send_invoice" | "checkout_verification"
   orderId?: string
   code: string
   customerName?: string
@@ -48,6 +48,9 @@ function buildOtpSubject(input: OtpDeliveryInput): string {
   if (input.purpose === "track_order") {
     return `Order Tracking OTP${input.orderId ? ` - ${input.orderId}` : ""}`
   }
+  if (input.purpose === "send_invoice") {
+    return `Invoice Verification OTP${input.orderId ? ` - ${input.orderId}` : ""}`
+  }
   return "Checkout Verification OTP"
 }
 
@@ -55,6 +58,8 @@ function buildOtpTextContent(input: OtpDeliveryInput): string {
   const intro =
     input.purpose === "track_order"
       ? "Use this OTP to verify your order tracking request."
+      : input.purpose === "send_invoice"
+        ? "Use this OTP to verify your invoice request."
       : "Use this OTP to verify your checkout details."
   return [
     intro,
@@ -68,6 +73,8 @@ function buildOtpHtmlContent(input: OtpDeliveryInput): string {
   const intro =
     input.purpose === "track_order"
       ? "Use this OTP to verify your order tracking request."
+      : input.purpose === "send_invoice"
+        ? "Use this OTP to verify your invoice request."
       : "Use this OTP to verify your checkout details."
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#1f2937;">

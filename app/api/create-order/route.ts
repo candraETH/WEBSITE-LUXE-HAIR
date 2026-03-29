@@ -333,9 +333,10 @@ export async function POST(request: Request) {
         }
       }
 
+      const maxUsesPerCustomer = requestedCoupon.maxUsesPerCustomer ?? 1
       const hasUseLimits =
         (typeof requestedCoupon.maxUsesTotal === "number" && requestedCoupon.maxUsesTotal > 0) ||
-        (typeof requestedCoupon.maxUsesPerCustomer === "number" && requestedCoupon.maxUsesPerCustomer > 0)
+        maxUsesPerCustomer > 0
 
       if (hasUseLimits) {
         const { count: totalUses, error: totalUsesError } = await countPaidCouponUses({ code: requestedCoupon.code })
@@ -369,7 +370,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Unable to validate coupon. Please try again." }, { status: 500 })
         }
 
-        if (requestedCoupon.maxUsesPerCustomer != null && customerUses >= requestedCoupon.maxUsesPerCustomer) {
+        if (customerUses >= maxUsesPerCustomer) {
           return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 })
         }
       }

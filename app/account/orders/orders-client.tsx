@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns"
 import { Package } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -25,6 +26,18 @@ type UiState =
   | { status: "signed_out" }
   | { status: "error"; message: string }
   | { status: "ready"; orders: OrderSummary[] }
+
+type OrderOtpRequestResponse = {
+  error?: string
+  challengeId?: string
+  destination?: string
+  devOtpCode?: string
+}
+
+type OrderOtpVerifyResponse = {
+  error?: string
+  sessionToken?: string
+}
 
 type StatusKey = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "other"
 
@@ -98,6 +111,9 @@ export function OrdersClient() {
   const [resumingOrderId, setResumingOrderId] = useState<string | null>(null)
   const [resumeError, setResumeError] = useState("")
   const [invoiceLoadingByOrder, setInvoiceLoadingByOrder] = useState<Record<string, boolean>>({})
+  const [invoiceChallengeIdByOrder, setInvoiceChallengeIdByOrder] = useState<Record<string, string>>({})
+  const [invoiceOtpByOrder, setInvoiceOtpByOrder] = useState<Record<string, string>>({})
+  const [invoiceInfoByOrder, setInvoiceInfoByOrder] = useState<Record<string, string>>({})
   const [invoiceSuccessByOrder, setInvoiceSuccessByOrder] = useState<Record<string, string>>({})
   const [invoiceErrorByOrder, setInvoiceErrorByOrder] = useState<Record<string, string>>({})
 
@@ -194,26 +210,88 @@ export function OrdersClient() {
     const phone = phoneNumber.trim()
     setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "" }))
     setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceInfoByOrder((prev) => ({ ...prev, [orderId]: "" }))
 
     if (!phone) {
       setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "Phone number is required to send an invoice." }))
       return
     }
 
+    const challengeId = invoiceChallengeIdByOrder[orderId]
+    const otpCode = (invoiceOtpByOrder[orderId] ?? "").replace(/\D/g, "")
+
+    if (!challengeId) {
+      setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: true }))
+      try {
+        const response = await fetch("/api/order-tracking/request-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId,
+            phoneNumber: phone,
+            purpose: "send_invoice",
+          }),
+        })
+        const data = (await response.json().catch(() => ({}))) as OrderOtpRequestResponse
+        if (!response.ok || !data.challengeId) {
+          throw new Error(data.error || "Unable to request invoice verification code.")
+        }
+
+        setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [orderId]: data.challengeId ?? "" }))
+        setInvoiceOtpByOrder((prev) => ({ ...prev, [orderId]: "" }))
+        setInvoiceInfoByOrder((prev) => ({
+          ...prev,
+          [orderId]: `${data.destination ? `OTP sent to ${data.destination}.` : "OTP sent to your registered email."}${
+            data.devOtpCode ? ` Dev code: ${data.devOtpCode}` : ""
+          }`,
+        }))
+      } catch (error) {
+        setInvoiceErrorByOrder((prev) => ({
+          ...prev,
+          [orderId]: error instanceof Error ? error.message : "Unable to request invoice verification code.",
+        }))
+      } finally {
+        setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: false }))
+      }
+      return
+    }
+
+    if (otpCode.length !== 6) {
+      setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "Enter the 6-digit OTP from your email." }))
+      return
+    }
+
     setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: true }))
+    setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "" }))
 
     try {
-      const response = await fetch("/api/order-tracking/send-invoice", {
+      const verifyResponse = await fetch("/api/order-tracking/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, phoneNumber: phone }),
+        body: JSON.stringify({ challengeId, otpCode }),
       })
-      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string; destination?: string }
-      if (!response.ok) {
-        throw new Error(data.error || "Unable to send invoice.")
+      const verifyData = (await verifyResponse.json().catch(() => ({}))) as OrderOtpVerifyResponse
+      if (!verifyResponse.ok || !verifyData.sessionToken) {
+        throw new Error(verifyData.error || "Unable to verify invoice code.")
       }
-      const message = data.destination ? `${data.message || "Invoice sent."} (${data.destination})` : data.message || "Invoice sent."
+
+      const sendResponse = await fetch("/api/order-tracking/send-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionToken: verifyData.sessionToken }),
+      })
+      const sendData = (await sendResponse.json().catch(() => ({}))) as { error?: string; message?: string; destination?: string }
+      if (!sendResponse.ok) {
+        throw new Error(sendData.error || "Unable to send invoice.")
+      }
+
+      const message = sendData.destination
+        ? `${sendData.message || "Invoice sent."} (${sendData.destination})`
+        : sendData.message || "Invoice sent."
       setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: message }))
+      setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [orderId]: "" }))
+      setInvoiceOtpByOrder((prev) => ({ ...prev, [orderId]: "" }))
+      setInvoiceInfoByOrder((prev) => ({ ...prev, [orderId]: "" }))
     } catch (error) {
       setInvoiceErrorByOrder((prev) => ({
         ...prev,
@@ -401,6 +479,9 @@ export function OrdersClient() {
             const invoiceLoading = Boolean(invoiceLoadingByOrder[order.orderId])
             const invoiceError = invoiceErrorByOrder[order.orderId]
             const invoiceSuccess = invoiceSuccessByOrder[order.orderId]
+            const invoiceChallengeId = invoiceChallengeIdByOrder[order.orderId]
+            const invoiceOtpValue = invoiceOtpByOrder[order.orderId] ?? ""
+            const invoiceInfo = invoiceInfoByOrder[order.orderId]
 
             return (
               <div key={order.orderId} className="rounded-2xl border border-border/30 bg-card/60 p-5 shadow-sm">
@@ -451,9 +532,74 @@ export function OrdersClient() {
                     disabled={!order.phoneNumber || invoiceLoading}
                     onClick={() => void handleSendInvoice(order.orderId, order.phoneNumber)}
                   >
-                    {invoiceLoading ? "Sending..." : "Send Invoice"}
+                    {invoiceLoading
+                      ? invoiceChallengeId
+                        ? "Verifying..."
+                        : "Sending OTP..."
+                      : invoiceChallengeId
+                        ? "Verify & Send Invoice"
+                        : "Send Invoice"}
                   </Button>
                 </div>
+
+                {invoiceChallengeId ? (
+                  <div className="mt-3 rounded-2xl border border-[#D4AF37]/25 bg-[#FFFDF8] p-4 shadow-sm sm:p-5">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Invoice OTP</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {invoiceInfo || "We sent a 6-digit code to your registered email."}
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Enter OTP</p>
+                      <InputOTP
+                        value={invoiceOtpValue}
+                        onChange={(value) =>
+                          setInvoiceOtpByOrder((prev) => ({
+                            ...prev,
+                            [order.orderId]: value.replace(/\D/g, "").slice(0, 6),
+                          }))
+                        }
+                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        containerClassName="justify-start"
+                        className="gap-3"
+                      >
+                        <InputOTPGroup className="gap-3">
+                          <InputOTPSlot index={0} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                          <InputOTPSlot index={1} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                          <InputOTPSlot index={2} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                          <InputOTPSlot index={3} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                          <InputOTPSlot index={4} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                          <InputOTPSlot index={5} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={!order.phoneNumber || invoiceLoading}
+                        onClick={() => void handleSendInvoice(order.orderId, order.phoneNumber)}
+                      >
+                        {invoiceLoading ? "Processing..." : "Verify & Send Invoice"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={!order.phoneNumber || invoiceLoading}
+                        onClick={() => {
+                          setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                          setInvoiceOtpByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                          setInvoiceInfoByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                          void handleSendInvoice(order.orderId, order.phoneNumber)
+                        }}
+                      >
+                        Resend OTP
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {canContinuePayment ? (
                   <div className="mt-3">

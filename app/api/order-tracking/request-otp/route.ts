@@ -5,7 +5,11 @@ import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
 import { deliverOtpCode } from "@/lib/otp-delivery"
 import { generateOtpCode, hashOtpCode, maskEmail, maskPhone } from "@/lib/otp-utils"
-import { setSecurityStoreValue } from "@/lib/security-store"
+import {
+  ORDER_OTP_TTL_SECONDS,
+  isOrderOtpPurpose,
+  storeOrderOtpChallenge,
+} from "@/lib/order-otp"
 import { queryOrderByOrderAndPhone } from "@/lib/order-lookup"
 
 export const runtime = "nodejs"
@@ -18,7 +22,8 @@ const requestOtpSchema = z.object({
     .max(80)
     .transform((value) => value.toUpperCase())
     .refine((value) => isValidPayPalOrderId(value), "Invalid order id."),
-  phoneNumber: z.string().trim().regex(/^\+\d{8,15}$/),
+  phoneNumber: z.string().trim().regex(/^\+?\d{4,15}$/),
+  purpose: z.enum(["track_order", "send_invoice"]).default("track_order"),
 })
 
 type OrderRow = {
@@ -30,8 +35,6 @@ type OrderRow = {
 }
 
 const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,cart_json"
-const OTP_TTL_SECONDS = 10 * 60
-
 function mapOtpErrorToMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : ""
   const message = raw.toLowerCase()
@@ -110,7 +113,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request payload." }, { status: 400 })
     }
 
-    const { orderId, phoneNumber } = parsed.data
+    const { orderId, phoneNumber, purpose } = parsed.data
+    if (!isOrderOtpPurpose(purpose)) {
+      return NextResponse.json({ error: "Invalid OTP purpose." }, { status: 400 })
+    }
+
     const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(orderId, phoneNumber, ORDER_SELECT)
     if (error) {
       console.error("Order-tracking request-otp query failed:", error, `order=${orderId}`)
@@ -132,12 +139,13 @@ export async function POST(request: Request) {
     const challengePayload = {
       orderId,
       phoneNumber,
+      purpose,
       otpHash,
       attemptsLeft: 5,
-      expiresAt: Date.now() + OTP_TTL_SECONDS * 1000,
+      expiresAt: Date.now() + ORDER_OTP_TTL_SECONDS * 1000,
     }
 
-    await setSecurityStoreValue(`track-otp:${challengeId}`, challengePayload, OTP_TTL_SECONDS)
+    await storeOrderOtpChallenge(challengeId, challengePayload)
 
     const customerPhone = extractCustomerPhone(data) || phoneNumber
     const customerEmail = extractCustomerEmail(data)
@@ -149,7 +157,7 @@ export async function POST(request: Request) {
     }
 
     const delivery = await deliverOtpCode({
-      purpose: "track_order",
+      purpose,
       orderId,
       code: otpCode,
       customerName: data.customer_name ?? "",
@@ -159,10 +167,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       challengeId,
-      expiresInSeconds: OTP_TTL_SECONDS,
+      expiresInSeconds: ORDER_OTP_TTL_SECONDS,
       destination: customerEmail ? `${maskEmail(customerEmail)} / ${maskPhone(customerPhone)}` : maskPhone(customerPhone),
       channel: delivery.channel,
       devOtpCode: delivery.devOtpCode,
+      purpose,
     })
   } catch (error) {
     console.error("Order-tracking request-otp error:", error instanceof Error ? error.message : "Unknown error")

@@ -2,21 +2,15 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { hasSupabaseEnv } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
-import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
-import { queryOrderByOrderAndPhone, extractEmailFromCartJson, extractPhoneFromCartJson } from "@/lib/order-lookup"
+import { isAllowedRequestOrigin } from "@/lib/security"
+import { extractEmailFromCartJson, extractPhoneFromCartJson, queryOrderByOrderAndPhone } from "@/lib/order-lookup"
+import { deleteOrderOtpSession, getOrderOtpSession } from "@/lib/order-otp"
 import { getSiteUrl } from "@/lib/seo"
 
 export const runtime = "nodejs"
 
 const sendInvoiceSchema = z.object({
-  orderId: z
-    .string()
-    .trim()
-    .min(1)
-    .max(80)
-    .transform((value) => value.toUpperCase())
-    .refine((value) => isValidPayPalOrderId(value), "Invalid order id."),
-  phoneNumber: z.string().trim().regex(/^\+\d{8,15}$/),
+  sessionToken: z.string().trim().min(20).max(200),
 })
 
 type OrderRow = {
@@ -264,10 +258,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request payload." }, { status: 400 })
     }
 
-    const { orderId, phoneNumber } = parsed.data
-    const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(orderId, phoneNumber, ORDER_SELECT)
+    const session = await getOrderOtpSession(parsed.data.sessionToken)
+    if (!session) {
+      return NextResponse.json({ error: "Invoice session expired. Request a new verification code." }, { status: 401 })
+    }
+
+    if (session.purpose !== "send_invoice") {
+      return NextResponse.json({ error: "Invalid invoice session." }, { status: 403 })
+    }
+
+    const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(session.orderId, session.phoneNumber, ORDER_SELECT)
     if (error) {
-      console.error("Order-tracking send-invoice query failed:", error, `order=${orderId}`)
+      console.error("Order-tracking send-invoice query failed:", error, `order=${session.orderId}`)
       return NextResponse.json({ error: "Unable to read order data." }, { status: 500 })
     }
 
@@ -283,7 +285,8 @@ export async function POST(request: Request) {
     const brevo = getBrevoConfig()
     if (!brevo) {
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[INVOICE_DEV] order=${orderId} to=${customerEmail}`)
+        console.log(`[INVOICE_DEV] order=${session.orderId} to=${customerEmail}`)
+        await deleteOrderOtpSession(parsed.data.sessionToken)
         return NextResponse.json({
           message: "Invoice prepared (development mode).",
           destination: maskEmail(customerEmail),
@@ -293,7 +296,7 @@ export async function POST(request: Request) {
     }
 
     const root = getCartJsonRoot(data.cart_json)
-    const orderRef = asString(data.paypal_order_id) || orderId
+    const orderRef = asString(data.paypal_order_id) || session.orderId
     const customerName = asString(data.customer_name) || asString(root.customer?.name) || "Customer"
     const customerPhone = asString(root.customer?.phone_number) || extractPhoneFromCartJson(data.cart_json) || "-"
     const customerAddress = [
@@ -509,6 +512,8 @@ export async function POST(request: Request) {
       const errorBody = await response.text().catch(() => "")
       throw new Error(`Brevo invoice delivery failed with status ${response.status}${errorBody ? `: ${errorBody}` : ""}`)
     }
+
+    await deleteOrderOtpSession(parsed.data.sessionToken)
 
     return NextResponse.json({
       message: "Professional invoice sent successfully.",

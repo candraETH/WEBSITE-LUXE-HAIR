@@ -2,9 +2,9 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { hasSupabaseEnv } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
-import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
-import { getSecurityStoreValue } from "@/lib/security-store"
-import { queryOrderByOrderAndPhone, extractPhoneFromCartJson, extractEmailFromCartJson } from "@/lib/order-lookup"
+import { isAllowedRequestOrigin } from "@/lib/security"
+import { getOrderOtpSession } from "@/lib/order-otp"
+import { extractPhoneFromCartJson, extractEmailFromCartJson, queryOrderByOrderAndPhone } from "@/lib/order-lookup"
 
 export const runtime = "nodejs"
 
@@ -12,22 +12,10 @@ const trackBySessionSchema = z.object({
   sessionToken: z.string().trim().min(20).max(200),
 })
 
-const trackByIdentitySchema = z.object({
-  orderId: z
-    .string()
-    .trim()
-    .min(1)
-    .max(80)
-    .transform((value) => value.toUpperCase())
-    .refine((value) => isValidPayPalOrderId(value), "Invalid order id."),
-  phoneNumber: z.string().trim().regex(/^\+\d{8,15}$/),
-})
-
-const trackOrderSchema = z.union([trackBySessionSchema, trackByIdentitySchema])
-
 type TrackSession = {
   orderId: string
   phoneNumber: string
+  purpose: "track_order" | "send_invoice"
 }
 
 type OrderRow = {
@@ -134,35 +122,24 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const parsed = trackOrderSchema.safeParse(body)
+    const parsed = trackBySessionSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid tracking payload." }, { status: 400 })
     }
 
-    let queryOrderId = ""
-    let queryPhoneNumber = ""
-
-    if ("sessionToken" in parsed.data) {
-      const session = await getSecurityStoreValue<TrackSession>(`track-session:${parsed.data.sessionToken}`)
-      if (!session) {
-        return NextResponse.json({ error: "Tracking session expired. Track your order again." }, { status: 401 })
-      }
-
-      queryOrderId = session.orderId
-      queryPhoneNumber = session.phoneNumber
-    } else {
-      queryOrderId = parsed.data.orderId
-      queryPhoneNumber = parsed.data.phoneNumber
+    const session = await getOrderOtpSession(parsed.data.sessionToken)
+    if (!session) {
+      return NextResponse.json({ error: "Tracking session expired. Request a new verification code." }, { status: 401 })
     }
 
-    const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(
-      queryOrderId,
-      queryPhoneNumber,
-      ORDER_SELECT
-    )
+    if (session.purpose !== "track_order") {
+      return NextResponse.json({ error: "Invalid tracking session." }, { status: 403 })
+    }
+
+    const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(session.orderId, session.phoneNumber, ORDER_SELECT)
 
     if (error) {
-      console.error("Order-tracking read query failed:", error, `order=${queryOrderId}`)
+      console.error("Order-tracking read query failed:", error, `order=${session.orderId}`)
       const isProd = process.env.NODE_ENV === "production"
       return NextResponse.json(
         { error: isProd ? "Unable to read order data." : `Unable to read order data. (${error})` },

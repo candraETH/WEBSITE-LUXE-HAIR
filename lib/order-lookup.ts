@@ -39,6 +39,10 @@ export function buildPhoneCandidates(rawValue: string): string[] {
   return Array.from(values).filter(Boolean)
 }
 
+function normalizePhoneDigits(value: string): string {
+  return value.replace(/\D/g, "")
+}
+
 export function extractPhoneFromCartJson(value: unknown): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null
@@ -92,15 +96,13 @@ export async function queryOrderByOrderAndPhone<T extends Record<string, unknown
   const phoneColumns = ["phone_number", "customer_phone", "customer_whatsapp", "whatsapp"] as const
   const candidates = buildPhoneCandidates(phoneNumber)
 
-  const normalizePhoneComparable = (value: string) => {
-    const digits = value.replace(/\D/g, "")
-    return digits ? `+${digits}` : ""
-  }
-
   const phoneMatches = (storedPhone: string, inputPhone: string) => {
-    const input = normalizePhoneComparable(inputPhone)
-    const stored = normalizePhoneComparable(storedPhone)
+    const input = normalizePhoneDigits(inputPhone)
+    const stored = normalizePhoneDigits(storedPhone)
     if (!input || !stored) return false
+    if (input.length === 4) {
+      return stored.endsWith(input)
+    }
     return input === stored
   }
 

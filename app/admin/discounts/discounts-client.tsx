@@ -575,6 +575,11 @@ function BuiltInCouponRow({ coupon }: { coupon: CouponDefinition }) {
             <span className="rounded-full border border-border bg-background px-3 py-1">
               Minimum subtotal: <span className="font-semibold text-foreground">${coupon.minimumSubtotal.toFixed(0)}</span>
             </span>
+            {coupon.maxUsesPerCustomer != null ? (
+              <span className="rounded-full border border-border bg-background px-3 py-1">
+                Max/customer: <span className="font-semibold text-foreground">{coupon.maxUsesPerCustomer}</span>
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ const COUPON_MAP: Record<string, CouponDefinition> = {
     description: "25% off for orders with minimum subtotal $1000.",
     discountRate: WELCOME_COUPON_DISCOUNT_RATE,
     minimumSubtotal: 1000,
+    maxUsesPerCustomer: 1,
   },
 }
 

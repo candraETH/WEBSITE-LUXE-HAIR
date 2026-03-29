@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { useLocale } from "@/context/LocaleContext"
 
 type TrackedOrder = {
@@ -29,6 +30,18 @@ type SendInvoiceResponse = {
   error?: string
   message?: string
   destination?: string
+}
+
+type OrderOtpRequestResponse = {
+  error?: string
+  challengeId?: string
+  destination?: string
+  devOtpCode?: string
+}
+
+type OrderOtpVerifyResponse = {
+  error?: string
+  sessionToken?: string
 }
 
 const DHL_TRACKING_BASE_URL = "https://www.dhl.com/global-en/home/tracking.html"
@@ -266,8 +279,17 @@ function TrackOrderContent() {
   const [error, setError] = useState("")
   const [orders, setOrders] = useState<TrackedOrder[]>([])
   const [searched, setSearched] = useState(false)
+  const [trackChallengeId, setTrackChallengeId] = useState("")
+  const [trackOtpCode, setTrackOtpCode] = useState("")
+  const [trackOtpInfo, setTrackOtpInfo] = useState("")
+  const [trackOtpError, setTrackOtpError] = useState("")
+  const [trackOtpLoading, setTrackOtpLoading] = useState(false)
+  const [trackOtpDevCode, setTrackOtpDevCode] = useState("")
   const [invoiceOptInByOrder, setInvoiceOptInByOrder] = useState<Record<string, boolean>>({})
   const [invoiceLoadingByOrder, setInvoiceLoadingByOrder] = useState<Record<string, boolean>>({})
+  const [invoiceChallengeIdByOrder, setInvoiceChallengeIdByOrder] = useState<Record<string, string>>({})
+  const [invoiceOtpByOrder, setInvoiceOtpByOrder] = useState<Record<string, string>>({})
+  const [invoiceInfoByOrder, setInvoiceInfoByOrder] = useState<Record<string, string>>({})
   const [invoiceSuccessByOrder, setInvoiceSuccessByOrder] = useState<Record<string, string>>({})
   const [invoiceErrorByOrder, setInvoiceErrorByOrder] = useState<Record<string, string>>({})
   const primaryOrder = orders[0] ?? null
@@ -288,15 +310,26 @@ function TrackOrderContent() {
 
   const normalizePhone = () => {
     const normalizedPhoneDigits = phoneNumber.replace(/\D/g, "")
-    return normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : ""
+    if (normalizedPhoneDigits.length < 4) {
+      return ""
+    }
+    return normalizedPhoneDigits.slice(-4)
   }
 
   const resetTrackingState = () => {
     setOrders([])
     setSearched(false)
     setError("")
+    setTrackChallengeId("")
+    setTrackOtpCode("")
+    setTrackOtpInfo("")
+    setTrackOtpError("")
+    setTrackOtpDevCode("")
     setInvoiceOptInByOrder({})
     setInvoiceLoadingByOrder({})
+    setInvoiceChallengeIdByOrder({})
+    setInvoiceOtpByOrder({})
+    setInvoiceInfoByOrder({})
     setInvoiceSuccessByOrder({})
     setInvoiceErrorByOrder({})
   }
@@ -307,34 +340,104 @@ function TrackOrderContent() {
     if (!canTrackOrder) {
       setError(
         isRu
-          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal \u0438 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
-          : "Enter both PayPal Order ID and Phone Number."
+          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 ID \u0437\u0430\u043a\u0430\u0437\u0430 \u0438 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
+          : "Enter both Order ID and phone number."
       )
       return
     }
 
     const normalizedPhone = normalizePhone()
     if (!normalizedPhone) {
-      setError(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430." : "Enter a valid phone number.")
+      setError(
+        isRu
+          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
+          : "Enter the last 4 digits of the phone number."
+      )
       return
     }
 
     setLoading(true)
     setError("")
+    setTrackOtpError("")
+    setTrackOtpInfo("")
     setOrders([])
     setSearched(false)
     setInvoiceOptInByOrder({})
     setInvoiceLoadingByOrder({})
+    setInvoiceChallengeIdByOrder({})
+    setInvoiceOtpByOrder({})
+    setInvoiceInfoByOrder({})
     setInvoiceSuccessByOrder({})
     setInvoiceErrorByOrder({})
 
     try {
-      const response = await fetch("/api/order-tracking", {
+      const response = await fetch("/api/order-tracking/request-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: orderId.trim().toUpperCase(),
           phoneNumber: normalizedPhone,
+          purpose: "track_order",
+        }),
+      })
+
+      const data = (await response.json().catch(() => ({}))) as OrderOtpRequestResponse
+      if (!response.ok || !data.challengeId) {
+        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u0441\u043b\u0430\u0442\u044c OTP." : data.error || "Unable to send OTP.")
+      }
+
+      setTrackChallengeId(data.challengeId)
+      setTrackOtpCode("")
+      setTrackOtpInfo(
+        `${data.destination ? `${isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430" : "OTP sent to"} ${data.destination}.` : isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 \u0432\u0430\u0448 email." : "OTP sent to your registered email."}${data.devOtpCode ? ` Dev code: ${data.devOtpCode}` : ""}`
+      )
+      setTrackOtpDevCode(data.devOtpCode ?? "")
+    } catch (requestError) {
+      const safeMessage = isRu
+        ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP."
+        : requestError instanceof Error
+          ? requestError.message
+          : "Unable to send OTP."
+      setTrackOtpError(safeMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyTrackOtp = async () => {
+    if (!trackChallengeId) {
+      setTrackOtpError(isRu ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0437\u0430\u043f\u0440\u043e\u0441\u0438\u0442\u0435 OTP." : "Request an OTP first.")
+      return
+    }
+
+    const otpCode = trackOtpCode.replace(/\D/g, "")
+    if (otpCode.length !== 6) {
+      setTrackOtpError(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 OTP." : "Enter a valid 6-digit OTP.")
+      return
+    }
+
+    setTrackOtpLoading(true)
+    setTrackOtpError("")
+
+    try {
+      const verifyResponse = await fetch("/api/order-tracking/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: trackChallengeId,
+          otpCode,
+        }),
+      })
+      const verifyData = (await verifyResponse.json().catch(() => ({}))) as OrderOtpVerifyResponse
+      if (!verifyResponse.ok || !verifyData.sessionToken) {
+        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c OTP." : verifyData.error || "Unable to verify OTP.")
+      }
+
+      const response = await fetch("/api/order-tracking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionToken: verifyData.sessionToken,
         }),
       })
 
@@ -346,6 +449,10 @@ function TrackOrderContent() {
       const nextOrders = Array.isArray(data.orders) ? data.orders : []
       setOrders(nextOrders)
       setSearched(true)
+      setTrackChallengeId("")
+      setTrackOtpCode("")
+      setTrackOtpInfo("")
+      setTrackOtpDevCode("")
       if (nextOrders.length === 0) {
         setError(isRu ? "\u0417\u0430\u043a\u0430\u0437 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d." : "No order found.")
       }
@@ -355,9 +462,9 @@ function TrackOrderContent() {
         : requestError instanceof Error
           ? requestError.message
           : "Unable to track order."
-      setError(safeMessage)
+      setTrackOtpError(safeMessage)
     } finally {
-      setLoading(false)
+      setTrackOtpLoading(false)
     }
   }
 
@@ -383,22 +490,95 @@ function TrackOrderContent() {
       return
     }
 
+    const challengeId = invoiceChallengeIdByOrder[targetOrderId]
+    const otpCode = (invoiceOtpByOrder[targetOrderId] ?? "").replace(/\D/g, "")
+
+    if (!challengeId) {
+      setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: true }))
+      setInvoiceErrorByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+      setInvoiceSuccessByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+      setInvoiceInfoByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+
+      try {
+        const response = await fetch("/api/order-tracking/request-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: targetOrderId,
+            phoneNumber: normalizedPhone,
+            purpose: "send_invoice",
+          }),
+        })
+
+        const data = (await response.json().catch(() => ({}))) as OrderOtpRequestResponse
+        if (!response.ok || !data.challengeId) {
+          throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u0441\u043b\u0430\u0442\u044c OTP." : data.error || "Unable to request invoice verification code.")
+        }
+
+        setInvoiceChallengeIdByOrder((prev) => ({
+          ...prev,
+          [targetOrderId]: data.challengeId ?? "",
+        }))
+        setInvoiceOtpByOrder((prev) => ({
+          ...prev,
+          [targetOrderId]: "",
+        }))
+        setInvoiceInfoByOrder((prev) => ({
+          ...prev,
+          [targetOrderId]: `${data.destination ? `${isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430" : "OTP sent to"} ${data.destination}.` : isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 \u0432\u0430\u0448 email." : "OTP sent to your registered email."}${data.devOtpCode ? ` Dev code: ${data.devOtpCode}` : ""}`,
+        }))
+      } catch (requestError) {
+        const safeMessage = isRu
+          ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP."
+          : requestError instanceof Error
+            ? requestError.message
+            : "Unable to request invoice verification code."
+        setInvoiceErrorByOrder((prev) => ({
+          ...prev,
+          [targetOrderId]: safeMessage,
+        }))
+      } finally {
+        setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: false }))
+      }
+      return
+    }
+
+    if (otpCode.length !== 6) {
+      setInvoiceErrorByOrder((prev) => ({
+        ...prev,
+        [targetOrderId]: isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 OTP." : "Enter the 6-digit OTP from your email.",
+      }))
+      return
+    }
+
     setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: true }))
     setInvoiceErrorByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-    setInvoiceSuccessByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
 
     try {
-      const response = await fetch("/api/order-tracking/send-invoice", {
+      const verifyResponse = await fetch("/api/order-tracking/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId: targetOrderId,
-          phoneNumber: normalizedPhone,
+          challengeId,
+          otpCode,
         }),
       })
 
-      const data = (await response.json().catch(() => ({}))) as SendInvoiceResponse
-      if (!response.ok) {
+      const verifyData = (await verifyResponse.json().catch(() => ({}))) as OrderOtpVerifyResponse
+      if (!verifyResponse.ok || !verifyData.sessionToken) {
+        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c OTP." : verifyData.error || "Unable to verify invoice code.")
+      }
+
+      const sendResponse = await fetch("/api/order-tracking/send-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionToken: verifyData.sessionToken,
+        }),
+      })
+
+      const data = (await sendResponse.json().catch(() => ({}))) as SendInvoiceResponse
+      if (!sendResponse.ok) {
         throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442." : data.error || "Unable to send invoice.")
       }
 
@@ -414,6 +594,9 @@ function TrackOrderContent() {
         ...prev,
         [targetOrderId]: false,
       }))
+      setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+      setInvoiceOtpByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
+      setInvoiceInfoByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
     } catch (requestError) {
       const safeMessage = isRu
         ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442."
@@ -445,7 +628,7 @@ function TrackOrderContent() {
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">{paymentStatusMessage(primaryOrder.status, isRu)}</p>
               <p className="mt-3 text-sm text-muted-foreground">
-                {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal" : "PayPal Order ID"}:{" "}
+                {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430" : "Order ID"}:{" "}
                 <span className="font-semibold text-foreground">{primaryOrder.orderId}</span>
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -455,65 +638,156 @@ function TrackOrderContent() {
             </section>
           )}
 
-          <p id="order-tracking" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430" : "Order Tracking"}
-          </p>
-          <h1 className="mt-3 font-serif text-3xl font-bold text-foreground sm:text-4xl">
-            {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437" : "Track Your Order"}
-          </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {isRu
-              ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 PayPal Order ID \u0438 \u043d\u043e\u043c\u0435\u0440 WhatsApp, \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0434\u0435\u0442\u0430\u043b\u0438 \u0437\u0430\u043a\u0430\u0437\u0430."
-              : "Enter your PayPal Order ID and WhatsApp number to view order details."}
-          </p>
+          <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+            <p id="order-tracking" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430" : "Order Tracking"}
+            </p>
+            <h1 className="mt-3 font-serif text-3xl font-bold text-foreground sm:text-4xl">
+              {isRu ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437" : "Track Your Order"}
+            </h1>
 
-          <form className="mt-6 space-y-4" onSubmit={handleTrackOrder}>
-            <label className="block text-xs font-medium text-muted-foreground">
-              {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430 PayPal" : "PayPal Order ID"}
-              <input
-                type="text"
-                value={orderId}
-                onChange={(event) => {
-                  setOrderId(event.target.value)
-                  resetTrackingState()
-                }}
-                placeholder={isRu ? "\u041f\u0440\u0438\u043c\u0435\u0440: 5PE7892813655042E" : "Example: 5PE7892813655042E"}
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-              />
-            </label>
+            <form className="mt-6 w-full space-y-5" onSubmit={handleTrackOrder}>
+              <div className="flex flex-col items-center">
+                <label htmlFor="track-order-id" className="text-center text-xs font-medium text-muted-foreground">
+                  {isRu ? "ID \u0437\u0430\u043a\u0430\u0437\u0430" : "Order ID"}
+                </label>
+                <input
+                  id="track-order-id"
+                  type="text"
+                  value={orderId}
+                  onChange={(event) => {
+                    setOrderId(event.target.value)
+                    resetTrackingState()
+                  }}
+                  placeholder={isRu ? "\u041f\u0440\u0438\u043c\u0435\u0440: 5PE7892813655042E" : "Example: 5PE7892813655042E"}
+                  className="mx-auto mt-1 h-12 w-full max-w-[240px] rounded-xl border border-border/60 bg-white px-3.5 text-center text-sm text-foreground shadow-sm outline-none transition-shadow focus:border-[#D4AF37]/60 focus:ring-2 focus:ring-[#D4AF37]/25"
+                />
+              </div>
 
-            <label className="block text-xs font-medium text-muted-foreground">
-              {isRu ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Phone Number"}
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(event) => {
-                  setPhoneNumber(event.target.value)
-                  resetTrackingState()
-                }}
-                placeholder={isRu ? "\u041f\u0440\u0438\u043c\u0435\u0440: +62812xxxxxxx" : "Example: +62812xxxxxxx"}
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40"
-              />
-            </label>
+              <label className="block text-center text-xs font-medium text-muted-foreground">
+                {isRu ? "\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Last 4 digits of phone number"}
+                <div className="mt-2 flex justify-center">
+                  <InputOTP
+                    value={phoneNumber}
+                    onChange={(value) => {
+                      setPhoneNumber(value.replace(/\D/g, "").slice(0, 4))
+                      resetTrackingState()
+                    }}
+                    maxLength={4}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    containerClassName="justify-center"
+                    className="gap-3"
+                  >
+                    <InputOTPGroup className="gap-3 justify-center">
+                      <InputOTPSlot index={0} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                      <InputOTPSlot index={1} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                      <InputOTPSlot index={2} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                      <InputOTPSlot index={3} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </label>
 
-            <button
-              type="submit"
-              disabled={loading || !canTrackOrder}
-              className={`w-full rounded-lg bg-foreground px-5 py-3 text-sm font-semibold uppercase tracking-widest text-background transition-colors ${
-                loading || !canTrackOrder ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
-              }`}
-            >
-              {loading
-                ? isRu
-                  ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
-                  : "Checking..."
-                : isRu
-                  ? "\u041e\u0442\u0441\u043b\u0435\u0434\u0438\u0442\u044c"
-                  : "Track Order"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading || !canTrackOrder}
+                className={`mx-auto block w-full max-w-[240px] rounded-lg bg-foreground px-5 py-3 text-sm font-semibold uppercase tracking-widest text-background transition-colors ${
+                  loading || !canTrackOrder ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
+                }`}
+              >
+                {loading
+                  ? isRu
+                    ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c OTP..."
+                    : "Sending OTP..."
+                  : isRu
+                    ? trackChallengeId
+                      ? "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP \u0435\u0449\u0451 \u0440\u0430\u0437"
+                      : "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP"
+                    : trackChallengeId
+                      ? "Resend OTP"
+                      : "Send OTP"}
+              </button>
+            </form>
 
-          {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
+            {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
+            {trackOtpError && <p className="mt-4 text-sm font-medium text-red-500">{trackOtpError}</p>}
+            {trackOtpInfo && <p className="mt-2 text-sm font-medium text-emerald-700">{trackOtpInfo}</p>}
+            {trackOtpDevCode && (
+              <p className="mt-2 text-xs font-medium text-amber-700">
+                {isRu ? "Dev OTP:" : "Dev OTP:"} {trackOtpDevCode}
+              </p>
+            )}
+          </div>
+
+          {trackChallengeId && (
+            <div className="mx-auto mt-4 w-full max-w-2xl rounded-xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-4 py-5 sm:px-6">
+              <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">
+                {isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 OTP" : "OTP Verification"}
+              </p>
+              <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
+                {isRu
+                  ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 \u043a\u043e\u0434, \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043d\u044b\u0439 \u043d\u0430 email."
+                  : "Enter the 6-digit code sent to your email to continue."}
+              </p>
+              <div className="mt-3 space-y-2">
+                <p className="text-center text-xs font-medium text-muted-foreground">{isRu ? "\u041a\u043e\u0434 OTP" : "OTP Code"}</p>
+                <InputOTP
+                  value={trackOtpCode}
+                  onChange={(value) => setTrackOtpCode(value.replace(/\D/g, "").slice(0, 6))}
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  containerClassName="justify-center"
+                  className="gap-2"
+                >
+                  <InputOTPGroup className="justify-center gap-2">
+                    <InputOTPSlot index={0} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                    <InputOTPSlot index={1} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                    <InputOTPSlot index={2} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                    <InputOTPSlot index={3} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                    <InputOTPSlot index={4} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                    <InputOTPSlot index={5} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              <div className="mx-auto mt-3 grid w-full max-w-xl grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleVerifyTrackOtp()}
+                  disabled={trackOtpLoading}
+                  className={`h-10 w-full rounded-lg bg-foreground px-3 text-xs font-semibold uppercase tracking-widest text-background transition-colors sm:h-11 sm:text-sm ${
+                    trackOtpLoading ? "cursor-not-allowed opacity-70" : "hover:bg-[#2B2722]"
+                  }`}
+                >
+                  {trackOtpLoading
+                    ? isRu
+                      ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
+                      : "Verifying..."
+                    : isRu
+                      ? "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c OTP"
+                      : "Verify OTP"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrackChallengeId("")
+                    setTrackOtpCode("")
+                    setTrackOtpInfo("")
+                    setTrackOtpError("")
+                    setTrackOtpDevCode("")
+                    void handleTrackOrder({ preventDefault: () => undefined } as FormEvent<HTMLFormElement>)
+                  }}
+                  disabled={trackOtpLoading || loading}
+                  className={`h-10 w-full rounded-lg border border-border bg-white px-3 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors sm:h-11 sm:text-sm ${
+                    trackOtpLoading || loading ? "cursor-not-allowed opacity-70" : "hover:bg-secondary"
+                  }`}
+                >
+                  {isRu ? "\u041f\u043e\u0432\u0442\u043e\u0440\u043d\u043e OTP" : "Resend OTP"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {!error && searched && !loading && orders.length === 0 && (
             <p className="mt-4 text-sm text-muted-foreground">
@@ -604,7 +878,7 @@ function TrackOrderContent() {
                           : "If you need an invoice, we can send it to your registered email."
                         : isRu
                           ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 \u0441\u0447\u0451\u0442\u0430 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0434\u043b\u044f \u044d\u0442\u043e\u0433\u043e \u0437\u0430\u043a\u0430\u0437\u0430."
-                          : "Invoice email is not available for this order."}
+                        : "Invoice email is not available for this order."}
                     </p>
 
                     <label
@@ -653,12 +927,100 @@ function TrackOrderContent() {
                     >
                       {invoiceLoadingByOrder[order.orderId]
                         ? isRu
-                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c \u0441\u0447\u0451\u0442..."
-                          : "Sending Invoice..."
+                          ? invoiceChallengeIdByOrder[order.orderId]
+                            ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
+                            : "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c OTP..."
+                          : invoiceChallengeIdByOrder[order.orderId]
+                            ? "Verifying..."
+                            : "Sending OTP..."
                         : isRu
-                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442 \u043d\u0430 email"
-                          : "Send Invoice to Email"}
+                          ? invoiceChallengeIdByOrder[order.orderId]
+                            ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c"
+                            : "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP"
+                          : invoiceChallengeIdByOrder[order.orderId]
+                            ? "Verify & Send Invoice"
+                            : "Send OTP"}
                     </button>
+
+                    {invoiceChallengeIdByOrder[order.orderId] && (
+                      <div className="mt-3 rounded-xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-4 py-5 sm:px-6">
+                        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">
+                          {isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 OTP" : "OTP Verification"}
+                        </p>
+                        <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
+                          {invoiceInfoByOrder[order.orderId] || (isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 \u043a\u043e\u0434, \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043d\u044b\u0439 \u043d\u0430 email." : "Enter the 6-digit code sent to your email to continue.")}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          <p className="text-center text-xs font-medium text-muted-foreground">{isRu ? "\u041a\u043e\u0434 OTP" : "OTP Code"}</p>
+                          <InputOTP
+                            value={invoiceOtpByOrder[order.orderId] ?? ""}
+                            onChange={(value) =>
+                              setInvoiceOtpByOrder((prev) => ({
+                                ...prev,
+                                [order.orderId]: value.replace(/\D/g, "").slice(0, 6),
+                              }))
+                            }
+                            maxLength={6}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            containerClassName="justify-center"
+                            className="gap-2"
+                          >
+                            <InputOTPGroup className="justify-center gap-2">
+                              <InputOTPSlot index={0} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                              <InputOTPSlot index={1} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                              <InputOTPSlot index={2} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                              <InputOTPSlot index={3} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                              <InputOTPSlot index={4} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                              <InputOTPSlot index={5} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
+                            </InputOTPGroup>
+                          </InputOTP>
+                        </div>
+                        <div className="mx-auto mt-3 grid w-full max-w-xl grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleSendInvoice(order.orderId)}
+                            disabled={
+                              !order.canSendInvoice ||
+                              !invoiceOptInByOrder[order.orderId] ||
+                              Boolean(invoiceLoadingByOrder[order.orderId])
+                            }
+                            className={`h-10 w-full rounded-lg bg-foreground px-3 text-xs font-semibold uppercase tracking-widest text-background transition-colors sm:h-11 sm:text-sm ${
+                              !order.canSendInvoice ||
+                              !invoiceOptInByOrder[order.orderId] ||
+                              Boolean(invoiceLoadingByOrder[order.orderId])
+                                ? "cursor-not-allowed opacity-70"
+                                : "hover:bg-[#2B2722]"
+                            }`}
+                          >
+                            {invoiceLoadingByOrder[order.orderId]
+                              ? isRu
+                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
+                                : "Verifying..."
+                              : isRu
+                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c"
+                                : "Verify & Send Invoice"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                              setInvoiceOtpByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                              setInvoiceInfoByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                              void handleSendInvoice(order.orderId)
+                            }}
+                            disabled={!order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])}
+                            className={`h-10 w-full rounded-lg border border-border bg-white px-3 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors sm:h-11 sm:text-sm ${
+                              !order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])
+                                ? "cursor-not-allowed opacity-70"
+                                : "hover:bg-secondary"
+                            }`}
+                          >
+                            {isRu ? "\u041f\u043e\u0432\u0442\u043e\u0440\u043d\u043e OTP" : "Resend OTP"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {invoiceSuccessByOrder[order.orderId] && (
                       <p className="mt-2 text-xs font-medium text-[#2E7D32]">{invoiceSuccessByOrder[order.orderId]}</p>
