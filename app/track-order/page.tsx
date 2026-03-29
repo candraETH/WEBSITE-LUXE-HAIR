@@ -14,7 +14,6 @@ type TrackedOrder = {
   currency: string
   customerName: string
   customerEmailMasked?: string
-  canSendInvoice?: boolean
   phoneNumber: string
   trackingNumber: string
   shippingCarrier: string
@@ -24,12 +23,6 @@ type TrackedOrder = {
 type TrackReadResponse = {
   error?: string
   orders?: TrackedOrder[]
-}
-
-type SendInvoiceResponse = {
-  error?: string
-  message?: string
-  destination?: string
 }
 
 type OrderOtpRequestResponse = {
@@ -285,13 +278,6 @@ function TrackOrderContent() {
   const [trackOtpError, setTrackOtpError] = useState("")
   const [trackOtpLoading, setTrackOtpLoading] = useState(false)
   const [trackOtpDevCode, setTrackOtpDevCode] = useState("")
-  const [invoiceOptInByOrder, setInvoiceOptInByOrder] = useState<Record<string, boolean>>({})
-  const [invoiceLoadingByOrder, setInvoiceLoadingByOrder] = useState<Record<string, boolean>>({})
-  const [invoiceChallengeIdByOrder, setInvoiceChallengeIdByOrder] = useState<Record<string, string>>({})
-  const [invoiceOtpByOrder, setInvoiceOtpByOrder] = useState<Record<string, string>>({})
-  const [invoiceInfoByOrder, setInvoiceInfoByOrder] = useState<Record<string, string>>({})
-  const [invoiceSuccessByOrder, setInvoiceSuccessByOrder] = useState<Record<string, string>>({})
-  const [invoiceErrorByOrder, setInvoiceErrorByOrder] = useState<Record<string, string>>({})
   const primaryOrder = orders[0] ?? null
 
   const canTrackOrder = useMemo(() => Boolean(orderId.trim() && phoneNumber.trim()), [orderId, phoneNumber])
@@ -325,13 +311,6 @@ function TrackOrderContent() {
     setTrackOtpInfo("")
     setTrackOtpError("")
     setTrackOtpDevCode("")
-    setInvoiceOptInByOrder({})
-    setInvoiceLoadingByOrder({})
-    setInvoiceChallengeIdByOrder({})
-    setInvoiceOtpByOrder({})
-    setInvoiceInfoByOrder({})
-    setInvoiceSuccessByOrder({})
-    setInvoiceErrorByOrder({})
   }
 
   const handleTrackOrder = async (event: FormEvent<HTMLFormElement>) => {
@@ -362,13 +341,6 @@ function TrackOrderContent() {
     setTrackOtpInfo("")
     setOrders([])
     setSearched(false)
-    setInvoiceOptInByOrder({})
-    setInvoiceLoadingByOrder({})
-    setInvoiceChallengeIdByOrder({})
-    setInvoiceOtpByOrder({})
-    setInvoiceInfoByOrder({})
-    setInvoiceSuccessByOrder({})
-    setInvoiceErrorByOrder({})
 
     try {
       const response = await fetch("/api/order-tracking/request-otp", {
@@ -465,150 +437,6 @@ function TrackOrderContent() {
       setTrackOtpError(safeMessage)
     } finally {
       setTrackOtpLoading(false)
-    }
-  }
-
-  const handleSendInvoice = async (targetOrderId: string) => {
-    if (!invoiceOptInByOrder[targetOrderId]) {
-      setInvoiceErrorByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: isRu
-          ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043c\u0435\u0442\u044c\u0442\u0435 \u043e\u043f\u0446\u0438\u044e \u0434\u043b\u044f \u0441\u0447\u0451\u0442\u0430."
-          : "Select the invoice option first.",
-      }))
-      return
-    }
-
-    const normalizedPhone = normalizePhone()
-    if (!normalizedPhone) {
-      setInvoiceErrorByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: isRu
-          ? "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u0438\u0441\u043a \u0437\u0430\u043a\u0430\u0437\u0430."
-          : "Phone number is missing. Please search the order again.",
-      }))
-      return
-    }
-
-    const challengeId = invoiceChallengeIdByOrder[targetOrderId]
-    const otpCode = (invoiceOtpByOrder[targetOrderId] ?? "").replace(/\D/g, "")
-
-    if (!challengeId) {
-      setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: true }))
-      setInvoiceErrorByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-      setInvoiceSuccessByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-      setInvoiceInfoByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-
-      try {
-        const response = await fetch("/api/order-tracking/request-otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: targetOrderId,
-            phoneNumber: normalizedPhone,
-            purpose: "send_invoice",
-          }),
-        })
-
-        const data = (await response.json().catch(() => ({}))) as OrderOtpRequestResponse
-        if (!response.ok || !data.challengeId) {
-          throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u044b\u0441\u043b\u0430\u0442\u044c OTP." : data.error || "Unable to request invoice verification code.")
-        }
-
-        setInvoiceChallengeIdByOrder((prev) => ({
-          ...prev,
-          [targetOrderId]: data.challengeId ?? "",
-        }))
-        setInvoiceOtpByOrder((prev) => ({
-          ...prev,
-          [targetOrderId]: "",
-        }))
-        setInvoiceInfoByOrder((prev) => ({
-          ...prev,
-          [targetOrderId]: `${data.destination ? `${isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430" : "OTP sent to"} ${data.destination}.` : isRu ? "\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 \u0432\u0430\u0448 email." : "OTP sent to your registered email."}${data.devOtpCode ? ` Dev code: ${data.devOtpCode}` : ""}`,
-        }))
-      } catch (requestError) {
-        const safeMessage = isRu
-          ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP."
-          : requestError instanceof Error
-            ? requestError.message
-            : "Unable to request invoice verification code."
-        setInvoiceErrorByOrder((prev) => ({
-          ...prev,
-          [targetOrderId]: safeMessage,
-        }))
-      } finally {
-        setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: false }))
-      }
-      return
-    }
-
-    if (otpCode.length !== 6) {
-      setInvoiceErrorByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 OTP." : "Enter the 6-digit OTP from your email.",
-      }))
-      return
-    }
-
-    setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: true }))
-    setInvoiceErrorByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-
-    try {
-      const verifyResponse = await fetch("/api/order-tracking/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          challengeId,
-          otpCode,
-        }),
-      })
-
-      const verifyData = (await verifyResponse.json().catch(() => ({}))) as OrderOtpVerifyResponse
-      if (!verifyResponse.ok || !verifyData.sessionToken) {
-        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c OTP." : verifyData.error || "Unable to verify invoice code.")
-      }
-
-      const sendResponse = await fetch("/api/order-tracking/send-invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionToken: verifyData.sessionToken,
-        }),
-      })
-
-      const data = (await sendResponse.json().catch(() => ({}))) as SendInvoiceResponse
-      if (!sendResponse.ok) {
-        throw new Error(isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442." : data.error || "Unable to send invoice.")
-      }
-
-      const successMessage = data.destination
-        ? `${data.message || (isRu ? "\u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d." : "Invoice sent successfully.")} (${data.destination})`
-        : data.message || (isRu ? "\u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d." : "Invoice sent successfully.")
-
-      setInvoiceSuccessByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: successMessage,
-      }))
-      setInvoiceOptInByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: false,
-      }))
-      setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-      setInvoiceOtpByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-      setInvoiceInfoByOrder((prev) => ({ ...prev, [targetOrderId]: "" }))
-    } catch (requestError) {
-      const safeMessage = isRu
-        ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442."
-        : requestError instanceof Error
-          ? requestError.message
-          : "Unable to send invoice."
-      setInvoiceErrorByOrder((prev) => ({
-        ...prev,
-        [targetOrderId]: safeMessage,
-      }))
-    } finally {
-      setInvoiceLoadingByOrder((prev) => ({ ...prev, [targetOrderId]: false }))
     }
   }
 
@@ -721,7 +549,7 @@ function TrackOrderContent() {
           </div>
 
           {trackChallengeId && (
-            <div className="mx-auto mt-4 w-full max-w-2xl rounded-xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-4 py-5 sm:px-6">
+            <div className="mx-auto mt-4 w-full max-w-2xl rounded-xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-3 py-4 sm:px-6 sm:py-5">
               <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">
                 {isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 OTP" : "OTP Verification"}
               </p>
@@ -739,19 +567,19 @@ function TrackOrderContent() {
                   inputMode="numeric"
                   pattern="[0-9]*"
                   containerClassName="justify-center"
-                  className="gap-2"
-                >
-                  <InputOTPGroup className="justify-center gap-2">
-                    <InputOTPSlot index={0} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
-                    <InputOTPSlot index={1} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
-                    <InputOTPSlot index={2} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
-                    <InputOTPSlot index={3} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
-                    <InputOTPSlot index={4} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
-                    <InputOTPSlot index={5} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-14 sm:w-14" />
+                className="gap-1.5 sm:gap-2"
+              >
+                  <InputOTPGroup className="justify-center gap-1.5 sm:gap-2">
+                    <InputOTPSlot index={0} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
+                    <InputOTPSlot index={1} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
+                    <InputOTPSlot index={2} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
+                    <InputOTPSlot index={3} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
+                    <InputOTPSlot index={4} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
+                    <InputOTPSlot index={5} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-14 sm:w-14 sm:text-base" />
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-              <div className="mx-auto mt-3 grid w-full max-w-xl grid-cols-2 gap-2">
+              <div className="mx-auto mt-3 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => void handleVerifyTrackOtp()}
@@ -864,170 +692,6 @@ function TrackOrderContent() {
                           ? "\u0422\u0440\u0435\u043a-\u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c \u043f\u043e\u0441\u043b\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u043f\u043e\u0441\u044b\u043b\u043a\u0438."
                           : "Tracking info will appear here once your shipment is dispatched."}
                       </p>
-                    )}
-                  </section>
-
-                  <section className="mt-4 rounded-xl border border-border/40 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                      {isRu ? "\u0421\u0447\u0451\u0442" : "Invoice"}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {order.canSendInvoice
-                        ? isRu
-                          ? "\u0415\u0441\u043b\u0438 \u0432\u0430\u043c \u043d\u0443\u0436\u0435\u043d \u0441\u0447\u0451\u0442, \u043c\u044b \u043c\u043e\u0436\u0435\u043c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0435\u0433\u043e \u043d\u0430 \u0432\u0430\u0448 email."
-                          : "If you need an invoice, we can send it to your registered email."
-                        : isRu
-                          ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 \u0441\u0447\u0451\u0442\u0430 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0434\u043b\u044f \u044d\u0442\u043e\u0433\u043e \u0437\u0430\u043a\u0430\u0437\u0430."
-                        : "Invoice email is not available for this order."}
-                    </p>
-
-                    <label
-                      className={`mt-3 flex items-start gap-2 text-sm ${
-                        order.canSendInvoice ? "text-foreground" : "cursor-not-allowed text-muted-foreground"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(invoiceOptInByOrder[order.orderId])}
-                        onChange={(event) =>
-                          setInvoiceOptInByOrder((prev) => ({
-                            ...prev,
-                            [order.orderId]: event.target.checked,
-                          }))
-                        }
-                        disabled={!order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])}
-                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#1f1f1f] focus:ring-[#D4AF37]/40"
-                      />
-                      <span>
-                        {order.canSendInvoice
-                          ? isRu
-                            ? `\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u0447\u0451\u0442 \u043d\u0430 ${order.customerEmailMasked || "\u0432\u0430\u0448 email"}`
-                            : `Send invoice to ${order.customerEmailMasked || "your registered email"}`
-                          : isRu
-                            ? "\u0415\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u0430 \u043f\u043e\u043c\u043e\u0449\u044c \u0441\u043e \u0441\u0447\u0451\u0442\u043e\u043c, \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435 \u0432 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0443."
-                            : "Please contact support if you need manual invoice assistance."}
-                      </span>
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => void handleSendInvoice(order.orderId)}
-                      disabled={
-                        !order.canSendInvoice ||
-                        !invoiceOptInByOrder[order.orderId] ||
-                        Boolean(invoiceLoadingByOrder[order.orderId])
-                      }
-                      className={`mt-3 w-full rounded-lg border border-border px-5 py-3 text-sm font-semibold uppercase tracking-widest text-foreground transition-colors ${
-                        !order.canSendInvoice ||
-                        !invoiceOptInByOrder[order.orderId] ||
-                        Boolean(invoiceLoadingByOrder[order.orderId])
-                          ? "cursor-not-allowed opacity-70"
-                          : "hover:bg-secondary"
-                      }`}
-                    >
-                      {invoiceLoadingByOrder[order.orderId]
-                        ? isRu
-                          ? invoiceChallengeIdByOrder[order.orderId]
-                            ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
-                            : "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c OTP..."
-                          : invoiceChallengeIdByOrder[order.orderId]
-                            ? "Verifying..."
-                            : "Sending OTP..."
-                        : isRu
-                          ? invoiceChallengeIdByOrder[order.orderId]
-                            ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c"
-                            : "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c OTP"
-                          : invoiceChallengeIdByOrder[order.orderId]
-                            ? "Verify & Send Invoice"
-                            : "Send OTP"}
-                    </button>
-
-                    {invoiceChallengeIdByOrder[order.orderId] && (
-                      <div className="mt-3 rounded-xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-4 py-5 sm:px-6">
-                        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[#A77B15]">
-                          {isRu ? "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 OTP" : "OTP Verification"}
-                        </p>
-                        <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
-                          {invoiceInfoByOrder[order.orderId] || (isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 6-\u0437\u043d\u0430\u0447\u043d\u044b\u0439 \u043a\u043e\u0434, \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043d\u044b\u0439 \u043d\u0430 email." : "Enter the 6-digit code sent to your email to continue.")}
-                        </p>
-                        <div className="mt-3 space-y-2">
-                          <p className="text-center text-xs font-medium text-muted-foreground">{isRu ? "\u041a\u043e\u0434 OTP" : "OTP Code"}</p>
-                          <InputOTP
-                            value={invoiceOtpByOrder[order.orderId] ?? ""}
-                            onChange={(value) =>
-                              setInvoiceOtpByOrder((prev) => ({
-                                ...prev,
-                                [order.orderId]: value.replace(/\D/g, "").slice(0, 6),
-                              }))
-                            }
-                            maxLength={6}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            containerClassName="justify-center"
-                            className="gap-2"
-                          >
-                            <InputOTPGroup className="justify-center gap-2">
-                              <InputOTPSlot index={0} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                              <InputOTPSlot index={1} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                              <InputOTPSlot index={2} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                              <InputOTPSlot index={3} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                              <InputOTPSlot index={4} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                              <InputOTPSlot index={5} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                            </InputOTPGroup>
-                          </InputOTP>
-                        </div>
-                        <div className="mx-auto mt-3 grid w-full max-w-xl grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleSendInvoice(order.orderId)}
-                            disabled={
-                              !order.canSendInvoice ||
-                              !invoiceOptInByOrder[order.orderId] ||
-                              Boolean(invoiceLoadingByOrder[order.orderId])
-                            }
-                            className={`h-10 w-full rounded-lg bg-foreground px-3 text-xs font-semibold uppercase tracking-widest text-background transition-colors sm:h-11 sm:text-sm ${
-                              !order.canSendInvoice ||
-                              !invoiceOptInByOrder[order.orderId] ||
-                              Boolean(invoiceLoadingByOrder[order.orderId])
-                                ? "cursor-not-allowed opacity-70"
-                                : "hover:bg-[#2B2722]"
-                            }`}
-                          >
-                            {invoiceLoadingByOrder[order.orderId]
-                              ? isRu
-                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c..."
-                                : "Verifying..."
-                              : isRu
-                                ? "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c"
-                                : "Verify & Send Invoice"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
-                              setInvoiceOtpByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
-                              setInvoiceInfoByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
-                              void handleSendInvoice(order.orderId)
-                            }}
-                            disabled={!order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])}
-                            className={`h-10 w-full rounded-lg border border-border bg-white px-3 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors sm:h-11 sm:text-sm ${
-                              !order.canSendInvoice || Boolean(invoiceLoadingByOrder[order.orderId])
-                                ? "cursor-not-allowed opacity-70"
-                                : "hover:bg-secondary"
-                            }`}
-                          >
-                            {isRu ? "\u041f\u043e\u0432\u0442\u043e\u0440\u043d\u043e OTP" : "Resend OTP"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {invoiceSuccessByOrder[order.orderId] && (
-                      <p className="mt-2 text-xs font-medium text-[#2E7D32]">{invoiceSuccessByOrder[order.orderId]}</p>
-                    )}
-
-                    {invoiceErrorByOrder[order.orderId] && (
-                      <p className="mt-2 text-xs font-medium text-red-500">{invoiceErrorByOrder[order.orderId]}</p>
                     )}
                   </section>
                 </article>

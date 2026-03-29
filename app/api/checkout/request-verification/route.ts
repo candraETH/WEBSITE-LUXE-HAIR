@@ -4,7 +4,7 @@ import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin } from "@/lib/security"
 import { checkoutCustomerSchema, normalizeCheckoutCustomer } from "@/lib/checkout-customer"
 import { deliverOtpCode } from "@/lib/otp-delivery"
-import { generateOtpCode, hashOtpCode, maskEmail, maskPhone } from "@/lib/otp-utils"
+import { generateOtpCode, hashOtpCode, maskEmail } from "@/lib/otp-utils"
 import { setSecurityStoreValue } from "@/lib/security-store"
 import { getCheckoutFingerprint } from "@/lib/checkout-verification"
 
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       challengeId,
       expiresInSeconds: OTP_TTL_SECONDS,
-      destination: `${maskEmail(customer.email)} / ${maskPhone(customer.whatsapp)}`,
+      destination: maskEmail(customer.email),
       channel: delivery.channel,
       devOtpCode: delivery.devOtpCode,
     })

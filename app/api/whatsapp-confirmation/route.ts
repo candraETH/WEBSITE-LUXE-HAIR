@@ -161,14 +161,14 @@ function buildItemLines(root: CartJsonRoot, currency: string): string[] {
 
   const lines = rawItems
     .filter((item): item is CartJsonItem => Boolean(item && typeof item === "object"))
-    .map((item) => {
+    .map((item, index) => {
       const name = asString(item.name) || "Item"
       const length = asNumber(item.length)
       const category = asString(item.category)
       const quantity = Math.max(1, Math.floor(asNumber(item.quantity) || 1))
       const lineTotal = asNumber(item.line_total)
       const lengthLabel = length > 0 ? `${length}"` : "-"
-      return `- ${name} | ${lengthLabel} | ${category || "-"} | x${quantity} | ${formatAmount(lineTotal, currency)}`
+      return `${index + 1}. ${name} | ${lengthLabel} | ${category || "-"} | x${quantity} | ${formatAmount(lineTotal, currency)}`
     })
 
   return lines.length > 0 ? lines : ["-"]
@@ -296,28 +296,30 @@ export async function POST(request: Request) {
     const customerEmail = customerEmailFromCart || customerEmailFromRow || "-"
     const customerPhone = extractBuyerPhone(data, cartRoot)
     const address = buildAddress(cartRoot)
+    const orderId = asString(data.paypal_order_id) || parsed.data.orderId
 
     const sellerMessage = [
-      "Payment successful notification",
-      `Order ID: ${asString(data.paypal_order_id) || parsed.data.orderId}`,
-      "Status: PAID",
+      "Orders Confirmation",
+      `Order ID: ${orderId}`,
+      "Payment Status: PAID",
       "",
-      "Customer Details",
+      "Address Details",
       `Name: ${customerName}`,
       `Email: ${customerEmail}`,
       `WhatsApp: ${customerPhone || "-"}`,
-      `Address: ${address}`,
+      `Shipping Address: ${address}`,
       "",
       "Order Items",
       ...buildItemLines(cartRoot, currency),
       "",
+      "Order Summary",
       ...buildSummaryLines(cartRoot, data),
     ].join("\n")
 
     const buyerMessage = [
       `Hi ${customerName === "-" ? "Customer" : customerName},`,
       "Your payment has been received successfully.",
-      `Order ID: ${asString(data.paypal_order_id) || parsed.data.orderId}`,
+      `Order ID: ${orderId}`,
       "Status: PAID",
       "",
       "Thank you for shopping with CANDRA'S HAIR.",

@@ -4,7 +4,7 @@ import { hasSupabaseEnv } from "@/lib/supabase-server"
 import { enforceRateLimit } from "@/lib/rate-limit"
 import { isAllowedRequestOrigin, isValidPayPalOrderId } from "@/lib/security"
 import { deliverOtpCode } from "@/lib/otp-delivery"
-import { generateOtpCode, hashOtpCode, maskEmail, maskPhone } from "@/lib/otp-utils"
+import { generateOtpCode, hashOtpCode, maskEmail } from "@/lib/otp-utils"
 import {
   ORDER_OTP_TTL_SECONDS,
   isOrderOtpPurpose,
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       challengeId,
       expiresInSeconds: ORDER_OTP_TTL_SECONDS,
-      destination: customerEmail ? `${maskEmail(customerEmail)} / ${maskPhone(customerPhone)}` : maskPhone(customerPhone),
+      destination: customerEmail ? maskEmail(customerEmail) : "your registered email",
       channel: delivery.channel,
       devOtpCode: delivery.devOtpCode,
       purpose,

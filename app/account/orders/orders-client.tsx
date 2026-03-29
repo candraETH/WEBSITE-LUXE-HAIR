@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { format, parseISO } from "date-fns"
-import { Package } from "lucide-react"
+import { Package, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
@@ -213,7 +213,7 @@ export function OrdersClient() {
     setInvoiceInfoByOrder((prev) => ({ ...prev, [orderId]: "" }))
 
     if (!phone) {
-      setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "Phone number is required to send an invoice." }))
+      setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "Phone number is required to send a receipt." }))
       return
     }
 
@@ -234,7 +234,7 @@ export function OrdersClient() {
         })
         const data = (await response.json().catch(() => ({}))) as OrderOtpRequestResponse
         if (!response.ok || !data.challengeId) {
-          throw new Error(data.error || "Unable to request invoice verification code.")
+          throw new Error(data.error || "Unable to request receipt verification code.")
         }
 
         setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [orderId]: data.challengeId ?? "" }))
@@ -248,7 +248,7 @@ export function OrdersClient() {
       } catch (error) {
         setInvoiceErrorByOrder((prev) => ({
           ...prev,
-          [orderId]: error instanceof Error ? error.message : "Unable to request invoice verification code.",
+          [orderId]: error instanceof Error ? error.message : "Unable to request receipt verification code.",
         }))
       } finally {
         setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: false }))
@@ -272,7 +272,7 @@ export function OrdersClient() {
       })
       const verifyData = (await verifyResponse.json().catch(() => ({}))) as OrderOtpVerifyResponse
       if (!verifyResponse.ok || !verifyData.sessionToken) {
-        throw new Error(verifyData.error || "Unable to verify invoice code.")
+        throw new Error(verifyData.error || "Unable to verify receipt code.")
       }
 
       const sendResponse = await fetch("/api/order-tracking/send-invoice", {
@@ -282,24 +282,32 @@ export function OrdersClient() {
       })
       const sendData = (await sendResponse.json().catch(() => ({}))) as { error?: string; message?: string; destination?: string }
       if (!sendResponse.ok) {
-        throw new Error(sendData.error || "Unable to send invoice.")
+        throw new Error(sendData.error || "Unable to send receipt.")
       }
 
-      const message = sendData.destination
-        ? `${sendData.message || "Invoice sent."} (${sendData.destination})`
-        : sendData.message || "Invoice sent."
-      setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: message }))
+      setInvoiceSuccessByOrder((prev) => ({
+        ...prev,
+        [orderId]: sendData.message || "Receipt sent.",
+      }))
       setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [orderId]: "" }))
       setInvoiceOtpByOrder((prev) => ({ ...prev, [orderId]: "" }))
       setInvoiceInfoByOrder((prev) => ({ ...prev, [orderId]: "" }))
     } catch (error) {
       setInvoiceErrorByOrder((prev) => ({
         ...prev,
-        [orderId]: error instanceof Error ? error.message : "Unable to send invoice.",
+        [orderId]: error instanceof Error ? error.message : "Unable to send receipt.",
       }))
     } finally {
       setInvoiceLoadingByOrder((prev) => ({ ...prev, [orderId]: false }))
     }
+  }
+
+  function resetInvoiceState(orderId: string) {
+    setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceOtpByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceInfoByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceErrorByOrder((prev) => ({ ...prev, [orderId]: "" }))
+    setInvoiceSuccessByOrder((prev) => ({ ...prev, [orderId]: "" }))
   }
 
   if (state.status === "loading") {
@@ -520,36 +528,41 @@ export function OrdersClient() {
 
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:justify-end">
                   <Button asChild size="sm" variant="outline" className="w-full">
-                    <Link href={`/track-order?orderId=${encodeURIComponent(order.orderId)}`}>Track Order</Link>
+                    <Link href={`/account/orders/${encodeURIComponent(order.orderId)}`}>Confirm Orders</Link>
                   </Button>
                   <Button asChild size="sm" variant="outline" className="w-full">
-                    <Link href={`/account/orders/${encodeURIComponent(order.orderId)}`}>View Order</Link>
+                    <Link href={`/track-order?orderId=${encodeURIComponent(order.orderId)}`}>Track Order</Link>
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     className="w-full"
-                    disabled={!order.phoneNumber || invoiceLoading}
+                    disabled={!order.phoneNumber || invoiceLoading || Boolean(invoiceChallengeId)}
                     onClick={() => void handleSendInvoice(order.orderId, order.phoneNumber)}
+                    title={invoiceChallengeId ? "Use the OTP panel below" : undefined}
                   >
-                    {invoiceLoading
-                      ? invoiceChallengeId
-                        ? "Verifying..."
-                        : "Sending OTP..."
-                      : invoiceChallengeId
-                        ? "Verify & Send Invoice"
-                        : "Send Invoice"}
+                    {invoiceLoading ? "Sending OTP..." : invoiceChallengeId ? "OTP Sent" : "Send Receipt"}
                   </Button>
                 </div>
 
                 {invoiceChallengeId ? (
-                  <div className="mt-3 rounded-2xl border border-[#D4AF37]/25 bg-[#FFFDF8] p-4 shadow-sm sm:p-5">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Invoice OTP</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                  <div className="relative mt-3 rounded-2xl border border-[#D4AF37]/25 bg-[#FFFDF8] px-3 py-4 shadow-sm sm:px-5 sm:py-5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2 h-8 w-8 rounded-full text-muted-foreground hover:bg-black/5 hover:text-foreground"
+                      onClick={() => resetInvoiceState(order.orderId)}
+                      aria-label="Cancel invoice OTP"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">Receipt OTP</p>
+                    <p className="mx-auto mt-2 max-w-lg text-center text-sm font-medium text-emerald-700">
                       {invoiceInfo || "We sent a 6-digit code to your registered email."}
                     </p>
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Enter OTP</p>
+                      <p className="text-center text-xs font-medium text-muted-foreground">Enter OTP</p>
                       <InputOTP
                         value={invoiceOtpValue}
                         onChange={(value) =>
@@ -561,41 +574,50 @@ export function OrdersClient() {
                         maxLength={6}
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        containerClassName="justify-start"
-                        className="gap-3"
+                        containerClassName="justify-center"
+                        className="gap-1.5 sm:gap-2"
                       >
-                        <InputOTPGroup className="gap-3">
-                          <InputOTPSlot index={0} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
-                          <InputOTPSlot index={1} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
-                          <InputOTPSlot index={2} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
-                          <InputOTPSlot index={3} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
-                          <InputOTPSlot index={4} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
-                          <InputOTPSlot index={5} className="h-11 w-11 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm sm:h-12 sm:w-12" />
+                        <InputOTPGroup className="justify-center gap-1.5 sm:gap-2">
+                          <InputOTPSlot index={0} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
+                          <InputOTPSlot index={1} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
+                          <InputOTPSlot index={2} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
+                          <InputOTPSlot index={3} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
+                          <InputOTPSlot index={4} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
+                          <InputOTPSlot index={5} className="h-9 w-9 rounded-xl border border-border/70 bg-white text-sm font-semibold shadow-sm sm:h-12 sm:w-12 sm:text-base" />
                         </InputOTPGroup>
                       </InputOTP>
                     </div>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="mx-auto mt-4 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
                       <Button
                         size="sm"
-                        className="w-full"
+                        className="h-10 w-full px-3 text-xs sm:h-11 sm:text-sm"
                         disabled={!order.phoneNumber || invoiceLoading}
                         onClick={() => void handleSendInvoice(order.orderId, order.phoneNumber)}
                       >
-                        {invoiceLoading ? "Processing..." : "Verify & Send Invoice"}
+                        {invoiceLoading ? "Processing..." : "Verify & Send Receipt"}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full"
+                        className="h-10 w-full px-3 text-xs sm:h-11 sm:text-sm"
                         disabled={!order.phoneNumber || invoiceLoading}
                         onClick={() => {
-                          setInvoiceChallengeIdByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
-                          setInvoiceOtpByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
-                          setInvoiceInfoByOrder((prev) => ({ ...prev, [order.orderId]: "" }))
+                          resetInvoiceState(order.orderId)
                           void handleSendInvoice(order.orderId, order.phoneNumber)
                         }}
                       >
                         Resend OTP
+                      </Button>
+                    </div>
+                    <div className="mt-2 flex justify-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => resetInvoiceState(order.orderId)}
+                      >
+                        Cancel
                       </Button>
                     </div>
                   </div>

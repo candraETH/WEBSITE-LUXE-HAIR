@@ -136,10 +136,10 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;")
 }
 
-function buildInvoiceNumber(orderRef: string): string {
+function buildReceiptNumber(orderRef: string): string {
   const compact = orderRef.replace(/[^A-Z0-9]/gi, "").toUpperCase()
   const suffix = compact.slice(-6) || "000001"
-  return `INV-${suffix}`
+  return `RCT-${suffix}`
 }
 
 function getCompanyWebsite(request: Request): string {
@@ -260,11 +260,11 @@ export async function POST(request: Request) {
 
     const session = await getOrderOtpSession(parsed.data.sessionToken)
     if (!session) {
-      return NextResponse.json({ error: "Invoice session expired. Request a new verification code." }, { status: 401 })
+      return NextResponse.json({ error: "Receipt session expired. Request a new verification code." }, { status: 401 })
     }
 
     if (session.purpose !== "send_invoice") {
-      return NextResponse.json({ error: "Invalid invoice session." }, { status: 403 })
+      return NextResponse.json({ error: "Invalid receipt session." }, { status: 403 })
     }
 
     const { data, error } = await queryOrderByOrderAndPhone<OrderRow>(session.orderId, session.phoneNumber, ORDER_SELECT)
@@ -288,11 +288,11 @@ export async function POST(request: Request) {
         console.log(`[INVOICE_DEV] order=${session.orderId} to=${customerEmail}`)
         await deleteOrderOtpSession(parsed.data.sessionToken)
         return NextResponse.json({
-          message: "Invoice prepared (development mode).",
+          message: "Receipt prepared (development mode).",
           destination: maskEmail(customerEmail),
         })
       }
-      return NextResponse.json({ error: "Invoice email delivery is not configured." }, { status: 500 })
+      return NextResponse.json({ error: "Receipt email delivery is not configured." }, { status: 500 })
     }
 
     const root = getCartJsonRoot(data.cart_json)
@@ -316,35 +316,33 @@ export async function POST(request: Request) {
     const taxLabel = taxRatePercent > 0 ? `${taxRatePercent.toFixed(1)}%` : "-"
     const lines = buildInvoiceLines(root, currency, taxLabel)
 
-    const invoiceNumber = buildInvoiceNumber(orderRef)
+    const receiptNumber = buildReceiptNumber(orderRef)
     const createdAt = parseDate(asString(root.order?.created_at)) ?? new Date()
-    const invoiceDateLabel = formatDate(createdAt)
-    const dueDateLabel = status === "PAID" ? "Paid" : "On receipt"
+    const receiptDateLabel = formatDate(createdAt)
     const paidAmount = status === "PAID" ? summary.total : 0
     const balanceDue = Math.max(summary.total - paidAmount, 0)
     const isPaidInFull = status === "PAID" && balanceDue <= 0.01
     const paymentBadgeLabel = isPaidInFull ? "PAID IN FULL" : "PAYMENT PENDING"
     const paymentBadgeBackground = isPaidInFull ? "#166534" : "#9a3412"
-    const balanceLabel = isPaidInFull ? "PAID IN FULL" : "BALANCE DUE"
+    const balanceLabel = isPaidInFull ? "PAYMENT RECEIVED" : "BALANCE DUE"
     const balanceBarBackground = isPaidInFull ? "#166534" : "#111827"
 
     const companyName = process.env.INVOICE_COMPANY_NAME?.trim() || brevo.senderName || "Candra's Hair"
-    const companyPhone = process.env.INVOICE_COMPANY_PHONE?.trim() || "-"
+    const companyPhone = process.env.INVOICE_COMPANY_PHONE?.trim() || "+6289-7890-5657"
     const companyAddress = process.env.INVOICE_COMPANY_ADDRESS?.trim() || "Indonesia"
     const companyWebsite = getCompanyWebsite(request)
     const companyEmail = brevo.senderEmail
 
     const textContent = [
-      `${companyName} - INVOICE`,
+      `${companyName} - RECEIPT`,
       "",
-      `Invoice Number: ${invoiceNumber}`,
-      `Invoice Date: ${invoiceDateLabel}`,
-      `Due Date: ${dueDateLabel}`,
+      `Receipt Number: ${receiptNumber}`,
+      `Receipt Date: ${receiptDateLabel}`,
       `Order ID: ${orderRef}`,
       `Status: ${status}`,
       `Payment Badge: ${paymentBadgeLabel}`,
       "",
-      "Bill To:",
+      "Address Details:",
       `${customerName}`,
       `${customerAddress || "-"}`,
       `${customerPhone}`,
@@ -360,7 +358,7 @@ export async function POST(request: Request) {
       `Paid: ${formatCurrency(paidAmount, currency)}`,
       `Balance Due: ${formatCurrency(balanceDue, currency)}`,
       "",
-      "Need help with this invoice? Reply to this email.",
+      `Need help with this receipt? Chat with us on WhatsApp at ${companyPhone}.`,
       `Contact: ${companyEmail} | ${companyPhone}`,
       `Website: ${companyWebsite}`,
     ].join("\n")
@@ -377,12 +375,11 @@ export async function POST(request: Request) {
                       <tr>
                         <td style="vertical-align:top;">
                           <p style="margin:0;font-size:12px;letter-spacing:1.7px;color:#6b7280;font-weight:700;">${escapeHtml(companyName.toUpperCase())}</p>
-                          <h1 style="margin:9px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:40px;line-height:1;color:#111827;">Invoice</h1>
+                          <h1 style="margin:9px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:40px;line-height:1;color:#111827;">Receipt</h1>
                         </td>
                         <td style="text-align:right;vertical-align:top;">
-                          <p style="margin:0;color:#111827;font-size:13px;"><strong>Number:</strong> ${escapeHtml(invoiceNumber)}</p>
-                          <p style="margin:4px 0 0;color:#111827;font-size:13px;"><strong>Date:</strong> ${escapeHtml(invoiceDateLabel)}</p>
-                          <p style="margin:4px 0 0;color:#111827;font-size:13px;"><strong>Due date:</strong> ${escapeHtml(dueDateLabel)}</p>
+                          <p style="margin:0;color:#111827;font-size:13px;"><strong>Number:</strong> ${escapeHtml(receiptNumber)}</p>
+                          <p style="margin:4px 0 0;color:#111827;font-size:13px;"><strong>Date:</strong> ${escapeHtml(receiptDateLabel)}</p>
                           <p style="margin:4px 0 0;color:#111827;font-size:13px;"><strong>Order ID:</strong> ${escapeHtml(orderRef)}</p>
                           <p style="margin:10px 0 0;">
                             <span style="display:inline-block;padding:6px 11px;border-radius:999px;background:${paymentBadgeBackground};color:#ffffff;font-size:11px;font-weight:800;letter-spacing:0.8px;">
@@ -399,7 +396,7 @@ export async function POST(request: Request) {
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                       <tr>
                         <td style="width:60%;vertical-align:top;padding-right:18px;">
-                          <p style="margin:0 0 7px;font-size:12px;letter-spacing:1px;color:#6b7280;font-weight:700;">Bill to</p>
+                          <p style="margin:0 0 7px;font-size:12px;letter-spacing:1px;color:#6b7280;font-weight:700;">Address Details</p>
                           <p style="margin:0;color:#111827;font-size:14px;font-weight:700;">${escapeHtml(customerName)}</p>
                           <p style="margin:4px 0 0;color:#374151;font-size:13px;line-height:1.5;">${escapeHtml(customerAddress || "-")}</p>
                           <p style="margin:4px 0 0;color:#374151;font-size:13px;">${escapeHtml(customerPhone || "-")}</p>
@@ -441,7 +438,7 @@ export async function POST(request: Request) {
                       <tr>
                         <td style="width:56%;vertical-align:top;padding-right:14px;">
                           <p style="margin:0;color:#374151;font-size:13px;"><strong>Payment method:</strong> PayPal</p>
-                          <p style="margin:9px 0 0;color:#6b7280;font-size:12px;line-height:1.5;">Thank you for your purchase. If you need any correction on this invoice, reply to this email.</p>
+                          <p style="margin:9px 0 0;color:#6b7280;font-size:12px;line-height:1.5;">Thank you for your purchase. If you need any correction on this receipt, please chat with us on WhatsApp.</p>
                         </td>
                         <td style="width:44%;vertical-align:top;">
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
@@ -501,7 +498,7 @@ export async function POST(request: Request) {
             name: customerName,
           },
         ],
-        subject: `Invoice ${invoiceNumber} - Order ${orderRef}`,
+        subject: `Receipt ${receiptNumber} - Order ${orderRef}`,
         textContent,
         htmlContent,
       }),
@@ -510,17 +507,17 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "")
-      throw new Error(`Brevo invoice delivery failed with status ${response.status}${errorBody ? `: ${errorBody}` : ""}`)
+      throw new Error(`Brevo receipt delivery failed with status ${response.status}${errorBody ? `: ${errorBody}` : ""}`)
     }
 
     await deleteOrderOtpSession(parsed.data.sessionToken)
 
     return NextResponse.json({
-      message: "Professional invoice sent successfully.",
+      message: `Your receipt has been sent successfully to ${maskEmail(customerEmail)}.`,
       destination: maskEmail(customerEmail),
     })
   } catch (error) {
-    console.error("Order-tracking send-invoice error:", error instanceof Error ? error.message : "Unknown error")
-    return NextResponse.json({ error: "Unable to send invoice email." }, { status: 500 })
+    console.error("Order-tracking send-receipt error:", error instanceof Error ? error.message : "Unknown error")
+    return NextResponse.json({ error: "Unable to send receipt email." }, { status: 500 })
   }
 }

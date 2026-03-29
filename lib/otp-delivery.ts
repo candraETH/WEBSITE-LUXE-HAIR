@@ -49,7 +49,7 @@ function buildOtpSubject(input: OtpDeliveryInput): string {
     return `Order Tracking OTP${input.orderId ? ` - ${input.orderId}` : ""}`
   }
   if (input.purpose === "send_invoice") {
-    return `Invoice Verification OTP${input.orderId ? ` - ${input.orderId}` : ""}`
+    return `Receipt Verification OTP${input.orderId ? ` - ${input.orderId}` : ""}`
   }
   return "Checkout Verification OTP"
 }
@@ -59,7 +59,7 @@ function buildOtpTextContent(input: OtpDeliveryInput): string {
     input.purpose === "track_order"
       ? "Use this OTP to verify your order tracking request."
       : input.purpose === "send_invoice"
-        ? "Use this OTP to verify your invoice request."
+        ? "Use this OTP to verify your receipt request."
       : "Use this OTP to verify your checkout details."
   return [
     intro,
@@ -74,7 +74,7 @@ function buildOtpHtmlContent(input: OtpDeliveryInput): string {
     input.purpose === "track_order"
       ? "Use this OTP to verify your order tracking request."
       : input.purpose === "send_invoice"
-        ? "Use this OTP to verify your invoice request."
+        ? "Use this OTP to verify your receipt request."
       : "Use this OTP to verify your checkout details."
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#1f2937;">
