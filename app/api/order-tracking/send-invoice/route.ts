@@ -155,14 +155,14 @@ function getCompanyWebsite(request: Request): string {
   }
 }
 
-function buildInvoiceLines(root: CartJsonRoot, currency: string, taxLabel: string) {
+function buildInvoiceLines(root: CartJsonRoot, currency: string) {
   const itemsSource = Array.isArray(root.items) ? root.items : []
   const items = itemsSource.filter((item): item is CartJsonItem => Boolean(item && typeof item === "object"))
 
   if (items.length === 0) {
     return {
       text: ["- Item details unavailable"],
-      html: ["<tr><td colspan=\"5\" style=\"padding:12px;color:#6b7280;\">Item details unavailable</td></tr>"],
+      html: ["<tr><td colspan=\"4\" style=\"padding:12px;color:#6b7280;\">Item details unavailable</td></tr>"],
     }
   }
 
@@ -174,7 +174,7 @@ function buildInvoiceLines(root: CartJsonRoot, currency: string, taxLabel: strin
     const length = asNumber(item.length)
     const category = asString(item.category) || "-"
     const lengthLabel = length > 0 ? `${length}"` : "-"
-    return `- ${name} (${lengthLabel} | ${category}) | Qty ${quantity} | Unit ${formatCurrency(unitPrice, currency)} | Tax ${taxLabel} | Amount ${formatCurrency(amount, currency)}`
+    return `- ${name} (${lengthLabel} | ${category}) | Qty ${quantity} | Unit ${formatCurrency(unitPrice, currency)} | Amount ${formatCurrency(amount, currency)}`
   })
 
   const html = items.map((item) => {
@@ -194,7 +194,6 @@ function buildInvoiceLines(root: CartJsonRoot, currency: string, taxLabel: strin
       <td style="padding:11px 10px;border-bottom:1px solid #e5e7eb;color:#111827;">${name}${details}</td>
       <td style="padding:11px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:#111827;">${quantity}</td>
       <td style="padding:11px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#111827;">${unitPrice}</td>
-      <td style="padding:11px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:#111827;">${escapeHtml(taxLabel)}</td>
       <td style="padding:11px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#111827;font-weight:600;">${amount}</td>
     </tr>`
   })
@@ -312,10 +311,7 @@ export async function POST(request: Request) {
     const currency = asString(data.currency) || "USD"
     const status = asString(data.status).toUpperCase() || "UNKNOWN"
     const summary = buildSummary(root, asNumber(data.amount))
-    const taxRatePercent = summary.subtotal > 0 && summary.tax > 0 ? (summary.tax / summary.subtotal) * 100 : 0
-    const taxLabel = taxRatePercent > 0 ? `${taxRatePercent.toFixed(1)}%` : "-"
-    const lines = buildInvoiceLines(root, currency, taxLabel)
-
+    const lines = buildInvoiceLines(root, currency)
     const receiptNumber = buildReceiptNumber(orderRef)
     const createdAt = parseDate(asString(root.order?.created_at)) ?? new Date()
     const receiptDateLabel = formatDate(createdAt)
@@ -422,7 +418,6 @@ export async function POST(request: Request) {
                           <th style="padding:11px 10px;text-align:left;color:#ffffff;font-size:13px;">Description</th>
                           <th style="padding:11px 10px;text-align:center;color:#ffffff;font-size:13px;">Quantity</th>
                           <th style="padding:11px 10px;text-align:right;color:#ffffff;font-size:13px;">Unit Price</th>
-                          <th style="padding:11px 10px;text-align:center;color:#ffffff;font-size:13px;">Tax</th>
                           <th style="padding:11px 10px;text-align:right;color:#ffffff;font-size:13px;">Amount</th>
                         </tr>
                       </thead>
