@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       phoneNumber,
       purpose,
       otpHash,
-      attemptsLeft: 5,
+      attemptsLeft: 3,
       expiresAt: Date.now() + ORDER_OTP_TTL_SECONDS * 1000,
     }
 

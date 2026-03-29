@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     const challengePayload: CheckoutOtpChallenge = {
       fingerprint,
       otpHash,
-      attemptsLeft: 5,
+      attemptsLeft: 3,
       expiresAt: Date.now() + OTP_TTL_SECONDS * 1000,
     }
 

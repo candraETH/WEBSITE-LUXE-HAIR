@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       const nextAttempts = Math.max(0, challenge.attemptsLeft - 1)
       if (nextAttempts === 0) {
         await deleteSecurityStoreValue(challengeKey)
-        return NextResponse.json({ error: "Verification attempts exceeded. Request a new code." }, { status: 429 })
+        return NextResponse.json({ error: "Too many invalid attempts. Request a new code." }, { status: 429 })
       }
 
       const ttlSeconds = Math.max(1, Math.floor((challenge.expiresAt - Date.now()) / 1000))
@@ -78,10 +78,7 @@ export async function POST(request: Request) {
         ttlSeconds
       )
 
-      return NextResponse.json(
-        { error: `Invalid code. ${nextAttempts} attempt(s) remaining.` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid code. Please try again." }, { status: 400 })
     }
 
     await deleteSecurityStoreValue(challengeKey)

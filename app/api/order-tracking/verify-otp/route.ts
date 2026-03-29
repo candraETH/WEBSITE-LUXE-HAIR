@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       const nextAttempts = Math.max(0, challenge.attemptsLeft - 1)
       if (nextAttempts === 0) {
         await deleteOrderOtpChallenge(parsed.data.challengeId)
-        return NextResponse.json({ error: "OTP attempts exceeded. Request a new code." }, { status: 429 })
+        return NextResponse.json({ error: "Too many invalid attempts. Request a new code." }, { status: 429 })
       }
 
       const ttlSeconds = Math.max(1, Math.floor((challenge.expiresAt - Date.now()) / 1000))
@@ -72,10 +72,7 @@ export async function POST(request: Request) {
         ttlSeconds
       )
 
-      return NextResponse.json(
-        { error: `Invalid OTP. ${nextAttempts} attempt(s) remaining.` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid OTP. Please try again." }, { status: 400 })
     }
 
     await deleteOrderOtpChallenge(parsed.data.challengeId)
