@@ -9,7 +9,9 @@ import { withLocaleHref } from "@/lib/i18n"
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocaleFromRequestHeaders()
-  const title = locale === "ru" ? "Bulk Hair — коллекция" : "Bulk Hair Collection"
+  const title = locale === "ru" ? "Bulk Hair — коллекция" : "Bulk Hair Extensions"
+  const titleAbsolute =
+    locale === "ru" ? `${title} | CANDRA'S HAIR` : "Bulk Hair Extensions | CANDRA'S HAIR"
   const description =
     locale === "ru"
       ? "Премиальные натуральные волосы bulk hair для плетения, париков и профессиональных установок. Разные текстуры и оттенки."
@@ -17,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return buildLocalizedPageMetadata({
     title,
+    titleAbsolute,
     description,
     keywords: ["bulk hair", "braiding hair", "human bulk hair", "premium bulk hair"],
     images: ["/images/images1.png"],
@@ -71,3 +74,5 @@ export default async function BulkHairPage() {
     </>
   )
 }
+
+

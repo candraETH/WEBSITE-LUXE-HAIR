@@ -32,8 +32,15 @@ type HCaptchaProps = {
   label?: string
 }
 
+const DEV_HCAPTCHA_SITE_KEY = "10000000-ffff-ffff-ffff-000000000001"
+
 function getSiteKey() {
-  return process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim() ?? ""
+  const configured = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim() ?? ""
+  if (configured) return configured
+  if (process.env.NODE_ENV !== "production") {
+    return DEV_HCAPTCHA_SITE_KEY
+  }
+  return ""
 }
 
 export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0, label }: HCaptchaProps) {
@@ -116,6 +123,12 @@ export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0, label }
       <div className="flex min-h-[88px] justify-center overflow-visible">
         <div ref={containerRef} className="min-h-[88px] min-w-[302px]" />
       </div>
+      {process.env.NODE_ENV !== "production" && siteKey === DEV_HCAPTCHA_SITE_KEY ? (
+        <p className="text-center text-xs text-muted-foreground">
+          Development CAPTCHA mode is using the hCaptcha test key. For localhost, use a hosts alias like
+          `test.candrashair.local`.
+        </p>
+      ) : null}
       {error ? <p className="text-center text-xs font-medium text-red-500">{error}</p> : null}
     </div>
   )

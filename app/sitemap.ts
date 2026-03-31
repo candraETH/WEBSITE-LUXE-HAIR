@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/wigs", lastModified: now, changeFrequency: "weekly", priority: 0.9 },
     { path: "/blog", lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     { path: "/return-policy", lastModified: now, changeFrequency: "monthly", priority: 0.4 },
+    { path: "/terms-of-service", lastModified: now, changeFrequency: "monthly", priority: 0.4 },
   ]
 
   const staticRoutes: MetadataRoute.Sitemap = SUPPORTED_LOCALES.flatMap((locale) =>

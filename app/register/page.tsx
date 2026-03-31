@@ -17,17 +17,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type RegisterPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-function readSearchParam(props: RegisterPageProps, key: string): string | undefined {
-  const value = props.searchParams?.[key]
+async function readSearchParam(props: RegisterPageProps, key: string): Promise<string | undefined> {
+  const searchParams = (await props.searchParams) ?? {}
+  const value = searchParams[key]
   return typeof value === "string" ? value : undefined
 }
 
 export default async function RegisterPage(props: RegisterPageProps) {
-  const nextPath = readSearchParam(props, "next")
-  const returnTo = readSearchParam(props, "returnTo")
+  const nextPath = await readSearchParam(props, "next")
+  const returnTo = await readSearchParam(props, "returnTo")
   const locale = await getLocaleFromRequestHeaders()
 
   return (

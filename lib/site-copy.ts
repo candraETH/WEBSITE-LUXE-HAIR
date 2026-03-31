@@ -11,7 +11,7 @@ const COPY: Record<
   }
 > = {
   en: {
-    title: "CANDRA'S HAIR | Premium Hair Weft, Wigs & More",
+    title: "Premium Hair Weft, Wigs & More | CANDRA'S HAIR",
     description:
       "Shop premium human hair extensions, bulk hair, weft hair, and wigs. Perfect for wholesale with competitive pricing, trusted quality, and worldwide shipping.",
     keywords: [

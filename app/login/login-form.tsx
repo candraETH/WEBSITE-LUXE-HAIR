@@ -42,7 +42,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
   const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
   const authEnabled = Boolean(supabase)
-  const captchaConfigured = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
+  const captchaConfigured = process.env.NODE_ENV === "production" || Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
 
   const loginSchema = z.object({
     email: z.string().trim().email(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 email-\u0430\u0434\u0440\u0435\u0441." : "Enter a valid email address."),

@@ -130,7 +130,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
   const authEnabled = Boolean(supabase)
-  const captchaConfigured = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
+  const captchaConfigured = process.env.NODE_ENV === "production" || Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
 
   const registerSchema = z
     .object({
@@ -484,12 +484,18 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      {isRu ? "\u042f \u0441\u043e\u0433\u043b\u0430\u0441\u0435\u043d(\u043d\u0430) \u0441 \u0443\u0441\u043b\u043e\u0432\u0438\u044f\u043c\u0438" : "I agree to the terms"}
+                      {isRu ? "\u042f \u0441\u043e\u0433\u043b\u0430\u0441\u0435\u043d(\u043d\u0430) \u0441 \u0443\u0441\u043b\u043e\u0432\u0438\u044f\u043c\u0438" : (
+                        <>
+                          I agree to the <Link href={localizedHref("/terms-of-service")} className="underline underline-offset-4">
+                            Terms of Service
+                          </Link>
+                        </>
+                      )}
                     </FormLabel>
                     <FormDescription className="text-xs">
                       {isRu
                         ? "\u0421\u043e\u0437\u0434\u0430\u0432\u0430\u044f \u0430\u043a\u043a\u0430\u0443\u043d\u0442, \u0432\u044b \u0441\u043e\u0433\u043b\u0430\u0448\u0430\u0435\u0442\u0435\u0441\u044c \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u044c \u043f\u0438\u0441\u044c\u043c\u0430 \u043f\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0443."
-                        : "By creating an account, you agree to receive account-related emails."}
+                        : "By creating an account, you agree to our Terms of Service and receive account-related emails."}
                     </FormDescription>
                   </div>
                 </div>

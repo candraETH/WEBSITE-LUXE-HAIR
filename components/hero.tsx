@@ -26,22 +26,6 @@ const BASE_HERO_SLIDES: HeroSlide[] = [
     alt: "Luxurious hair extensions on silk fabric",
     ctaHref: "#extensions",
   },
-  {
-    id: "promo",
-    image: "/images/hero%202.jpg",
-    alt: "Premium hair promotion banner",
-    ctaHref: "/bulk-hair",
-    imageClassName: "object-cover object-top scale-[1.18] md:scale-100 md:object-contain md:object-center",
-    containerClassName: "bg-[#8d7263] md:bg-[#120f0d]",
-  },
-  {
-    id: "promo-2",
-    image: "/images/hero%203.png",
-    alt: "Premium bundles and bulk hair showcase",
-    ctaHref: "/weft-hair",
-    imageClassName: "object-cover object-top scale-[1.2] md:scale-100 md:object-contain md:object-center",
-    containerClassName: "bg-[#8a766a] md:bg-[#120f0d]",
-  },
 ]
 
 export function Hero() {
@@ -139,19 +123,21 @@ export function Hero() {
           </a>
         </div>
 
-        <div className="mt-6 flex items-center gap-2">
-          {heroSlides.map((slide, index) => (
-            <button
-              key={`dot-${slide.id}`}
-              type="button"
-              onClick={() => setActiveSlideIndex(index)}
-              aria-label={`Show slide ${index + 1}`}
-              className={`h-2.5 rounded-full transition-all ${
-                index === activeSlideIndex ? "w-8 bg-white" : "w-2.5 bg-white/50 hover:bg-white/70"
-              }`}
-            />
-          ))}
-        </div>
+        {heroSlides.length > 1 && (
+          <div className="mt-6 flex items-center gap-2">
+            {heroSlides.map((slide, index) => (
+              <button
+                key={`dot-${slide.id}`}
+                type="button"
+                onClick={() => setActiveSlideIndex(index)}
+                aria-label={`Show slide ${index + 1}`}
+                className={`h-2.5 rounded-full transition-all ${
+                  index === activeSlideIndex ? "w-8 bg-white" : "w-2.5 bg-white/50 hover:bg-white/70"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2">

@@ -24,6 +24,10 @@ export async function generateMetadata(): Promise<Metadata> {
     locale === "ru"
       ? "Премиальные наращивания, парики и многое другое"
       : "Premium Hair Weft, Wigs & More"
+  const titleAbsolute =
+    locale === "ru"
+      ? `${title} | CANDRA'S HAIR`
+      : "Premium Hair Weft, Wigs & More | CANDRA'S HAIR"
   const description =
     locale === "ru"
       ? "Покупайте премиальные натуральные волосы: наращивания, bulk hair, трессы и парики — надежное качество, быстрая доставка и поддержка."
@@ -31,6 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   const metadata = await buildLocalizedPageMetadata({
     title,
+    titleAbsolute,
     description,
     keywords: [
       "hair",
@@ -46,13 +51,14 @@ export async function generateMetadata(): Promise<Metadata> {
     images: ["/images/hero.jpg"],
   })
 
-  return {
+  return metadata
+  /*
     ...metadata,
     title:
       locale === "ru"
         ? { absolute: "CANDRA'S HAIR | ÐŸÑ€ÐµÐ¼Ð¸Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð½Ð°Ñ€Ð°Ñ‰Ð¸Ð²ÐÐ°Ð½Ð¸Ñ, Ð¿Ð°Ñ€Ð¸ÐºÐ¸ Ð¸ Ð¼Ð½Ð¾Ð³ÐÐ¾Ðµ Ð´Ñ€ÑƒÐ³Ð¾Ðµ" }
         : { absolute: "CANDRA'S HAIR | Premium Hair Weft, Wigs & More" },
-  }
+  */
 }
 
 export default async function Page() {

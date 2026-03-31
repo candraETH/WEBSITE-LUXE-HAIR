@@ -9,7 +9,9 @@ import { withLocaleHref } from "@/lib/i18n"
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocaleFromRequestHeaders()
-  const title = locale === "ru" ? "Парики — коллекция" : "Human Hair Wigs Collection"
+  const title = locale === "ru" ? "Парики — коллекция" : "Wigs Collection"
+  const titleAbsolute =
+    locale === "ru" ? `${title} | CANDRA'S HAIR` : "Wigs Collection | CANDRA'S HAIR"
   const description =
     locale === "ru"
       ? "Премиальные парики из натуральных волос: lace front и closure модели. Естественная линия роста, комфорт и длительная носка."
@@ -17,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return buildLocalizedPageMetadata({
     title,
+    titleAbsolute,
     description,
     keywords: ["human hair wigs", "lace front wigs", "closure wigs", "premium wigs"],
     images: ["/images/wig-1.jpg"],
@@ -71,3 +74,5 @@ export default async function WigsPage() {
     </>
   )
 }
+
+

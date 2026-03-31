@@ -87,6 +87,14 @@ export function Footer() {
                   {messages.footer.company.returnPolicy}
                 </Link>
               </li>
+              <li>
+                <Link
+                  href={localizedHref("/terms-of-service")}
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {messages.footer.company.termsOfService}
+                </Link>
+              </li>
             </ul>
           </div>
 

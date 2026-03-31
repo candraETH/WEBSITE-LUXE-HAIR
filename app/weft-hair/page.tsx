@@ -9,7 +9,9 @@ import { withLocaleHref } from "@/lib/i18n"
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocaleFromRequestHeaders()
-  const title = locale === "ru" ? "Трессы — коллекция" : "Bundles Collection"
+  const title = locale === "ru" ? "Трессы — коллекция" : "Weft Hair Extensions"
+  const titleAbsolute =
+    locale === "ru" ? `${title} | CANDRA'S HAIR` : "Weft Hair Extensions | CANDRA'S HAIR"
   const description =
     locale === "ru"
       ? "Премиальные трессы (weft hair): body wave, curly, deep wave и другие текстуры. Для естественной установки и движения."
@@ -17,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return buildLocalizedPageMetadata({
     title,
+    titleAbsolute,
     description,
     keywords: ["weft hair", "human hair weft", "body wave weft", "curly weft"],
     images: ["/images/texture/all%20texture.png"],
@@ -71,3 +74,5 @@ export default async function WeftHairPage() {
     </>
   )
 }
+
+

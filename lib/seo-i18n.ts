@@ -18,6 +18,7 @@ async function getRequestContext(): Promise<{ locale: SupportedLocale; canonical
 
 type BuildLocalizedPageMetadataInput = {
   title: string
+  titleAbsolute?: string
   description: string
   keywords?: string[]
   images?: string[]
@@ -26,6 +27,7 @@ type BuildLocalizedPageMetadataInput = {
 
 export async function buildLocalizedPageMetadata({
   title,
+  titleAbsolute,
   description,
   keywords,
   images = ["/images/hero.jpg"],
@@ -33,10 +35,11 @@ export async function buildLocalizedPageMetadata({
 }: BuildLocalizedPageMetadataInput): Promise<Metadata> {
   const { locale, canonicalPath } = await getRequestContext()
   const resolvedNoIndex = noIndex ?? shouldNoIndexPath(canonicalPath)
+  const resolvedTitle = titleAbsolute ? { absolute: titleAbsolute } : title
 
   return {
     metadataBase: new URL(getSiteUrl()),
-    title,
+    title: resolvedTitle,
     description,
     keywords,
     alternates: {
@@ -47,7 +50,7 @@ export async function buildLocalizedPageMetadata({
       },
     },
     openGraph: {
-      title,
+      title: titleAbsolute ?? title,
       description,
       url: canonicalPath,
       siteName: SITE_NAME,
@@ -57,7 +60,7 @@ export async function buildLocalizedPageMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: titleAbsolute ?? title,
       description,
       images: images.length > 0 ? [images[0]] : undefined,
     },

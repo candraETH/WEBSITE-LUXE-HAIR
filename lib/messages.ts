@@ -74,6 +74,7 @@ type Messages = {
       testimonials: string
       trackOrder: string
       returnPolicy: string
+      termsOfService: string
     }
     whatsappMessage: string
     whatsappUnavailableTitle: string
@@ -202,6 +203,7 @@ const EN: Messages = {
       testimonials: "Testimonials",
       trackOrder: "Track Order",
       returnPolicy: "Return Policy",
+      termsOfService: "Terms of Service",
     },
     whatsappMessage: "Hi, I'm interested in your hair products",
     whatsappUnavailableTitle: "WhatsApp is temporarily unavailable",
@@ -330,6 +332,7 @@ const RU: Messages = {
       testimonials: "Отзывы",
       trackOrder: "Отследить заказ",
       returnPolicy: "Возврат",
+      termsOfService: "Условия использования",
     },
     whatsappMessage: "Здравствуйте! Интересуют ваши продукты для волос.",
     whatsappUnavailableTitle: "WhatsApp временно недоступен",
