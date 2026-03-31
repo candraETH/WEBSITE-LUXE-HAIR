@@ -1,7 +1,7 @@
 "use client"
 
 import Script from "next/script"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 declare global {
   interface Window {
@@ -29,7 +29,6 @@ type HCaptchaProps = {
   action: "login" | "register"
   onTokenChange: (token: string | null) => void
   resetKey?: number
-  label?: string
 }
 
 const DEV_HCAPTCHA_SITE_KEY = "10000000-ffff-ffff-ffff-000000000001"
@@ -43,14 +42,12 @@ function getSiteKey() {
   return ""
 }
 
-export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0, label }: HCaptchaProps) {
+export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0 }: HCaptchaProps) {
   const siteKey = getSiteKey()
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
-  const [scriptReady, setScriptReady] = useState(false)
+  const [scriptReady, setScriptReady] = useState(() => typeof window !== "undefined" && Boolean(window.hcaptcha))
   const [error, setError] = useState<string | null>(null)
-
-  const caption = useMemo(() => label ?? "Security check", [label])
 
   useEffect(() => {
     onTokenChange(null)
@@ -58,8 +55,19 @@ export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0, label }
   }, [action, onTokenChange, resetKey])
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.hcaptcha) {
+      setScriptReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!siteKey || !scriptReady || !containerRef.current || !window.hcaptcha) {
       return
+    }
+
+    if (widgetIdRef.current && window.hcaptcha.remove) {
+      window.hcaptcha.remove(widgetIdRef.current)
+      widgetIdRef.current = null
     }
 
     containerRef.current.innerHTML = ""
@@ -105,31 +113,31 @@ export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0, label }
 
   if (!siteKey) {
     return (
-      <div className="rounded-xl border border-dashed border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-3.5 text-sm text-muted-foreground">
         CAPTCHA is not configured yet.
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      {caption ? <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{caption}</p> : null}
+    <>
       <Script
         src="https://js.hcaptcha.com/1/api.js?render=explicit"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
+        onReady={() => setScriptReady(true)}
         onError={() => setError("CAPTCHA failed to load. Please refresh and try again.")}
       />
-      <div className="flex min-h-[88px] justify-center overflow-visible">
-        <div ref={containerRef} className="min-h-[88px] min-w-[302px]" />
+      <div className="flex justify-center">
+        <div ref={containerRef} className="min-h-[84px] min-w-[302px]" />
       </div>
       {process.env.NODE_ENV !== "production" && siteKey === DEV_HCAPTCHA_SITE_KEY ? (
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-[11px] leading-5 text-muted-foreground">
           Development CAPTCHA mode is using the hCaptcha test key. For localhost, use a hosts alias like
           `test.candrashair.local`.
         </p>
       ) : null}
-      {error ? <p className="text-center text-xs font-medium text-red-500">{error}</p> : null}
-    </div>
+      {error ? <p className="text-center text-[11px] font-medium text-red-500">{error}</p> : null}
+    </>
   )
 }

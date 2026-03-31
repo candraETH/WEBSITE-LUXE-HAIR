@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -29,6 +29,12 @@ function appendReturnTo(target: string, returnTo: string | null) {
   return `${target}${joiner}returnTo=${encodeURIComponent(returnTo)}`
 }
 
+function authTabClassName(active: boolean) {
+  return active
+    ? "h-11 w-full rounded-xl bg-primary text-primary-foreground shadow-sm transition-all duration-200"
+    : "h-11 w-full rounded-xl bg-transparent text-muted-foreground transition-all duration-200 hover:bg-background/80 hover:text-foreground"
+}
+
 export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?: string }) {
   const router = useRouter()
   const { locale } = useLocale()
@@ -43,10 +49,11 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
 
   const authEnabled = Boolean(supabase)
   const captchaConfigured = process.env.NODE_ENV === "production" || Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
+  const forgotPasswordHref = "mailto:support@candrashair.com?subject=Password%20Reset"
 
   const loginSchema = z.object({
-    email: z.string().trim().email(isRu ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 email-\u0430\u0434\u0440\u0435\u0441." : "Enter a valid email address."),
-    password: z.string().min(1, isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u0435\u043d." : "Password is required."),
+    email: z.string().trim().email(isRu ? "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ñ‹Ð¹ email-Ð°Ð´Ñ€ÐµÑ." : "Enter a valid email address."),
+    password: z.string().min(1, isRu ? "ÐŸÐ°Ñ€Ð¾Ð»ÑŒ Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÐµÐ½." : "Password is required."),
   })
 
   type LoginValues = z.infer<typeof loginSchema>
@@ -67,7 +74,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
       form.setError("root", {
         message:
           isRu
-            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 NEXT_PUBLIC_SUPABASE_URL \u0438 NEXT_PUBLIC_SUPABASE_ANON_KEY \u0432 \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 \u043e\u043a\u0440\u0443\u0436\u0435\u043d\u0438\u044f."
+            ? "ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð½Ðµ Ð½Ð°ÑÑ‚Ñ€Ð¾ÐµÐ½Ð°. Ð”Ð¾Ð±Ð°Ð²ÑŒÑ‚Ðµ NEXT_PUBLIC_SUPABASE_URL Ð¸ NEXT_PUBLIC_SUPABASE_ANON_KEY Ð² Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ Ð¾ÐºÑ€ÑƒÐ¶ÐµÐ½Ð¸Ñ."
             : "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
       })
       return
@@ -77,7 +84,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
       form.setError("root", {
         message:
           isRu
-            ? "\u0414\u043b\u044f production \u043d\u0443\u0436\u043d\u0430 CAPTCHA. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
+            ? "Ð”Ð»Ñ production Ð½ÑƒÐ¶Ð½Ð° CAPTCHA. Ð”Ð¾Ð±Ð°Ð²ÑŒÑ‚Ðµ NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
             : "CAPTCHA is required in production. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY.",
       })
       return
@@ -86,7 +93,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
     if (captchaConfigured) {
       if (!captchaToken) {
         form.setError("root", {
-          message: isRu ? "\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u043f\u0440\u043e\u0439\u0434\u0438\u0442\u0435 CAPTCHA." : "Please complete the CAPTCHA.",
+          message: isRu ? "ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð¿Ñ€Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ CAPTCHA." : "Please complete the CAPTCHA.",
         })
         return
       }
@@ -104,7 +111,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
         form.setError("root", {
           message:
             captchaPayload.error ||
-            (isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0439\u0442\u0438 CAPTCHA." : "Unable to verify CAPTCHA."),
+            (isRu ? "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ñ€Ð¾Ð¹Ñ‚Ð¸ CAPTCHA." : "Unable to verify CAPTCHA."),
         })
         return
       }
@@ -126,7 +133,7 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
 
       setCaptchaToken(null)
       setCaptchaResetKey((current) => current + 1)
-      setSuccessMessage(isRu ? "\u0412\u0445\u043e\u0434 \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d." : "Signed in successfully.")
+      setSuccessMessage(isRu ? "Ð’Ñ…Ð¾Ð´ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½." : "Signed in successfully.")
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
       const nextTarget = localizedHref(safeNext)
@@ -138,26 +145,51 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
     }
   }
 
+  const registerHref = `${localizedHref("/register")}${(() => {
+    const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
+    const safeReturnTo = sanitizeInternalPath(returnTo)
+    const params = new URLSearchParams({ next: localizedHref(safeNext) })
+    if (safeReturnTo) params.set("returnTo", localizedHref(safeReturnTo))
+    return `?${params.toString()}`
+  })()}`
+
   return (
-    <div className="rounded-2xl border border-border/30 bg-card/60 p-6 shadow-sm">
+    <div className="w-full rounded-[32px] border border-border/40 bg-card/95 p-5 shadow-[0_28px_90px_rgba(31,24,18,0.12)] backdrop-blur-xl sm:p-7">
+      <div className="grid grid-cols-2 gap-2 rounded-[22px] border border-border/60 bg-muted/40 p-1.5">
+        <Button asChild variant="ghost" className={authTabClassName(false)}>
+          <Link href={registerHref}>{isRu ? "Ð ÐµÐ³Ð¸ÑÑ‚Ñ€Ð°Ñ†Ð¸Ñ" : "Register"}</Link>
+        </Button>
+        <Button asChild variant="ghost" className={authTabClassName(true)}>
+          <Link href={localizedHref("/login")}>{isRu ? "Ð’Ð¾Ð¹Ñ‚Ð¸" : "Log In"}</Link>
+        </Button>
+      </div>
+
       {!authEnabled && (
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="mt-5 rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
           {isRu
-            ? "\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u0435\u0449\u0451 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0430. \u041f\u043e\u043f\u0440\u043e\u0441\u0438\u0442\u0435 \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0430 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 env \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 Supabase (\u0430\u043d\u043e\u043d\u0438\u043c\u043d\u044b\u0439 \u043a\u043b\u044e\u0447)."
+            ? "ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ð¸Ñ ÐµÑ‰Ñ‘ Ð½Ðµ Ð½Ð°ÑÑ‚Ñ€Ð¾ÐµÐ½Ð°. ÐŸÐ¾Ð¿Ñ€Ð¾ÑÐ¸Ñ‚Ðµ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð° Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚ÑŒ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ñ‹Ðµ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ Supabase (anon key)."
             : "Auth is not configured yet. Ask an admin to add Supabase public env variables (anon key)."}
         </p>
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-6 space-y-5">
           <FormField
             control={form.control}
             name="email"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{isRu ? "Email" : "Email"}</FormLabel>
+              <FormItem className="space-y-2">
+                <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                  {isRu ? "Email" : "Email"}
+                </FormLabel>
                 <FormControl>
-                  <Input type="email" autoComplete="email" placeholder="you@example.com" {...field} />
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="example@gmail.com"
+                    className="h-12 rounded-2xl border-border/60 bg-background px-4 text-[15px] shadow-none transition-all duration-200 placeholder:text-muted-foreground/80 focus-visible:ring-2 focus-visible:ring-ring/60"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -168,55 +200,62 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
             control={form.control}
             name="password"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{isRu ? "\u041f\u0430\u0440\u043e\u043b\u044c" : "Password"}</FormLabel>
+              <FormItem className="space-y-2">
+                <div className="flex items-end justify-between gap-4">
+                  <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                    {isRu ? "ÐŸÐ°Ñ€Ð¾Ð»ÑŒ" : "Password"}
+                  </FormLabel>
+                  <Button asChild variant="link" className="h-auto p-0 text-sm font-semibold text-accent">
+                    <Link href={forgotPasswordHref}>{isRu ? "Ð—Ð°Ð±Ñ‹Ð»Ð¸ Ð¿Ð°Ñ€Ð¾Ð»ÑŒ?" : "Forgot Password?"}</Link>
+                  </Button>
+                </div>
                 <FormControl>
-                  <Input type="password" autoComplete="current-password" {...field} />
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="********"
+                    className="h-12 rounded-2xl border-border/60 bg-background px-4 text-[15px] shadow-none transition-all duration-200 placeholder:text-muted-foreground/80 focus-visible:ring-2 focus-visible:ring-ring/60"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <HCaptchaChallenge
-            action="login"
-            resetKey={captchaResetKey}
-            onTokenChange={setCaptchaToken}
-            label={isRu ? "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438" : "Security check"}
-          />
+          <HCaptchaChallenge action="login" resetKey={captchaResetKey} onTokenChange={setCaptchaToken} />
 
           {form.formState.errors.root?.message && (
             <p className="text-sm font-medium text-destructive">{form.formState.errors.root.message}</p>
           )}
           {successMessage && <p className="text-sm text-foreground">{successMessage}</p>}
 
-          <Button type="submit" className="w-full" disabled={!authEnabled || isSubmitting}>
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-px hover:bg-primary/90"
+            disabled={!authEnabled || isSubmitting}
+          >
             {isSubmitting
               ? isRu
-                ? "\u0412\u0445\u043e\u0434..."
+                ? "Ð’Ñ…Ð¾Ð´..."
                 : "Signing in..."
               : isRu
-                ? "\u0412\u043e\u0439\u0442\u0438"
+                ? "Ð’Ð¾Ð¹Ñ‚Ð¸"
                 : "Sign in"}
           </Button>
 
-           <p className="text-center text-sm text-muted-foreground">
-             {isRu ? "\u0412\u043f\u0435\u0440\u0432\u044b\u0435 \u0443 \u043d\u0430\u0441?" : "New here?"}{" "}
-             <Link
-               href={`${localizedHref("/register")}${(() => {
-                 const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
-                 const safeReturnTo = sanitizeInternalPath(returnTo)
-                 const params = new URLSearchParams({ next: localizedHref(safeNext) })
-                 if (safeReturnTo) params.set("returnTo", localizedHref(safeReturnTo))
-                 return `?${params.toString()}`
-               })()}`}
-               className="font-medium text-foreground underline underline-offset-4"
-             >
-               {isRu ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442" : "Create an account"}
-             </Link>
-           </p>
+          <p className="text-center text-sm text-muted-foreground">
+            {isRu ? "Ð’Ð¿ÐµÑ€Ð²Ñ‹Ðµ Ñƒ Ð½Ð°Ñ?" : "New here?"}{" "}
+            <Link
+              href={registerHref}
+              className="font-semibold text-foreground underline underline-offset-4"
+            >
+              {isRu ? "Ð¡Ð¾Ð·Ð´Ð°Ñ‚ÑŒ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚" : "Create an account"}
+            </Link>
+          </p>
         </form>
       </Form>
     </div>
   )
 }
+

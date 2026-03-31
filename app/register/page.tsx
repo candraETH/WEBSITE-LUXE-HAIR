@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { AuthPageRedirect } from "@/components/auth-page-redirect"
 import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
 import { RegisterForm } from "./register-form"
 
@@ -32,22 +33,24 @@ export default async function RegisterPage(props: RegisterPageProps) {
   const locale = await getLocaleFromRequestHeaders()
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-background to-background/50 pt-[102px] lg:pt-[108px]">
+    <main className="min-h-screen overflow-x-hidden bg-background pt-[102px] lg:pt-[108px]">
       <Navbar />
+      <AuthPageRedirect nextPath={nextPath} returnTo={returnTo} />
 
-      <section className="mx-auto w-full max-w-md px-6 py-12 lg:py-16">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-accent/80">
-          {locale === "ru" ? "\u0410\u043a\u043a\u0430\u0443\u043d\u0442" : "Account"}
-        </p>
-        <h1 className="mb-2 font-serif text-4xl font-bold text-foreground lg:text-5xl">
-          {locale === "ru" ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f" : "Register"}
-        </h1>
-        <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
-          {locale === "ru"
-            ? "\u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u0430\u043a\u043a\u0430\u0443\u043d\u0442, \u0447\u0442\u043e\u0431\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435 \u0438 \u043e\u0444\u043e\u0440\u043c\u043b\u044f\u0442\u044c \u0437\u0430\u043a\u0430\u0437\u044b \u0431\u044b\u0441\u0442\u0440\u0435\u0435."
-            : "Create an account to save your details and check out faster."}
-        </p>
-
+      <section className="mx-auto flex w-full max-w-[560px] flex-col items-stretch px-4 py-10 sm:px-6 lg:py-14">
+        <div className="mb-6 text-center sm:mb-8">
+          <p className="font-serif text-3xl font-semibold uppercase tracking-[0.38em] text-foreground sm:text-[2.15rem]">
+            CANDRA&apos;S HAIR
+          </p>
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-foreground sm:text-[2.1rem]">
+            {locale === "ru" ? "Регистрация" : "Create account"}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            {locale === "ru"
+              ? "Создайте аккаунт или войдите в существующий."
+              : "Create an account or sign in"}
+          </p>
+        </div>
         <RegisterForm nextPath={nextPath} returnTo={returnTo} />
       </section>
 
