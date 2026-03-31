@@ -29,16 +29,17 @@ export function AuthPageRedirect({ nextPath, returnTo }: AuthPageRedirectProps) 
   const { locale } = useLocale()
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) {
+    const maybeClient = getSupabaseBrowserClient()
+    if (!maybeClient) {
       return
     }
+    const client: NonNullable<typeof maybeClient> = maybeClient
 
     let active = true
     const redirectTo = withLocaleHref(resolveRedirectTarget(nextPath, returnTo), locale)
 
     async function checkSession() {
-      const { data } = await supabase.auth.getSession()
+      const { data } = await client.auth.getSession()
       if (!active) return
       if (data.session) {
         router.replace(redirectTo)
@@ -47,7 +48,7 @@ export function AuthPageRedirect({ nextPath, returnTo }: AuthPageRedirectProps) 
 
     void checkSession()
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       if (!active) return
       if (session) {
         router.replace(redirectTo)
