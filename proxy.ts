@@ -86,12 +86,18 @@ function getSupabaseHost(): string | null {
 
 function buildContentSecurityPolicy(nonce: string) {
   const paypalHosts = getPayPalCspHosts()
+  const hcaptchaHosts = [
+    "https://hcaptcha.com",
+    "https://*.hcaptcha.com",
+    "https://js.hcaptcha.com",
+  ]
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
     ...(isDevelopment ? ["'unsafe-eval'"] : []),
     "https://va.vercel-scripts.com",
     paypalHosts.www,
+    ...hcaptchaHosts,
   ]
 
   const supabaseHost = getSupabaseHost()
@@ -110,10 +116,10 @@ function buildContentSecurityPolicy(nonce: string) {
     `script-src ${scriptSrc.join(" ")}`,
     "script-src-attr 'none'",
     // Keep unsafe-inline styles for now (Tailwind + third-party components can inject inline styles).
-    "style-src 'self' 'unsafe-inline' https:",
-    `connect-src 'self' ${paypalHosts.api} ${paypalHosts.www} https://vitals.vercel-insights.com https://vitals.vercel-analytics.com ${supabaseConnect.join(" ")}`.trim(),
+    `style-src 'self' 'unsafe-inline' https: ${hcaptchaHosts.join(" ")}`,
+    `connect-src 'self' ${paypalHosts.api} ${paypalHosts.www} https://vitals.vercel-insights.com https://vitals.vercel-analytics.com ${supabaseConnect.join(" ")} ${hcaptchaHosts.join(" ")}`.trim(),
     "font-src 'self' data: https:",
-    `frame-src 'self' ${paypalHosts.www}`.trim(),
+    `frame-src 'self' ${paypalHosts.www} ${hcaptchaHosts.join(" ")}`.trim(),
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "media-src 'self' data: blob: https:",
