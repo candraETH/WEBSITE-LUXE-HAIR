@@ -647,9 +647,20 @@ export default function CartPage() {
 
     try {
       const normalizedDetails = getNormalizedCheckoutDetails()
+      const { data: checkoutSessionData } = await supabase.auth.getSession()
+      const accessToken = checkoutSessionData.session?.access_token ?? ""
+      if (!accessToken) {
+        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(nextAddress)}&returnTo=${encodeURIComponent(returnTo)}`
+        window.location.href = loginUrl
+        return
+      }
+
       const response = await fetch("/api/checkout/request-verification", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           customer: normalizedDetails,
         }),
@@ -715,9 +726,20 @@ export default function CartPage() {
     setVerificationInfo("")
 
     try {
+      const { data: checkoutSessionData } = await supabase.auth.getSession()
+      const accessToken = checkoutSessionData.session?.access_token ?? ""
+      if (!accessToken) {
+        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(nextAddress)}&returnTo=${encodeURIComponent(returnTo)}`
+        window.location.href = loginUrl
+        return
+      }
+
       const response = await fetch("/api/checkout/verify-verification", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           challengeId: verificationChallengeId,
           otpCode: verificationCode.trim(),

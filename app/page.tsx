@@ -23,13 +23,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const title =
     locale === "ru"
       ? "Премиальные наращивания, парики и многое другое"
-      : "Premium Hair Extensions, Wigs & More"
+      : "Premium Hair Weft, Wigs & More"
   const description =
     locale === "ru"
       ? "Покупайте премиальные натуральные волосы: наращивания, bulk hair, трессы и парики — надежное качество, быстрая доставка и поддержка."
-      : "Shop premium human hair extensions, bulk hair, weft hair, and wigs with trusted quality, fast delivery, and professional support."
+      : "Shop premium human hair extensions, bulk hair, weft hair, and wigs. Perfect for wholesale with competitive pricing, trusted quality, and worldwide shipping."
 
-  return buildLocalizedPageMetadata({
+  const metadata = await buildLocalizedPageMetadata({
     title,
     description,
     keywords: [
@@ -45,6 +45,14 @@ export async function generateMetadata(): Promise<Metadata> {
     ],
     images: ["/images/hero.jpg"],
   })
+
+  return {
+    ...metadata,
+    title:
+      locale === "ru"
+        ? { absolute: "CANDRA'S HAIR | ÐŸÑ€ÐµÐ¼Ð¸Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð½Ð°Ñ€Ð°Ñ‰Ð¸Ð²ÐÐ°Ð½Ð¸Ñ, Ð¿Ð°Ñ€Ð¸ÐºÐ¸ Ð¸ Ð¼Ð½Ð¾Ð³ÐÐ¾Ðµ Ð´Ñ€ÑƒÐ³Ð¾Ðµ" }
+        : { absolute: "CANDRA'S HAIR | Premium Hair Weft, Wigs & More" },
+  }
 }
 
 export default async function Page() {

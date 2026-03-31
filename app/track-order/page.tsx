@@ -97,6 +97,34 @@ function maskPhoneNumber(value: string): string {
   return `${countryCode}${"*".repeat(maskedDigitsCount)}${lastThree}`
 }
 
+function sanitizePhoneInput(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return ""
+  }
+
+  const digits = trimmed.replace(/\D/g, "")
+  if (!digits) {
+    return trimmed.startsWith("+") ? "+" : ""
+  }
+
+  return `${trimmed.startsWith("+") ? "+" : ""}${digits}`
+}
+
+function normalizePhoneNumber(value: string): string {
+  const sanitized = sanitizePhoneInput(value)
+  if (!sanitized) {
+    return ""
+  }
+
+  const digits = sanitized.replace(/\D/g, "")
+  if (digits.length < 8) {
+    return ""
+  }
+
+  return sanitized.startsWith("+") ? `+${digits}` : digits
+}
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value
@@ -280,7 +308,8 @@ function TrackOrderContent() {
   const [trackOtpDevCode, setTrackOtpDevCode] = useState("")
   const primaryOrder = orders[0] ?? null
 
-  const canTrackOrder = useMemo(() => Boolean(orderId.trim() && phoneNumber.trim()), [orderId, phoneNumber])
+  const normalizedPhoneNumber = useMemo(() => normalizePhoneNumber(phoneNumber), [phoneNumber])
+  const canTrackOrder = useMemo(() => Boolean(orderId.trim() && normalizedPhoneNumber), [orderId, normalizedPhoneNumber])
 
   useEffect(() => {
     if (hasPrefilledOrderId.current) return
@@ -293,14 +322,6 @@ function TrackOrderContent() {
     setOrderId((current) => (current.trim() ? current : normalized))
     hasPrefilledOrderId.current = true
   }, [searchParams])
-
-  const normalizePhone = () => {
-    const normalizedPhoneDigits = phoneNumber.replace(/\D/g, "")
-    if (normalizedPhoneDigits.length < 4) {
-      return ""
-    }
-    return normalizedPhoneDigits.slice(-4)
-  }
 
   const resetTrackingState = () => {
     setOrders([])
@@ -319,18 +340,17 @@ function TrackOrderContent() {
     if (!canTrackOrder) {
       setError(
         isRu
-          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 ID \u0437\u0430\u043a\u0430\u0437\u0430 \u0438 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
+          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 ID \u0437\u0430\u043a\u0430\u0437\u0430 \u0438 \u043f\u043e\u043b\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
           : "Enter both Order ID and phone number."
       )
       return
     }
 
-    const normalizedPhone = normalizePhone()
-    if (!normalizedPhone) {
+    if (!normalizedPhoneNumber) {
       setError(
         isRu
-          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430."
-          : "Enter the last 4 digits of the phone number."
+          ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u043e\u043b\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u0441 \u043a\u043e\u0434\u043e\u043c \u0441\u0442\u0440\u0430\u043d\u044b."
+          : "Enter the full phone number, including country code."
       )
       return
     }
@@ -348,7 +368,7 @@ function TrackOrderContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: orderId.trim().toUpperCase(),
-          phoneNumber: normalizedPhone,
+          phoneNumber: normalizedPhoneNumber,
           purpose: "track_order",
         }),
       })
@@ -492,30 +512,30 @@ function TrackOrderContent() {
                 />
               </div>
 
-              <label className="block text-center text-xs font-medium text-muted-foreground">
-                {isRu ? "\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 4 \u0446\u0438\u0444\u0440\u044b \u043d\u043e\u043c\u0435\u0440\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Last 4 digits of phone number"}
-                <div className="mt-2 flex justify-center">
-                  <InputOTP
-                    value={phoneNumber}
-                    onChange={(value) => {
-                      setPhoneNumber(value.replace(/\D/g, "").slice(0, 4))
-                      resetTrackingState()
-                    }}
-                    maxLength={4}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    containerClassName="justify-center"
-                    className="gap-3"
-                  >
-                    <InputOTPGroup className="gap-3 justify-center">
-                      <InputOTPSlot index={0} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                      <InputOTPSlot index={1} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                      <InputOTPSlot index={2} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                      <InputOTPSlot index={3} className="h-12 w-12 rounded-2xl border border-border/70 bg-white text-base font-semibold shadow-sm" />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              </label>
+              <div className="flex flex-col items-center">
+                <label htmlFor="track-phone-number" className="text-center text-xs font-medium text-muted-foreground">
+                  {isRu ? "\u041f\u043e\u043b\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430" : "Full phone number"}
+                </label>
+                <input
+                  id="track-phone-number"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(event) => {
+                    setPhoneNumber(sanitizePhoneInput(event.target.value))
+                    resetTrackingState()
+                  }}
+                  placeholder={isRu ? "+1 81234567890" : "+1 81234567890"}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  maxLength={16}
+                  className="mx-auto mt-2 h-12 w-full max-w-[320px] rounded-xl border border-border/60 bg-white px-3.5 text-center text-sm text-foreground shadow-sm outline-none transition-shadow focus:border-[#D4AF37]/60 focus:ring-2 focus:ring-[#D4AF37]/25"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {isRu
+                    ? "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043f\u043e\u043b\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0441 \u043a\u043e\u0434\u043e\u043c \u0441\u0442\u0440\u0430\u043d\u044b."
+                    : "Enter the full number with country code."}
+                </p>
+              </div>
 
               <button
                 type="submit"

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
-import { SITE_NAME, getSiteUrl } from "@/lib/seo"
+import { SITE_NAME, getSiteUrl, shouldNoIndexPath } from "@/lib/seo"
 import { localeFromPathname, swapLocaleInPathname, type SupportedLocale } from "@/lib/i18n"
 
 function parseLocale(value: string | null | undefined): SupportedLocale {
@@ -32,6 +32,7 @@ export async function buildLocalizedPageMetadata({
   noIndex = false,
 }: BuildLocalizedPageMetadataInput): Promise<Metadata> {
   const { locale, canonicalPath } = await getRequestContext()
+  const resolvedNoIndex = noIndex ?? shouldNoIndexPath(canonicalPath)
 
   return {
     metadataBase: new URL(getSiteUrl()),
@@ -60,7 +61,7 @@ export async function buildLocalizedPageMetadata({
       description,
       images: images.length > 0 ? [images[0]] : undefined,
     },
-    robots: noIndex
+    robots: resolvedNoIndex
       ? {
           index: false,
           follow: false,
@@ -78,4 +79,3 @@ export async function getLocaleFromRequestHeaders(): Promise<SupportedLocale> {
   const headerStore = await headers()
   return localeFromPathname(`/${headerStore.get("x-locale") ?? "en"}`).locale
 }
-

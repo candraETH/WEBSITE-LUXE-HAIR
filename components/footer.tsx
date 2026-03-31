@@ -81,14 +81,6 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href={localizedHref("/track-order")}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {messages.footer.company.trackOrder}
-                </Link>
-              </li>
-              <li>
-                <Link
                   href={localizedHref("/return-policy")}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >

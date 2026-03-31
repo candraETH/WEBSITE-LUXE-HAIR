@@ -22,7 +22,7 @@ const requestOtpSchema = z.object({
     .max(80)
     .transform((value) => value.toUpperCase())
     .refine((value) => isValidPayPalOrderId(value), "Invalid order id."),
-  phoneNumber: z.string().trim().regex(/^\+?\d{4,15}$/),
+  phoneNumber: z.string().trim().regex(/^\+?\d{8,15}$/),
   purpose: z.enum(["track_order", "send_invoice"]).default("track_order"),
 })
 
@@ -31,10 +31,13 @@ type OrderRow = {
   customer_name?: string | null
   customer_email?: string | null
   phone_number?: string | null
+  customer_phone?: string | null
+  customer_whatsapp?: string | null
+  whatsapp?: string | null
   cart_json?: unknown
 }
 
-const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,cart_json"
+const ORDER_SELECT = "paypal_order_id,customer_name,customer_email,phone_number,customer_phone,customer_whatsapp,whatsapp,cart_json"
 function mapOtpErrorToMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : ""
   const message = raw.toLowerCase()
@@ -55,6 +58,18 @@ function mapOtpErrorToMessage(error: unknown): string {
 function extractCustomerPhone(row: OrderRow): string {
   if (row.phone_number?.trim()) {
     return row.phone_number.trim()
+  }
+
+  if (row.customer_phone?.trim()) {
+    return row.customer_phone.trim()
+  }
+
+  if (row.customer_whatsapp?.trim()) {
+    return row.customer_whatsapp.trim()
+  }
+
+  if (row.whatsapp?.trim()) {
+    return row.whatsapp.trim()
   }
 
   const root = row.cart_json
@@ -132,13 +147,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found for the provided details." }, { status: 404 })
     }
 
+    const verifiedPhone = extractCustomerPhone(data)
+    if (!verifiedPhone) {
+      return NextResponse.json(
+        { error: "No phone number is available for this order. Please contact support to verify your order." },
+        { status: 400 }
+      )
+    }
+
     const otpCode = generateOtpCode()
     const challengeId = crypto.randomUUID()
-    const context = `${orderId}|${phoneNumber}`
+    const context = `${orderId}|${verifiedPhone}`
     const otpHash = hashOtpCode(otpCode, context)
     const challengePayload = {
       orderId,
-      phoneNumber,
+      phoneNumber: verifiedPhone,
       purpose,
       otpHash,
       attemptsLeft: 3,
@@ -147,7 +170,7 @@ export async function POST(request: Request) {
 
     await storeOrderOtpChallenge(challengeId, challengePayload)
 
-    const customerPhone = extractCustomerPhone(data) || phoneNumber
+    const customerPhone = verifiedPhone
     const customerEmail = extractCustomerEmail(data)
     if (!customerEmail && !process.env.OTP_DELIVERY_WEBHOOK_URL?.trim()) {
       return NextResponse.json(

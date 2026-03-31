@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { HCaptchaChallenge } from "@/components/hcaptcha-captcha"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { withLocaleHref } from "@/lib/i18n"
 import { useLocale } from "@/context/LocaleContext"
@@ -125,8 +126,11 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [needsSignIn, setNeedsSignIn] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
   const authEnabled = Boolean(supabase)
+  const captchaConfigured = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
 
   const registerSchema = z
     .object({
@@ -208,6 +212,43 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       return
     }
 
+    if (process.env.NODE_ENV === "production" && !captchaConfigured) {
+      form.setError("root", {
+        message:
+          isRu
+            ? "\u0414\u043b\u044f production \u043d\u0443\u0436\u043d\u0430 CAPTCHA. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
+            : "CAPTCHA is required in production. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY.",
+      })
+      return
+    }
+
+    if (captchaConfigured) {
+      if (!captchaToken) {
+        form.setError("root", {
+          message: isRu ? "\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u043f\u0440\u043e\u0439\u0434\u0438\u0442\u0435 CAPTCHA." : "Please complete the CAPTCHA.",
+        })
+        return
+      }
+
+      const captchaResponse = await fetch("/api/captcha/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: captchaToken, action: "register" }),
+      })
+
+      const captchaPayload = (await captchaResponse.json().catch(() => ({}))) as { error?: string; ok?: boolean }
+      if (!captchaResponse.ok || !captchaPayload.ok) {
+        setCaptchaToken(null)
+        setCaptchaResetKey((current) => current + 1)
+        form.setError("root", {
+          message:
+            captchaPayload.error ||
+            (isRu ? "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0439\u0442\u0438 CAPTCHA." : "Unable to verify CAPTCHA."),
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       const phone = `${values.phoneCountryCode}${values.phoneNumber}`
@@ -223,11 +264,15 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       })
 
       if (signUpError) {
+        setCaptchaToken(null)
+        setCaptchaResetKey((current) => current + 1)
         form.setError("root", { message: signUpError.message })
         return
       }
 
       if (!data.session) {
+        setCaptchaToken(null)
+        setCaptchaResetKey((current) => current + 1)
         setSuccessMessage(
           isRu
             ? "\u0410\u043a\u043a\u0430\u0443\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 email \u0434\u043b\u044f \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f, \u0437\u0430\u0442\u0435\u043c \u0432\u043e\u0439\u0434\u0438\u0442\u0435."
@@ -237,6 +282,8 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
         return
       }
 
+      setCaptchaToken(null)
+      setCaptchaResetKey((current) => current + 1)
       setSuccessMessage(isRu ? "\u0410\u043a\u043a\u0430\u0443\u043d\u0442 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0441\u043e\u0437\u0434\u0430\u043d." : "Account created successfully.")
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
@@ -449,6 +496,13 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
                 <FormMessage />
               </FormItem>
             )}
+          />
+
+          <HCaptchaChallenge
+            action="register"
+            resetKey={captchaResetKey}
+            onTokenChange={setCaptchaToken}
+            label={isRu ? "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438" : "Security check"}
           />
 
            {form.formState.errors.root?.message && (

@@ -6,12 +6,6 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, Menu, X, ShoppingBag, Search, UserRound } from "lucide-react"
 import { useCart } from "@/context/CartContext"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { TierBadge, getTierNameGradientClass } from "@/components/loyalty/tier-badge"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { getTierForSpend, type LoyaltyTierKey } from "@/lib/loyalty-tier"
@@ -191,6 +185,8 @@ export function Navbar() {
   const [desktopSearchQuery, setDesktopSearchQuery] = useState("")
   const [openDesktopMenu, setOpenDesktopMenu] = useState<string | null>(null)
   const [openMobileMenu, setOpenMobileMenu] = useState<string | null>(null)
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [previewLightbox, setPreviewLightbox] = useState<PreviewLightboxState | null>(null)
   const [authState, setAuthState] = useState<{ status: "loading" | "signed_out" | "signed_in" }>({ status: "loading" })
   const [accountLabel, setAccountLabel] = useState<{
@@ -200,6 +196,8 @@ export function Navbar() {
   } | null>(null)
   const desktopNavRef = useRef<HTMLUListElement>(null)
   const desktopSearchRef = useRef<HTMLDivElement>(null)
+  const languageMenuRef = useRef<HTMLDivElement>(null)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
   const desktopOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const desktopCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -218,39 +216,58 @@ export function Navbar() {
     let isCancelled = false
 
     async function load() {
-      const { data } = await client.auth.getUser()
-      if (isCancelled) return
+      try {
+        const { data, error } = await client.auth.getUser()
+        if (error) {
+          throw error
+        }
 
-      if (!data.user) {
+        if (isCancelled) return
+
+        if (!data.user) {
+          setAuthState({ status: "signed_out" })
+          setAccountLabel(null)
+          return
+        }
+
+        const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>
+        const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : ""
+        const fallbackName = (data.user.email ?? "").split("@")[0] ?? ""
+        const firstNameRaw = (fullName || fallbackName).trim().split(/\s+/)[0] ?? ""
+        const firstName = firstNameRaw || messages.account.accountFallback
+
+        let tierKey: LoyaltyTierKey | null = null
+        let tierName: string | null = null
+        const { data: sessionData, error: sessionError } = await client.auth.getSession()
+        if (sessionError) {
+          throw sessionError
+        }
+
+        const token = sessionData.session?.access_token ?? ""
+        if (token) {
+          const response = await fetch("/api/account/loyalty", { headers: { authorization: `Bearer ${token}` } })
+          const payload = (await response.json().catch(() => ({}))) as { totalPoints?: number; totalSpent?: number }
+          if (!isCancelled && response.ok) {
+            const spent = typeof payload.totalSpent === "number" ? payload.totalSpent : Number(payload.totalSpent ?? 0)
+            const points = typeof payload.totalPoints === "number" ? payload.totalPoints : Math.max(0, Math.floor(spent))
+            const tier = getTierForSpend(points)
+            tierKey = tier.key
+            tierName = tier.name
+          }
+        }
+
+        setAuthState({ status: "signed_in" })
+        setAccountLabel({ firstName, tierKey, tierName })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (/refresh token/i.test(message) || /invalid.*token/i.test(message)) {
+          await client.auth.signOut().catch(() => void 0)
+        }
+
+        if (isCancelled) return
         setAuthState({ status: "signed_out" })
         setAccountLabel(null)
-        return
       }
-
-      const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>
-      const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : ""
-      const fallbackName = (data.user.email ?? "").split("@")[0] ?? ""
-      const firstNameRaw = (fullName || fallbackName).trim().split(/\s+/)[0] ?? ""
-      const firstName = firstNameRaw || messages.account.accountFallback
-
-      let tierKey: LoyaltyTierKey | null = null
-      let tierName: string | null = null
-      const { data: sessionData } = await client.auth.getSession()
-      const token = sessionData.session?.access_token ?? ""
-      if (token) {
-        const response = await fetch("/api/account/loyalty", { headers: { authorization: `Bearer ${token}` } })
-        const payload = (await response.json().catch(() => ({}))) as { totalPoints?: number; totalSpent?: number }
-        if (!isCancelled && response.ok) {
-          const spent = typeof payload.totalSpent === "number" ? payload.totalSpent : Number(payload.totalSpent ?? 0)
-          const points = typeof payload.totalPoints === "number" ? payload.totalPoints : Math.max(0, Math.floor(spent))
-          const tier = getTierForSpend(points)
-          tierKey = tier.key
-          tierName = tier.name
-        }
-      }
-
-      setAuthState({ status: "signed_in" })
-      setAccountLabel({ firstName, tierKey, tierName })
     }
 
     void load()
@@ -287,12 +304,22 @@ export function Navbar() {
       if (desktopSearchRef.current && !desktopSearchRef.current.contains(event.target as Node)) {
         setIsDesktopSearchOpen(false)
       }
+
+      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
+        setIsLanguageMenuOpen(false)
+      }
+
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false)
+      }
     }
 
     function handleEsc(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpenDesktopMenu(null)
         setIsDesktopSearchOpen(false)
+        setIsLanguageMenuOpen(false)
+        setIsAccountMenuOpen(false)
       }
     }
 
@@ -593,36 +620,48 @@ export function Navbar() {
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
-                aria-label="Change language"
-                title="Language"
-              >
-                {locale.toUpperCase()}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              <DropdownMenuItem
-                onSelect={() => {
-                  setLocale("en")
-                  router.push(localeSwitchHref("en"))
-                }}
-              >
-                English
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setLocale("ru")
-                  router.push(localeSwitchHref("ru"))
-                }}
-              >
-                Русский
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div ref={languageMenuRef} className="relative">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
+              aria-label="Change language"
+              aria-expanded={isLanguageMenuOpen}
+              title="Language"
+              onClick={() => {
+                setIsAccountMenuOpen(false)
+                setIsLanguageMenuOpen((prev) => !prev)
+              }}
+            >
+              {locale.toUpperCase()}
+            </button>
+
+            {isLanguageMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 min-w-40 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+                <button
+                  type="button"
+                  className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                  onClick={() => {
+                    setLocale("en")
+                    router.push(localeSwitchHref("en"))
+                    setIsLanguageMenuOpen(false)
+                  }}
+                >
+                  English
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                  onClick={() => {
+                    setLocale("ru")
+                    router.push(localeSwitchHref("ru"))
+                    setIsLanguageMenuOpen(false)
+                  }}
+                >
+                  Русский
+                </button>
+              </div>
+            )}
+          </div>
 
           <Link
             href={localizedHref("/cart")}
@@ -638,7 +677,7 @@ export function Navbar() {
             )}
           </Link>
 
-          <div className={`${accountDesktopWidthClass} shrink-0`}>
+          <div ref={accountMenuRef} className={`${accountDesktopWidthClass} relative shrink-0`}>
             {authState.status === "loading" ? (
               <div
                 className="flex w-full items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground opacity-90"
@@ -651,56 +690,103 @@ export function Navbar() {
                 </span>
               </div>
             ) : authState.status === "signed_in" ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
-                    aria-label="Open account menu"
-                    title="Account"
-                  >
-                    <UserRound size={18} strokeWidth={1.8} />
-                    <span className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
-                      <span
-                        className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} min-w-0 max-w-[96px] truncate`}
-                      >
-                        {accountLabel?.firstName || "Account"}
-                      </span>
-                      {accountLabel?.tierKey && accountLabel.tierName ? (
-                        <TierBadge
-                          tier={accountLabel.tierKey}
-                          label={accountLabel.tierName}
-                          className="shrink-0 px-2 py-0.5 text-[10px] shadow-none"
-                        />
-                      ) : (
-                        <span className="h-[18px] w-[52px] shrink-0 opacity-0" aria-hidden="true" />
-                      )}
+              <>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold tracking-wide text-foreground transition-colors hover:bg-accent/10"
+                  aria-label="Open account menu"
+                  aria-expanded={isAccountMenuOpen}
+                  title="Account"
+                  onClick={() => {
+                    setIsLanguageMenuOpen(false)
+                    setIsAccountMenuOpen((prev) => !prev)
+                  }}
+                >
+                  <UserRound size={18} strokeWidth={1.8} />
+                  <span className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/40 bg-background/95 px-2.5 py-1 text-foreground shadow-sm">
+                    <span
+                      className={`${accountLabel?.tierKey ? getTierNameGradientClass(accountLabel.tierKey) : "text-foreground"} min-w-0 max-w-[96px] truncate`}
+                    >
+                      {accountLabel?.firstName || "Account"}
                     </span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/account/profile"))}>{messages.account.myAccount}</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void handleSignOut()}>{messages.account.signOut}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {accountLabel?.tierKey && accountLabel.tierName ? (
+                      <TierBadge
+                        tier={accountLabel.tierKey}
+                        label={accountLabel.tierName}
+                        className="shrink-0 px-2 py-0.5 text-[10px] shadow-none"
+                      />
+                    ) : (
+                      <span className="h-[18px] w-[52px] shrink-0 opacity-0" aria-hidden="true" />
+                    )}
+                  </span>
+                </button>
+
+                {isAccountMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 min-w-44 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+                    <button
+                      type="button"
+                      className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                      onClick={() => {
+                        router.push(localizedHref("/account/profile"))
+                        setIsAccountMenuOpen(false)
+                      }}
+                    >
+                      {messages.account.myAccount}
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                      onClick={() => {
+                        setIsAccountMenuOpen(false)
+                        void handleSignOut()
+                      }}
+                    >
+                      {messages.account.signOut}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
-                    aria-label="Open account menu"
-                    title="Register / Login"
-                  >
-                    <UserRound size={18} strokeWidth={1.8} />
-                    {messages.account.register}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/register"))}>{messages.account.createAccount}</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => router.push(localizedHref("/login"))}>{messages.account.signIn}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center gap-2 rounded-none border border-border bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-foreground transition-colors hover:bg-accent/10"
+                  aria-label="Open account menu"
+                  aria-expanded={isAccountMenuOpen}
+                  title="Register / Login"
+                  onClick={() => {
+                    setIsLanguageMenuOpen(false)
+                    setIsAccountMenuOpen((prev) => !prev)
+                  }}
+                >
+                  <UserRound size={18} strokeWidth={1.8} />
+                  {messages.account.register}
+                </button>
+                {isAccountMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 min-w-44 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+                    <button
+                      type="button"
+                      className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                      onClick={() => {
+                        router.push(localizedHref("/register"))
+                        setIsAccountMenuOpen(false)
+                      }}
+                    >
+                      {messages.account.createAccount}
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent/10"
+                      onClick={() => {
+                        router.push(localizedHref("/login"))
+                        setIsAccountMenuOpen(false)
+                      }}
+                    >
+                      {messages.account.signIn}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

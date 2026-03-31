@@ -100,9 +100,6 @@ export async function queryOrderByOrderAndPhone<T extends Record<string, unknown
     const input = normalizePhoneDigits(inputPhone)
     const stored = normalizePhoneDigits(storedPhone)
     if (!input || !stored) return false
-    if (input.length === 4) {
-      return stored.endsWith(input)
-    }
     return input === stored
   }
 

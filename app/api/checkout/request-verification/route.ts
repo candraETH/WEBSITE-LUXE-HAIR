@@ -7,6 +7,7 @@ import { deliverOtpCode } from "@/lib/otp-delivery"
 import { generateOtpCode, hashOtpCode, maskEmail } from "@/lib/otp-utils"
 import { setSecurityStoreValue } from "@/lib/security-store"
 import { getCheckoutFingerprint } from "@/lib/checkout-verification"
+import { supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
 
@@ -15,6 +16,8 @@ const requestVerificationSchema = z.object({
 })
 
 type CheckoutOtpChallenge = {
+  userId: string
+  email: string
   fingerprint: string
   otpHash: string
   attemptsLeft: number
@@ -40,6 +43,16 @@ function mapOtpErrorToMessage(error: unknown): string {
   return "Unable to send verification code."
 }
 
+function getBearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? ""
+  if (!header.toLowerCase().startsWith("bearer ")) {
+    return null
+  }
+
+  const token = header.slice(7).trim()
+  return token || null
+}
+
 export async function POST(request: Request) {
   try {
     const rateLimit = await enforceRateLimit(request, "api:checkout:request-verification", {
@@ -57,6 +70,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden origin." }, { status: 403 })
     }
 
+    const token = getBearerToken(request)
+    if (!token) {
+      return NextResponse.json({ error: "You must be signed in to request a verification code." }, { status: 401 })
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    const authedUser = userData.user ?? null
+    const authedEmail = authedUser?.email?.trim().toLowerCase() ?? ""
+    if (userError || !authedUser || !authedEmail) {
+      return NextResponse.json({ error: "Your session expired. Please sign in again." }, { status: 401 })
+    }
+
     const body = await request.json()
     const parsed = requestVerificationSchema.safeParse(body)
     if (!parsed.success) {
@@ -64,12 +89,18 @@ export async function POST(request: Request) {
     }
 
     const customer = normalizeCheckoutCustomer(parsed.data.customer)
+    if (customer.email !== authedEmail) {
+      return NextResponse.json({ error: "Verification requests must use the signed-in account email." }, { status: 403 })
+    }
+
     const otpCode = generateOtpCode()
     const challengeId = crypto.randomUUID()
     const fingerprint = getCheckoutFingerprint(customer)
     const otpHash = hashOtpCode(otpCode, fingerprint)
 
     const challengePayload: CheckoutOtpChallenge = {
+      userId: authedUser.id,
+      email: authedEmail,
       fingerprint,
       otpHash,
       attemptsLeft: 3,

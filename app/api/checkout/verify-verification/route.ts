@@ -9,6 +9,7 @@ import {
 } from "@/lib/security-store"
 import { safeEqualOtpHash } from "@/lib/otp-utils"
 import { issueCheckoutVerificationTokenByFingerprint } from "@/lib/checkout-verification"
+import { supabase } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
 
@@ -18,6 +19,8 @@ const verifySchema = z.object({
 })
 
 type CheckoutOtpChallenge = {
+  userId: string
+  email: string
   fingerprint: string
   otpHash: string
   attemptsLeft: number
@@ -43,6 +46,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden origin." }, { status: 403 })
     }
 
+    const tokenHeader = request.headers.get("authorization") ?? ""
+    if (!tokenHeader.toLowerCase().startsWith("bearer ")) {
+      return NextResponse.json({ error: "You must be signed in to verify the code." }, { status: 401 })
+    }
+
+    const token = tokenHeader.slice(7).trim()
+    if (!token) {
+      return NextResponse.json({ error: "You must be signed in to verify the code." }, { status: 401 })
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    const authedUser = userData.user ?? null
+    const authedEmail = authedUser?.email?.trim().toLowerCase() ?? ""
+    if (userError || !authedUser || !authedEmail) {
+      return NextResponse.json({ error: "Your session expired. Please sign in again." }, { status: 401 })
+    }
+
     const body = await request.json()
     const parsed = verifySchema.safeParse(body)
     if (!parsed.success) {
@@ -53,6 +73,10 @@ export async function POST(request: Request) {
     const challenge = await getSecurityStoreValue<CheckoutOtpChallenge>(challengeKey)
     if (!challenge) {
       return NextResponse.json({ error: "Verification code expired. Request a new one." }, { status: 400 })
+    }
+
+    if (challenge.userId !== authedUser.id || challenge.email !== authedEmail) {
+      return NextResponse.json({ error: "This verification code does not belong to your signed-in session." }, { status: 403 })
     }
 
     if (challenge.expiresAt <= Date.now()) {
