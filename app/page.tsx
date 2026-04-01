@@ -3,10 +3,8 @@ import { Hero } from "@/components/hero"
 import { CategoryBanner } from "@/components/category-banner"
 import { ProductSection } from "@/components/product-section"
 import { AboutSection } from "@/components/about-section"
-import { Testimonials } from "@/components/testimonials"
 import { WhatsAppCTA } from "@/components/whatsapp-cta"
 import { Footer } from "@/components/footer"
-import { WhatsAppFloat } from "@/components/whatsapp-float"
 import { BULK_PRODUCTS } from "@/lib/bulk-products"
 import { EXTENSIONS_PRODUCTS } from "@/lib/extensions-products"
 import { WEFT_PRODUCTS } from "@/lib/weft-products"
@@ -17,6 +15,7 @@ import { JsonLd } from "@/components/json-ld"
 import { buildLocalizedPageMetadata, getLocaleFromRequestHeaders } from "@/lib/seo-i18n"
 import { getMessages } from "@/lib/messages"
 import { withLocaleHref } from "@/lib/i18n"
+import { HomepageExtras } from "@/components/homepage-extras"
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocaleFromRequestHeaders()
@@ -139,10 +138,9 @@ export default async function Page() {
       />
 
       <AboutSection />
-      <Testimonials />
+      <HomepageExtras />
       <WhatsAppCTA />
       <Footer />
-      <WhatsAppFloat />
     </main>
   )
 }

@@ -1,12 +1,17 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { CartProvider } from "@/context/CartContext"
 import { LocaleProvider } from "@/context/LocaleContext"
 import { LAST_VISITED_ROUTE_KEY } from "@/lib/navigation-state"
-import { WelcomeCouponPopup } from "@/components/welcome-coupon-popup"
 import { usePathname } from "next/navigation"
 import { ReactNode, useEffect } from "react"
 import { stripLocaleFromPathname, type SupportedLocale } from "@/lib/i18n"
+
+const WelcomeCouponPopup = dynamic(
+  () => import("@/components/welcome-coupon-popup").then((mod) => mod.WelcomeCouponPopup),
+  { ssr: false, loading: () => null }
+)
 
 function RouteMemory() {
   const pathname = usePathname()

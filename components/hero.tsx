@@ -1,4 +1,3 @@
-import Image from "next/image"
 import Link from "next/link"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 import { withLocaleHref } from "@/lib/i18n"
@@ -8,6 +7,7 @@ import type { SupportedLocale } from "@/lib/i18n"
 type HeroSlide = {
   id: string
   image: string
+  mobileImage?: string
   alt: string
   ctaHref: string
   imageClassName?: string
@@ -18,6 +18,7 @@ const BASE_HERO_SLIDES: HeroSlide[] = [
   {
     id: "main",
     image: "/images/hero.jpg",
+    mobileImage: "/images/hero-mobile.jpg",
     alt: "Luxurious hair extensions on silk fabric",
     ctaHref: "#extensions",
   },
@@ -44,14 +45,17 @@ export function Hero({ locale }: { locale: SupportedLocale }) {
     <section id="home" className="relative min-h-[42vh] overflow-hidden pt-24 lg:pt-28">
       <div className="absolute inset-0">
         <div className={`absolute inset-0 ${activeSlide.containerClassName ?? "bg-[#120f0d]"}`}>
-          <Image
-            src={activeSlide.image}
-            alt={activeSlide.alt}
-            fill
-            sizes="100vw"
-            className={activeSlide.imageClassName ?? "object-cover object-center"}
-            priority
-          />
+          <picture>
+            <source media="(max-width: 768px)" srcSet={activeSlide.mobileImage ?? activeSlide.image} />
+            <img
+              src={activeSlide.image}
+              alt={activeSlide.alt}
+              className={`absolute inset-0 h-full w-full ${activeSlide.imageClassName ?? "object-cover object-center"}`}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
+          </picture>
           <div className="absolute inset-0 bg-foreground/45" />
         </div>
       </div>
