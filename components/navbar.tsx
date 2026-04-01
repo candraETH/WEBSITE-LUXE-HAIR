@@ -13,6 +13,7 @@ import { swapLocaleInPathname, withLocaleHref, type SupportedLocale } from "@/li
 import { getMessages } from "@/lib/messages"
 import { useLocale } from "@/context/LocaleContext"
 import { getProductDisplayCopy } from "@/lib/product-copy"
+import { WELCOME_COUPON_OPEN_EVENT } from "@/lib/coupon"
 
 const navLinks = [
   { label: "Home", href: "/#home" },
@@ -81,7 +82,7 @@ const PRODUCT_MEGA_MENUS: Record<string, MegaMenuConfig> = {
     heading: "Bulk Hair",
     viewAllHref: "/bulk-hair",
     viewAllLabel: "View All Bulk Hair",
-    previewImage: "/images/images1.png",
+    previewImage: "/images/images4.png",
     previewAlt: "Bulk hair collection",
     items: bulkMenuItems,
   },
@@ -445,18 +446,25 @@ export function Navbar() {
     handleSearchSubmit(query)
   }
 
+  const handlePromoClick = () => {
+    window.dispatchEvent(new Event(WELCOME_COUPON_OPEN_EVENT))
+  }
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="promo-marquee border-b border-[#3a2e20] bg-[#1f1810] text-[#f6ddb3]">
         <div className="promo-marquee-track flex h-7 w-max min-w-full items-center">
           {Array.from({ length: 12 }).map((_, index) => (
-            <span
+            <button
               key={`promo-${index}`}
+              type="button"
+              onClick={handlePromoClick}
               className="mx-5 text-[10px] font-semibold uppercase tracking-[0.18em] sm:mx-7 sm:text-[11px]"
+              aria-label="Open welcome coupon popup"
             >
               {promoMarqueeMessage}
-            </span>
+            </button>
           ))}
         </div>
       </div>

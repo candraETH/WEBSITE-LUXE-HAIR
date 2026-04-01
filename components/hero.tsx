@@ -1,14 +1,9 @@
-"use client"
-
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
 import { withLocaleHref } from "@/lib/i18n"
 import { getMessages } from "@/lib/messages"
-import { useLocale } from "@/context/LocaleContext"
-
-const AUTO_SLIDE_MS = 6000
+import type { SupportedLocale } from "@/lib/i18n"
 
 type HeroSlide = {
   id: string
@@ -28,8 +23,7 @@ const BASE_HERO_SLIDES: HeroSlide[] = [
   },
 ]
 
-export function Hero() {
-  const { locale } = useLocale()
+export function Hero({ locale }: { locale: SupportedLocale }) {
   const messages = getMessages(locale)
 
   const slideCopyById = new Map(messages.hero.slides.map((slide) => [slide.id, slide]))
@@ -44,43 +38,22 @@ export function Hero() {
       ctaLabel: copy.ctaLabel,
     }
   })
-
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0)
-  const activeSlide = heroSlides[activeSlideIndex] ?? heroSlides[0]
-
-  useEffect(() => {
-    setActiveSlideIndex(0)
-  }, [locale])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveSlideIndex((prev) => (prev + 1) % heroSlides.length)
-    }, AUTO_SLIDE_MS)
-
-    return () => window.clearInterval(timer)
-  }, [heroSlides.length])
+  const activeSlide = heroSlides[0]!
 
   return (
     <section id="home" className="relative min-h-[42vh] overflow-hidden pt-24 lg:pt-28">
       <div className="absolute inset-0">
-        {heroSlides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-700 ${
-              index === activeSlideIndex ? "opacity-100" : "opacity-0"
-            } ${slide.containerClassName ?? "bg-[#120f0d]"}`}
-          >
-            <Image
-              src={slide.image}
-              alt={slide.alt}
-              fill
-              sizes="100vw"
-              className={slide.imageClassName ?? "object-cover object-center"}
-              priority={index === 0}
-            />
-            <div className="absolute inset-0 bg-foreground/45" />
-          </div>
-        ))}
+        <div className={`absolute inset-0 ${activeSlide.containerClassName ?? "bg-[#120f0d]"}`}>
+          <Image
+            src={activeSlide.image}
+            alt={activeSlide.alt}
+            fill
+            sizes="100vw"
+            className={activeSlide.imageClassName ?? "object-cover object-center"}
+            priority
+          />
+          <div className="absolute inset-0 bg-foreground/45" />
+        </div>
       </div>
 
       <div className="relative z-10 flex min-h-[42vh] flex-col items-center justify-center px-6 py-10 text-center md:py-12">
@@ -122,22 +95,6 @@ export function Hero() {
             {messages.hero.whatsappButtonLabel}
           </a>
         </div>
-
-        {heroSlides.length > 1 && (
-          <div className="mt-6 flex items-center gap-2">
-            {heroSlides.map((slide, index) => (
-              <button
-                key={`dot-${slide.id}`}
-                type="button"
-                onClick={() => setActiveSlideIndex(index)}
-                aria-label={`Show slide ${index + 1}`}
-                className={`h-2.5 rounded-full transition-all ${
-                  index === activeSlideIndex ? "w-8 bg-white" : "w-2.5 bg-white/50 hover:bg-white/70"
-                }`}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2">

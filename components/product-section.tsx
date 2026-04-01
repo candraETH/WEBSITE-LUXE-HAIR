@@ -1,4 +1,5 @@
 import { ProductCard } from "./product-card"
+import type { SupportedLocale } from "@/lib/i18n"
 
 interface Product {
   name: string
@@ -18,6 +19,7 @@ interface ProductSectionProps {
   description: string
   products: Product[]
   reverse?: boolean
+  locale: SupportedLocale
 }
 
 export function ProductSection({
@@ -27,6 +29,7 @@ export function ProductSection({
   description,
   products,
   reverse,
+  locale,
 }: ProductSectionProps) {
   return (
     <section id={id} className="py-24 lg:py-32">
@@ -49,7 +52,7 @@ export function ProductSection({
         {/* Products Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => (
-            <ProductCard key={product.slug} {...product} />
+            <ProductCard key={product.slug} {...product} locale={locale} />
           ))}
         </div>
       </div>

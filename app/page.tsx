@@ -85,7 +85,7 @@ export default async function Page() {
       <JsonLd data={websiteSchema} />
       <JsonLd data={organizationSchema} />
       <Navbar />
-      <Hero />
+      <Hero locale={locale} />
       <CategoryBanner />
 
       <ProductSection
@@ -94,6 +94,7 @@ export default async function Page() {
         subtitle={messages.home.sections.bulk.subtitle}
         description={messages.home.sections.bulk.description}
         products={BULK_PRODUCTS}
+        locale={locale}
       />
 
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
@@ -107,6 +108,7 @@ export default async function Page() {
         description={messages.home.sections.weft.description}
         products={WEFT_PRODUCTS}
         reverse
+        locale={locale}
       />
 
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
@@ -119,6 +121,7 @@ export default async function Page() {
         subtitle={messages.home.sections.extensions.subtitle}
         description={messages.home.sections.extensions.description}
         products={EXTENSIONS_PRODUCTS}
+        locale={locale}
       />
 
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-12 2xl:px-16">
@@ -132,6 +135,7 @@ export default async function Page() {
         description={messages.home.sections.wigs.description}
         products={WIGS_PRODUCTS}
         reverse
+        locale={locale}
       />
 
       <AboutSection />

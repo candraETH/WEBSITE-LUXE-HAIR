@@ -9,6 +9,7 @@ export const COUPON_STORAGE_KEYS = {
   popupSeen: "candrashair-coupon-popup-seen-v1",
 } as const
 export const COUPON_UPDATED_EVENT = "candrashair-coupon-updated"
+export const WELCOME_COUPON_OPEN_EVENT = "candrashair-welcome-coupon-open"
 
 export type CouponDefinition = {
   code: string

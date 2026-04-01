@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     titleAbsolute,
     description,
     keywords: ["bulk hair", "braiding hair", "human bulk hair", "premium bulk hair"],
-    images: ["/images/images1.png"],
+    images: ["/images/images4.png", "/images/images3.png", "/images/images1.png"],
   })
 }
 

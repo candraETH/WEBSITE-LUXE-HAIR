@@ -18,6 +18,7 @@ import {
   hasClaimedCoupon,
   markCouponClaimed,
   saveActiveCouponCode,
+  WELCOME_COUPON_OPEN_EVENT,
 } from "@/lib/coupon"
 
 export function WelcomeCouponPopup() {
@@ -37,6 +38,16 @@ export function WelcomeCouponPopup() {
     setAlreadyClaimed(hasClaimedCoupon(coupon.code))
     setOpen(true)
   }, [coupon.code, pathname])
+
+  useEffect(() => {
+    function handleOpenCouponPopup() {
+      setAlreadyClaimed(hasClaimedCoupon(coupon.code))
+      setOpen(true)
+    }
+
+    window.addEventListener(WELCOME_COUPON_OPEN_EVENT, handleOpenCouponPopup)
+    return () => window.removeEventListener(WELCOME_COUPON_OPEN_EVENT, handleOpenCouponPopup)
+  }, [coupon.code])
 
   const closePopup = () => {
     setOpen(false)

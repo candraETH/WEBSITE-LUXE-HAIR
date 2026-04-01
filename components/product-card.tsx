@@ -1,13 +1,9 @@
-"use client"
-
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
-import ProductGallery from "./product-gallery"
 import { getDiscountedPriceLabel } from "@/lib/pricing"
 import { getProductDisplayCopy } from "@/lib/product-copy"
 import { withLocaleHref } from "@/lib/i18n"
-import { useLocale } from "@/context/LocaleContext"
+import type { SupportedLocale } from "@/lib/i18n"
 
 interface ProductCardProps {
   name: string
@@ -18,37 +14,29 @@ interface ProductCardProps {
   category: string
   description: string
   tag?: string
+  locale: SupportedLocale
 }
 
-export function ProductCard({ name, slug, price, image, images, category, description, tag }: ProductCardProps) {
-  const [isHovered, setIsHovered] = useState(false)
+export function ProductCard({ name, slug, price, image, images, category, description, tag, locale }: ProductCardProps) {
   const isVirginStraightBulk = slug === "virgin-straight-bulk"
   const { discountedLabel, originalLabel } = getDiscountedPriceLabel(price)
-  const { locale } = useLocale()
   const copy = getProductDisplayCopy({ slug, name, category, description, tag }, locale)
+  const primaryImage = image ?? images?.[0] ?? ""
 
   return (
     <Link href={withLocaleHref(`/order/${slug}`, locale)}>
-      <div
-        className="group relative flex w-full flex-col cursor-pointer"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
+      <div className="group relative flex w-full cursor-pointer flex-col">
         {/* Image Container */}
         <div className="relative">
-          {images && images.length > 0 ? (
-            <ProductGallery images={images} alt={copy.name} />
-          ) : (
-            <div className="relative aspect-[15/14] overflow-hidden rounded-2xl bg-secondary">
-              <Image
-                src={image ?? ""}
-                alt={copy.name}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className={`transition-transform duration-700 ${isHovered ? "scale-110" : "scale-100"} ${isVirginStraightBulk ? "object-contain p-2" : "object-cover"}`}
-              />
-            </div>
-          )}
+          <div className="relative aspect-[15/14] overflow-hidden rounded-2xl bg-secondary">
+            <Image
+              src={primaryImage}
+              alt={copy.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className={`transition-transform duration-700 group-hover:scale-110 ${isVirginStraightBulk ? "object-contain p-2" : "object-cover"}`}
+            />
+          </div>
 
           {copy.tag && (
             <span className="absolute left-4 top-4 bg-accent px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-accent-foreground">
