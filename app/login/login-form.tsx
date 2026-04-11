@@ -6,7 +6,6 @@ import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { HCaptchaChallenge } from "@/components/hcaptcha-captcha"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { withLocaleHref } from "@/lib/i18n"
 import { useLocale } from "@/context/LocaleContext"
@@ -44,11 +43,8 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
   const authEnabled = Boolean(supabase)
-  const captchaConfigured = process.env.NODE_ENV === "production" || Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
   const forgotPasswordHref = "mailto:support@candrashair.com?subject=Password%20Reset"
 
   const loginSchema = z.object({
@@ -80,43 +76,6 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
       return
     }
 
-    if (process.env.NODE_ENV === "production" && !captchaConfigured) {
-      form.setError("root", {
-        message:
-          isRu
-            ? "Ð”Ð»Ñ production Ð½ÑƒÐ¶Ð½Ð° CAPTCHA. Ð”Ð¾Ð±Ð°Ð²ÑŒÑ‚Ðµ NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
-            : "CAPTCHA is required in production. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY.",
-      })
-      return
-    }
-
-    if (captchaConfigured) {
-      if (!captchaToken) {
-        form.setError("root", {
-          message: isRu ? "ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð¿Ñ€Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ CAPTCHA." : "Please complete the CAPTCHA.",
-        })
-        return
-      }
-
-      const captchaResponse = await fetch("/api/captcha/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: captchaToken, action: "login" }),
-      })
-
-      const captchaPayload = (await captchaResponse.json().catch(() => ({}))) as { error?: string; ok?: boolean }
-      if (!captchaResponse.ok || !captchaPayload.ok) {
-        setCaptchaToken(null)
-        setCaptchaResetKey((current) => current + 1)
-        form.setError("root", {
-          message:
-            captchaPayload.error ||
-            (isRu ? "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ñ€Ð¾Ð¹Ñ‚Ð¸ CAPTCHA." : "Unable to verify CAPTCHA."),
-        })
-        return
-      }
-    }
-
     setIsSubmitting(true)
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -125,14 +84,10 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
       })
 
       if (signInError) {
-        setCaptchaToken(null)
-        setCaptchaResetKey((current) => current + 1)
         form.setError("root", { message: signInError.message })
         return
       }
 
-      setCaptchaToken(null)
-      setCaptchaResetKey((current) => current + 1)
       setSuccessMessage(isRu ? "Ð’Ñ…Ð¾Ð´ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½." : "Signed in successfully.")
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
@@ -222,8 +177,6 @@ export function LoginForm({ nextPath, returnTo }: { nextPath?: string; returnTo?
               </FormItem>
             )}
           />
-
-          <HCaptchaChallenge action="login" resetKey={captchaResetKey} onTokenChange={setCaptchaToken} />
 
           {form.formState.errors.root?.message && (
             <p className="text-sm font-medium text-destructive">{form.formState.errors.root.message}</p>

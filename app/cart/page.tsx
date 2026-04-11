@@ -646,29 +646,10 @@ export default function CartPage() {
     setVerificationDevCode("")
 
     try {
-      const checkoutClient = supabase
-      const checkoutReturnTo = localizedHref("/cart?checkout=1")
-      if (!checkoutClient) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
-        window.location.href = loginUrl
-        return
-      }
-
       const normalizedDetails = getNormalizedCheckoutDetails()
-      const { data: checkoutSessionData } = await checkoutClient.auth.getSession()
-      const accessToken = checkoutSessionData.session?.access_token ?? ""
-      if (!accessToken) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
-        window.location.href = loginUrl
-        return
-      }
-
       const response = await fetch("/api/checkout/request-verification", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${accessToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: normalizedDetails,
         }),
@@ -734,28 +715,9 @@ export default function CartPage() {
     setVerificationInfo("")
 
     try {
-      const checkoutClient = supabase
-      const checkoutReturnTo = localizedHref("/cart?checkout=1")
-      if (!checkoutClient) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
-        window.location.href = loginUrl
-        return
-      }
-
-      const { data: checkoutSessionData } = await checkoutClient.auth.getSession()
-      const accessToken = checkoutSessionData.session?.access_token ?? ""
-      if (!accessToken) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
-        window.location.href = loginUrl
-        return
-      }
-
       const response = await fetch("/api/checkout/verify-verification", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${accessToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challengeId: verificationChallengeId,
           otpCode: verificationCode.trim(),
@@ -853,14 +815,6 @@ export default function CartPage() {
     setPaypalInfo("")
 
     try {
-      const checkoutClient = supabase
-      const checkoutReturnTo = localizedHref("/cart?checkout=1")
-      if (!checkoutClient) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
-        window.location.href = loginUrl
-        return
-      }
-
       const normalizedDetails = getNormalizedCheckoutDetails()
 
       const checkoutItemsPayload = items.map((item) => ({
@@ -870,10 +824,10 @@ export default function CartPage() {
         variant: item.variant,
       }))
 
-      const { data: checkoutSessionData } = await checkoutClient.auth.getSession()
+      const { data: checkoutSessionData } = await supabase.auth.getSession()
       const accessToken = checkoutSessionData.session?.access_token ?? ""
       if (!accessToken) {
-        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(checkoutReturnTo)}&returnTo=${encodeURIComponent(checkoutReturnTo)}`
+        const loginUrl = `${localizedHref("/login")}?next=${encodeURIComponent(nextAddress)}&returnTo=${encodeURIComponent(returnTo)}`
         window.location.href = loginUrl
         return
       }

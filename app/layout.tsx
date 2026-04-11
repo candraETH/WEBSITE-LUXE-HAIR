@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { headers } from "next/headers"
 
 import './globals.css'
@@ -7,7 +9,7 @@ import { AppProviders } from './providers'
 import { getSiteUrl, SITE_NAME } from '@/lib/seo'
 import { localeFromPathname, swapLocaleInPathname } from "@/lib/i18n"
 import { getSiteCopy } from "@/lib/site-copy"
-import { AnalyticsClients } from "@/components/analytics-clients"
+import { AnalyticsSessionTracker } from "@/components/analytics-session-tracker"
 
 export const dynamic = "force-dynamic"
 
@@ -92,7 +94,9 @@ export default async function RootLayout({
         className={`${inter.variable} ${playfair.variable} font-sans antialiased`}
       >
         <AppProviders locale={locale}>{children}</AppProviders>
-        <AnalyticsClients />
+        <AnalyticsSessionTracker />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { WHATSAPP_ENABLED, getWhatsAppHref } from "@/lib/whatsapp-config"
@@ -11,6 +12,11 @@ export function Footer() {
   const { locale } = useLocale()
   const messages = getMessages(locale)
   const localizedHref = (href: string) => withLocaleHref(href, locale)
+  const [currentYear, setCurrentYear] = useState("")
+
+  useEffect(() => {
+    setCurrentYear(String(new Date().getFullYear()))
+  }, [])
 
   return (
     <footer className="border-t border-border bg-card">
@@ -146,7 +152,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-16 border-t border-border pt-8 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} CANDRA&apos;S HAIR. {messages.footer.rightsReserved}
+            &copy; {currentYear ? `${currentYear} ` : ""}CANDRA&apos;S HAIR. {messages.footer.rightsReserved}
           </p>
         </div>
       </div>

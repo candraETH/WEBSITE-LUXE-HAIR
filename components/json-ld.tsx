@@ -5,13 +5,12 @@ export async function JsonLd({ data }: { data: unknown }) {
   // Prevent `</script>`-style breakouts inside JSON-LD (XSS hardening).
   const payload = JSON.stringify(data).replace(/</g, "\\u003c")
   return (
-    <script
+    <div
       // Browsers can hide/empty the `nonce` attribute after parsing, which may cause React hydration warnings.
-      // This script never needs to hydrate, so we can safely suppress the mismatch warning.
+      // Wrapping the script lets React ignore that one-level child mismatch without affecting the page content.
       suppressHydrationWarning
-      nonce={nonce}
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: payload }}
-    />
+    >
+      <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: payload }} />
+    </div>
   )
 }
