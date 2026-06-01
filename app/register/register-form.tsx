@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -43,7 +44,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   const localizedHref = (href: string) => withLocaleHref(href, locale)
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [needsSignIn, setNeedsSignIn] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
@@ -92,17 +92,15 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   }
 
   async function handleGoogleSignIn() {
-    setSuccessMessage(null)
     setNeedsSignIn(false)
     form.clearErrors("root")
 
     if (!supabase) {
-      form.setError("root", {
-        message:
-          isRu
-            ? "Авторизация не настроена. Добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY."
-            : "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      })
+      toast.error(
+        isRu
+          ? "Авторизация не настроена. Обратитесь к администратору."
+          : "Authentication is not configured. Please contact support.",
+      )
       return
     }
 
@@ -115,7 +113,7 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       })
 
       if (error) {
-        form.setError("root", { message: error.message })
+        toast.error(error.message)
       }
     } finally {
       setIsSubmitting(false)
@@ -139,7 +137,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   })()}`
 
   async function handleContinueEmailStep() {
-    setSuccessMessage(null)
     setNeedsSignIn(false)
     form.clearErrors("root")
 
@@ -150,34 +147,32 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   }
 
   async function handleSubmit(values: RegisterValues) {
-    setSuccessMessage(null)
     setNeedsSignIn(false)
     form.clearErrors("root")
 
     if (!supabase) {
-      form.setError("root", {
-        message: isRu
-          ? "Авторизация не настроена. Добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в переменные окружения."
-          : "Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
-      })
+      toast.error(
+        isRu
+          ? "Авторизация не настроена. Обратитесь к администратору."
+          : "Authentication is not configured. Please contact support.",
+      )
       return
     }
 
     if (process.env.NODE_ENV === "production" && !captchaConfigured) {
-      form.setError("root", {
-        message:
-          isRu
-            ? "Для production нужна CAPTCHA. Добавьте NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
-            : "CAPTCHA is required in production. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY.",
-      })
+      toast.error(
+        isRu
+          ? "CAPTCHA обязательна. Добавьте NEXT_PUBLIC_HCAPTCHA_SITE_KEY."
+          : "CAPTCHA is required in production. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY.",
+      )
       return
     }
 
     if (captchaConfigured) {
       if (!captchaToken) {
-        form.setError("root", {
-          message: isRu ? "Пожалуйста, пройдите CAPTCHA." : "Please complete the CAPTCHA.",
-        })
+        toast.warning(
+          isRu ? "Пожалуйста, пройдите CAPTCHA." : "Please complete the CAPTCHA verification.",
+        )
         return
       }
 
@@ -191,11 +186,10 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       if (!captchaResponse.ok || !captchaPayload.ok) {
         setCaptchaToken(null)
         setCaptchaResetKey((current) => current + 1)
-        form.setError("root", {
-          message:
-            captchaPayload.error ||
-            (isRu ? "Не удалось пройти CAPTCHA." : "Unable to verify CAPTCHA."),
-        })
+        toast.error(
+          captchaPayload.error ||
+            (isRu ? "Не удалось пройти CAPTCHA." : "CAPTCHA verification failed. Please try again."),
+        )
         return
       }
     }
@@ -215,17 +209,23 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       if (signUpError) {
         setCaptchaToken(null)
         setCaptchaResetKey((current) => current + 1)
-        form.setError("root", { message: signUpError.message })
+        toast.error(signUpError.message)
         return
       }
 
       if (!data.session) {
         setCaptchaToken(null)
         setCaptchaResetKey((current) => current + 1)
-        setSuccessMessage(
+        toast.success(
           isRu
-            ? "Аккаунт создан. Проверьте email для подтверждения, затем войдите."
-            : "Account created. Please check your email to verify your account, then sign in."
+            ? "🎉 Аккаунт создан! Проверьте email для подтверждения и войдите."
+            : "🎉 Account created! Check your email to verify, then sign in.",
+          {
+            description: isRu
+              ? "Мы отправили письмо со ссылкой для подтверждения."
+              : "We've sent a verification link to your email.",
+            duration: 8000,
+          },
         )
         setNeedsSignIn(true)
         return
@@ -233,7 +233,9 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
 
       setCaptchaToken(null)
       setCaptchaResetKey((current) => current + 1)
-      setSuccessMessage(isRu ? "Аккаунт успешно создан." : "Account created successfully.")
+      toast.success(
+        isRu ? "🎉 Добро пожаловать!" : "🎉 Welcome to Candra's Hair!",
+      )
       const safeNext = sanitizeInternalPath(nextPath) ?? "/account/address/new"
       const safeReturnTo = sanitizeInternalPath(returnTo)
       const nextTarget = localizedHref(safeNext)
@@ -398,11 +400,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
 
               <HCaptchaChallenge action="register" resetKey={captchaResetKey} onTokenChange={setCaptchaToken} />
 
-              {form.formState.errors.root?.message ? (
-                <p className="text-sm font-medium text-destructive">{form.formState.errors.root.message}</p>
-              ) : null}
-              {successMessage ? <p className="text-sm text-foreground">{successMessage}</p> : null}
-
               {needsSignIn ? (
                 <Button asChild type="button" variant="outline" className="h-12 w-full rounded-2xl">
                   <Link href={loginHref}>{isRu ? "Перейти ко входу" : "Go to Sign In"}</Link>
@@ -435,10 +432,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
             </div>
           ) : (
             <div className="space-y-5">
-              {form.formState.errors.root?.message ? (
-                <p className="text-sm font-medium text-destructive">{form.formState.errors.root.message}</p>
-              ) : null}
-
               <Button
                 type="button"
                 className="h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-px hover:bg-primary/90"

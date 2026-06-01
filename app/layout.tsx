@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Toaster } from 'sonner'
 import { headers } from "next/headers"
 
 import './globals.css'
@@ -10,6 +11,7 @@ import { getSiteUrl, SITE_NAME } from '@/lib/seo'
 import { localeFromPathname, swapLocaleInPathname } from "@/lib/i18n"
 import { getSiteCopy } from "@/lib/site-copy"
 import { AnalyticsSessionTracker } from "@/components/analytics-session-tracker"
+import { GoogleAnalytics } from "@/components/google-analytics"
 
 export const dynamic = "force-dynamic"
 
@@ -72,6 +74,9 @@ export async function generateMetadata(): Promise<Metadata> {
       shortcut: "/images/logo-favicon.png",
       apple: "/images/logo-favicon.png",
     },
+    verification: {
+      google: "cTiEfK8W7LY5w5CT5cry7dgqtCDLm5dJksvoFKkPwSw",
+    },
   }
 }
 
@@ -94,7 +99,21 @@ export default async function RootLayout({
         className={`${inter.variable} ${playfair.variable} font-sans antialiased`}
       >
         <AppProviders locale={locale}>{children}</AppProviders>
+        <Toaster
+          position="top-center"
+          richColors
+          toastOptions={{
+            duration: 5000,
+            style: {
+              borderRadius: '16px',
+              padding: '16px 20px',
+              fontSize: '15px',
+              fontWeight: 500,
+            },
+          }}
+        />
         <AnalyticsSessionTracker />
+        <GoogleAnalytics />
         <Analytics />
         <SpeedInsights />
       </body>
