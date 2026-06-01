@@ -22,6 +22,7 @@ declare global {
       reset: (widgetId?: string) => void
       remove?: (widgetId: string) => void
     }
+    hcaptchaOnLoad?: () => void
   }
 }
 
@@ -32,6 +33,16 @@ type HCaptchaProps = {
 }
 
 const DEV_HCAPTCHA_SITE_KEY = "10000000-ffff-ffff-ffff-000000000001"
+
+// ── Register onload callback BEFORE script loads ──
+if (typeof window !== "undefined" && !window.hcaptchaOnLoad) {
+  const listeners: Array<() => void> = []
+  window.hcaptchaOnLoad = () => {
+    listeners.forEach((fn) => fn())
+  }
+  // Store listeners so component useEffects can subscribe
+  ;(window as any).__hcaptchaReadyListeners = listeners
+}
 
 function getSiteKey() {
   const configured = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim() ?? ""
@@ -55,8 +66,22 @@ export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0 }: HCapt
   }, [action, onTokenChange, resetKey])
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.hcaptcha) {
-      setScriptReady(true)
+    if (typeof window !== "undefined") {
+      // If already loaded, mark ready immediately
+      if (window.hcaptcha) {
+        setScriptReady(true)
+        return
+      }
+      // Otherwise wait for the onload callback
+      const listeners = (window as any).__hcaptchaReadyListeners as Array<() => void> | undefined
+      if (listeners) {
+        const onReady = () => setScriptReady(true)
+        listeners.push(onReady)
+        return () => {
+          const idx = listeners.indexOf(onReady)
+          if (idx !== -1) listeners.splice(idx, 1)
+        }
+      }
     }
   }, [])
 
@@ -122,7 +147,7 @@ export function HCaptchaChallenge({ action, onTokenChange, resetKey = 0 }: HCapt
   return (
     <>
       <Script
-        src="https://js.hcaptcha.com/1/api.js?render=explicit"
+        src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=hcaptchaOnLoad"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
         onReady={() => setScriptReady(true)}
