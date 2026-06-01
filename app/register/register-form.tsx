@@ -45,10 +45,11 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   const supabase = useMemo(() => getSupabaseBrowserClient(), [])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [needsSignIn, setNeedsSignIn] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaResetKey, setCaptchaResetKey] = useState(0)
   const [step, setStep] = useState<"email" | "details">("email")
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState("")
 
   const authEnabled = Boolean(supabase)
   const captchaConfigured = process.env.NODE_ENV === "production" || Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim())
@@ -92,7 +93,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   }
 
   async function handleGoogleSignIn() {
-    setNeedsSignIn(false)
     form.clearErrors("root")
 
     if (!supabase) {
@@ -137,7 +137,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   })()}`
 
   async function handleContinueEmailStep() {
-    setNeedsSignIn(false)
     form.clearErrors("root")
 
     const valid = await form.trigger("email")
@@ -147,7 +146,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
   }
 
   async function handleSubmit(values: RegisterValues) {
-    setNeedsSignIn(false)
     form.clearErrors("root")
 
     if (!supabase) {
@@ -214,25 +212,13 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
       }
 
       if (!data.session) {
-        setCaptchaToken(null)
-        setCaptchaResetKey((current) => current + 1)
-        toast.success(
-          isRu
-            ? "🎉 Аккаунт создан! Проверьте email для подтверждения и войдите."
-            : "🎉 Account created! Check your email to verify, then sign in.",
-          {
-            description: isRu
-              ? "Мы отправили письмо со ссылкой для подтверждения."
-              : "We've sent a verification link to your email.",
-            duration: 8000,
-          },
-        )
-        setNeedsSignIn(true)
+        // Email verification required — show success modal
+        setRegisteredEmail(values.email)
+        setShowSuccessModal(true)
         return
       }
 
-      setCaptchaToken(null)
-      setCaptchaResetKey((current) => current + 1)
+      // Auto-logged in — redirect
       toast.success(
         isRu ? "🎉 Добро пожаловать!" : "🎉 Welcome to Candra's Hair!",
       )
@@ -247,6 +233,55 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
     }
   }
 
+  // ── Success Modal ──
+  if (showSuccessModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="mx-4 w-full max-w-md animate-in zoom-in-95 fade-in duration-300">
+          <div className="rounded-[32px] border border-border/40 bg-card p-8 shadow-[0_28px_90px_rgba(31,24,18,0.12)] text-center">
+            {/* Green checkmark circle */}
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <svg
+                className="h-10 w-10 text-emerald-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            <h2 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
+              {isRu ? "Аккаунт создан!" : "Account created!"}
+            </h2>
+
+            <p className="mb-1 text-sm leading-relaxed text-muted-foreground">
+              {isRu
+                ? "Мы отправили ссылку для подтверждения на"
+                : "We sent a verification link to"}
+            </p>
+            <p className="mb-5 text-[15px] font-semibold text-foreground">
+              {registeredEmail}
+            </p>
+            <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
+              {isRu
+                ? "Проверьте почту и нажмите на ссылку, чтобы подтвердить аккаунт."
+                : "Check your inbox and click the link to verify your account."}
+            </p>
+
+            <Button asChild className="h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-px hover:bg-primary/90">
+              <Link href={loginHref}>
+                {isRu ? "Перейти ко входу →" : "Go to Sign In →"}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Register Form ──
   return (
     <div className="w-full rounded-[32px] border border-border/40 bg-card/95 p-5 shadow-[0_28px_90px_rgba(31,24,18,0.12)] backdrop-blur-xl sm:p-7">
       <div className="grid grid-cols-2 gap-2 rounded-[22px] border border-border/60 bg-muted/40 p-1.5">
@@ -399,12 +434,6 @@ export function RegisterForm({ nextPath, returnTo }: { nextPath?: string; return
               />
 
               <HCaptchaChallenge action="register" resetKey={captchaResetKey} onTokenChange={setCaptchaToken} />
-
-              {needsSignIn ? (
-                <Button asChild type="button" variant="outline" className="h-12 w-full rounded-2xl">
-                  <Link href={loginHref}>{isRu ? "Перейти ко входу" : "Go to Sign In"}</Link>
-                </Button>
-              ) : null}
 
               <Button
                 type="submit"
