@@ -9,6 +9,7 @@ import {
   Bell,
   Boxes,
   CalendarDays,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Package,
@@ -77,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/inventory", label: "Inventory", icon: Boxes },
   { href: "/admin/discounts", label: "Discounts", icon: Percent },
+  { href: "/admin/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
