@@ -368,6 +368,7 @@ export const BLOG_POSTS: BlogPost[] = [
         answer:
           "Yes. Many clients switch based on style goals. Decide by desired look, time budget, and maintenance capacity for the next cycle.",
       },
+    ],
   },
   {
     slug: "body-wave-vs-deep-wave-hair-comparison",
